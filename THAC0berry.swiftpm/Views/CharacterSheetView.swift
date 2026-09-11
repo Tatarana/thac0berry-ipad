@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// As folhas de um personagem: a ficha em si e uma folha de magias por dia
 /// de jogo. As abas de papel no alto trocam de folha, como quem passa as
@@ -22,17 +23,28 @@ struct CharacterSheetView: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 10)
 
-                switch page {
-                case .record:
-                    ScrollView { OfficialRecordSheet(character: $character).padding(18) }
-                case .spells(let id):
-                    spellSheet(id: id)
-                case .campaignIndex:
-                    ScrollView {
-                        CampaignIndexView(character: $character, page: $page)
-                            .padding(18)
+                ZStack {
+                    switch page {
+                    case .record:
+                        ScrollView { OfficialRecordSheet(character: $character).padding(18) }
+                            .transition(.opacity)
+                    case .spells:
+                        // Sem .id(id) aqui — o pager precisa continuar
+                        // sendo a MESMA instância de UIPageViewController
+                        // quando o dia muda, pra ele mesmo desenhar o
+                        // curl de verdade em vez da gente recriar a view
+                        // (o que só daria um corte seco).
+                        DayPagerView(character: $character, currentID: currentSpellSheetID)
+                            .transition(.opacity)
+                    case .campaignIndex:
+                        ScrollView {
+                            CampaignIndexView(character: $character, page: $page)
+                                .padding(18)
+                        }
+                        .transition(.opacity)
                     }
                 }
+                .animation(.easeInOut(duration: 0.3), value: page)
             }
         }
         // Se a classe mudou pra uma sem ficha de magia enquanto uma folha ou
@@ -45,65 +57,54 @@ struct CharacterSheetView: View {
             case .record: break
             }
         }
+        // O UIPageViewController do folhear de dias tem o próprio gesto de
+        // arrasto — que também mora bem na quina esquerda da tela, onde o
+        // NavigationStack reserva o "puxar da borda pra voltar" do sistema.
+        // Desligado pra sempre nesta tela (o botão de voltar da barra
+        // continua funcionando normal).
+        .background(
+            InteractivePopGestureConfigurator()
+                .frame(width: 0, height: 0)
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Paper.sheet, for: .navigationBar)
     }
 
-    @ViewBuilder
-    private func spellSheet(id: UUID) -> some View {
-        if let index = character.spellSheets.firstIndex(where: { $0.id == id }) {
-            ZStack {
-                ScrollView {
-                    SpellSheetView(sheet: $character.spellSheets[index],
-                                   character: character)
-                        .padding(18)
-                }
-                HStack {
-                    EdgeSwipeZone { navigateDay(from: id, forward: false) }
-                    Spacer()
-                    EdgeSwipeZone { navigateDay(from: id, forward: true) }
-                }
-            }
-        } else {
-            Text("This sheet is no longer in the folder.")
-                .font(Paper.printedItalic(14))
-                .foregroundStyle(Paper.inkSoft)
-                .padding(40)
-        }
-    }
-
-    /// Folheia pro dia anterior/seguinte, por data — dentro da mesma sessão
-    /// a maior parte do tempo, e passando pra sessão vizinha sozinho quando
-    /// chega na ponta, porque a ordem é só cronológica, sem parar em
-    /// fronteira de sessão de propósito.
-    private func navigateDay(from id: UUID, forward: Bool) {
-        let ordered = character.spellSheets.sorted { $0.date < $1.date }
-        guard let position = ordered.firstIndex(where: { $0.id == id }) else { return }
-        let nextIndex = forward ? position + 1 : position - 1
-        guard ordered.indices.contains(nextIndex) else { return }
-        page = .spells(ordered[nextIndex].id)
+    /// Ponte entre o `page` (que carrega o UUID só quando é a case
+    /// .spells) e o `currentID: UUID` que o DayPagerView espera — ele só
+    /// existe enquanto a case .spells está montada, então o valor de saída
+    /// nunca é realmente usado fora dela.
+    private var currentSpellSheetID: Binding<UUID> {
+        Binding(
+            get: {
+                if case .spells(let id) = page { return id }
+                return UUID()
+            },
+            set: { newID in page = .spells(newID) }
+        )
     }
 }
 
-/// Faixa fina e invisível na borda da tela pra folhear com o dedo sem
-/// disputar gesto com o scroll da folha nem com o traço da caneta nos
-/// contadores — só reconhece um arrasto que já começa bem na beirada, longo
-/// o bastante pra não disparar num toque comum.
-private struct EdgeSwipeZone: View {
-    let action: () -> Void
+/// Um UIViewController "fantasma", sem conteúdo visível, só pra alcançar o
+/// UINavigationController de dentro do SwiftUI e desligar o
+/// `interactivePopGestureRecognizer` (o "puxar da borda esquerda pra
+/// voltar" do sistema) nesta tela inteira. Fica desligado o tempo todo, não
+/// só enquanto uma folha está aberta — ligar e desligar junto com a página
+/// deixava uma janela de corrida bem na hora do gesto, e um arrasto um
+/// pouco impreciso acabava puxando a tela inteira de volta pra lista de
+/// personagens. O botão de voltar da barra de navegação continua ali pra
+/// sair desta tela normalmente.
+private struct InteractivePopGestureConfigurator: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        DispatchQueue.main.async {
+            controller.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
+        }
+        return controller
+    }
 
-    var body: some View {
-        Color.clear
-            .frame(width: 22)
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 32)
-                    .onEnded { value in
-                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                        action()
-                    }
-            )
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        uiViewController.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
     }
 }
 
@@ -167,20 +168,14 @@ private struct SheetTabs: View {
             }
 
             if showSessionStrip, let expanded = expandedSession {
-                HStack(spacing: 6) {
-                    ForEach(daySheets(in: expanded)) { sheet in
-                        DayChip(title: sheet.displayTitle,
-                                isSelected: page == .spells(sheet.id)) {
-                            page = .spells(sheet.id)
-                        }
-                        .contextMenu {
-                            if character.spellSheets.count > 1 {
-                                Button("Delete sheet", role: .destructive) { deleteSheet(sheet) }
-                            }
-                        }
-                    }
-                }
-                .padding(.leading, 2)
+                DayThreadRow(
+                    sheets: daySheets(in: expanded),
+                    currentID: currentSpellSheetID,
+                    onSelect: { sheet in page = .spells(sheet.id) },
+                    onDelete: deleteSheet,
+                    canDelete: character.spellSheets.count > 1
+                )
+                .padding(.leading, 4)
             }
         }
         .onChange(of: page) { _, newPage in
@@ -203,6 +198,11 @@ private struct SheetTabs: View {
     private var expandedSession: Session? {
         guard let id = expandedSessionID else { return nil }
         return character.sessions.first { $0.id == id }
+    }
+
+    private var currentSpellSheetID: UUID? {
+        if case .spells(let id) = page { return id }
+        return nil
     }
 
     private func daySheets(in session: Session) -> [SpellSheet] {
@@ -299,8 +299,11 @@ private struct SessionDivisory: View {
                 .background(color.opacity(isSelected ? 0.95 : 0.6))
                 .clipShape(divisoryShape)
                 .overlay(divisoryShape.stroke(Paper.ink, lineWidth: 1.2))
+                .shadow(color: Paper.ink.opacity(isSelected ? 0.22 : 0), radius: 2.5, y: 1.5)
+                .offset(y: isSelected ? -2 : 0)
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.78), value: isSelected)
     }
 
     private var divisoryShape: UnevenRoundedRectangle {
@@ -317,27 +320,79 @@ private struct SessionDivisory: View {
     }
 }
 
-/// Um chip de dia, na sub-fileira que aparece embaixo da divisória
-/// expandida — o mesmo visual que as abas de dia tinham antes, só que
-/// agora escopado a uma sessão.
-private struct DayChip: View {
-    let title: String
+/// Os dias de uma sessão — não mais uma fileira de caixinhas, e sim contas
+/// de tinta enfiadas numa linha de costura pontilhada, como as folhas de um
+/// caderno costurado à mão (um "signature" de encadernação). Cada dia é um
+/// pingo redondo com o número dentro; o aberto cresce, ganha tinta cheia e
+/// sombra, os outros ficam pequenos e ocos, todos pendurados na mesma
+/// linha. O título de verdade do dia (pode ter sido renomeado) some
+/// discretamente por baixo, junto do pingo aberto.
+private struct DayThreadRow: View {
+    let sheets: [SpellSheet]
+    let currentID: UUID?
+    let onSelect: (SpellSheet) -> Void
+    let onDelete: (SpellSheet) -> Void
+    let canDelete: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 13) {
+                ForEach(Array(sheets.enumerated()), id: \.element.id) { index, sheet in
+                    InkDayBead(number: index + 1, isSelected: sheet.id == currentID) {
+                        onSelect(sheet)
+                    }
+                    .contextMenu {
+                        if canDelete {
+                            Button("Delete sheet", role: .destructive) { onDelete(sheet) }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 3)
+            .background(alignment: .leading) {
+                GeometryReader { geometry in
+                    Path { path in
+                        path.move(to: CGPoint(x: 9, y: geometry.size.height / 2))
+                        path.addLine(to: CGPoint(x: geometry.size.width - 9, y: geometry.size.height / 2))
+                    }
+                    .stroke(Paper.inkSoft.opacity(0.5),
+                           style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
+                }
+            }
+
+            if let title = currentTitle {
+                Text(title)
+                    .font(Paper.printedItalic(10.5))
+                    .foregroundStyle(Paper.inkSoft)
+                    .padding(.leading, 3)
+            }
+        }
+    }
+
+    private var currentTitle: String? {
+        sheets.first { $0.id == currentID }?.displayTitle
+    }
+}
+
+private struct InkDayBead: View {
+    let number: Int
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(Paper.printed(11))
-                .tracking(1)
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? Paper.sheet : Paper.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(isSelected ? Paper.ink : Color.white.opacity(0.14))
-                .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+            ZStack {
+                Circle().fill(isSelected ? Paper.penInk : Paper.sheet)
+                Circle().stroke(Paper.ink, lineWidth: isSelected ? 1.6 : 1)
+                Text("\(number)")
+                    .font(Paper.hand(isSelected ? 15 : 11))
+                    .foregroundStyle(isSelected ? Paper.sheet : Paper.inkSoft)
+            }
+            .frame(width: isSelected ? 30 : 20, height: isSelected ? 30 : 20)
+            .shadow(color: Paper.ink.opacity(isSelected ? 0.3 : 0), radius: 3, y: 1.5)
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.32, dampingFraction: 0.72), value: isSelected)
     }
 }
 

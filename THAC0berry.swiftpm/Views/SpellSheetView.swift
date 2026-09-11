@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A folha de magias de um dia de jogo, no formato do registro oficial:
 /// um quadro por círculo, com as bolinhas de slot no cabeçalho e a tabela
@@ -355,41 +356,30 @@ private struct MemorizedRow: View {
             }
         }
         .contentShape(Rectangle())
-        // simultaneousGesture, não gesture: a linha vive dentro de um
-        // ScrollView (a folha inteira rola), e um DragGesture "exclusivo"
-        // roubaria o toque do scroll antes dele reconhecer o arrasto vertical.
-        .simultaneousGesture(rowGesture)
-    }
-
-    /// Um único reconhecedor por linha: sem arrasto é toque (abre a
-    /// descrição); um arrasto majoritariamente horizontal cobrindo uns 30%
-    /// do campo do nome já risca a magia — não precisa ir até a metade.
-    private var rowGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                let dx = value.translation.width
-                let dy = abs(value.translation.height)
-                guard dx > 12, dx > dy else { return }
-                isStriking = true
-                strikeWidth = min(dx, rowWidth)
-            }
-            .onEnded { value in
-                let dx = value.translation.width
-                let dy = abs(value.translation.height)
-                let isTap = abs(dx) < 8 && dy < 8
-                let coveredEnough = rowWidth > 0 && dx > rowWidth * 0.3 && dy < 30
-
-                withAnimation(.easeOut(duration: 0.15)) {
-                    isStriking = false
-                    strikeWidth = 0
+        // Riscar com o dedo, sem querer, era confundido com o gesto de
+        // virar a página — o DragGesture do SwiftUI não tem como saber qual
+        // ferramenta fez o toque. `StrikeInteraction` é UIKit puro por
+        // baixo: só a Apple Pencil risca; um arrasto de dedo falha na hora
+        // e sobe livre pro UIPageViewController folhear. O toque simples
+        // (abrir a descrição) continua funcionando com as duas.
+        .overlay(
+            StrikeInteraction(
+                onTap: onShowDetail,
+                onStrikeChanged: { dx, dy in
+                    guard dx > 12, dx > dy else { return }
+                    isStriking = true
+                    strikeWidth = min(dx, rowWidth)
+                },
+                onStrikeEnded: { dx, dy in
+                    let coveredEnough = rowWidth > 0 && dx > rowWidth * 0.3 && dy < 30
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        isStriking = false
+                        strikeWidth = 0
+                    }
+                    if coveredEnough { onStrike() }
                 }
-
-                if isTap {
-                    onShowDetail()
-                } else if coveredEnough {
-                    onStrike()
-                }
-            }
+            )
+        )
     }
 
     private var name: String {
@@ -441,6 +431,98 @@ private struct MemorizedRow: View {
 }
 
 // MARK: - Turn Undead
+
+/// Cobre uma linha de `MemorizedRow` com dois reconhecedores UIKit em vez
+/// do `DragGesture` do SwiftUI, porque só o UIKit sabe dizer qual
+/// ferramenta fez o toque:
+/// - um toque simples (dedo OU caneta) abre a descrição da magia;
+/// - um arrasto só é aceito da Apple Pencil e risca a magia — um arrasto de
+///   dedo faz o reconhecedor falhar na hora, sem consumir o gesto, e sobe
+///   livre pro `UIPageViewController` folhear a página por trás.
+private struct StrikeInteraction: UIViewRepresentable {
+    let onTap: () -> Void
+    let onStrikeChanged: (_ dx: CGFloat, _ dy: CGFloat) -> Void
+    let onStrikeEnded: (_ dx: CGFloat, _ dy: CGFloat) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                          action: #selector(Coordinator.handleTap))
+        view.addGestureRecognizer(tap)
+
+        let pan = PencilOnlyPanGestureRecognizer(target: context.coordinator,
+                                                  action: #selector(Coordinator.handlePan(_:)))
+        pan.delegate = context.coordinator
+        view.addGestureRecognizer(pan)
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onTap = onTap
+        context.coordinator.onStrikeChanged = onStrikeChanged
+        context.coordinator.onStrikeEnded = onStrikeEnded
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTap: onTap, onStrikeChanged: onStrikeChanged, onStrikeEnded: onStrikeEnded)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var onTap: () -> Void
+        var onStrikeChanged: (_ dx: CGFloat, _ dy: CGFloat) -> Void
+        var onStrikeEnded: (_ dx: CGFloat, _ dy: CGFloat) -> Void
+
+        init(onTap: @escaping () -> Void,
+             onStrikeChanged: @escaping (_ dx: CGFloat, _ dy: CGFloat) -> Void,
+             onStrikeEnded: @escaping (_ dx: CGFloat, _ dy: CGFloat) -> Void) {
+            self.onTap = onTap
+            self.onStrikeChanged = onStrikeChanged
+            self.onStrikeEnded = onStrikeEnded
+        }
+
+        @objc func handleTap() {
+            onTap()
+        }
+
+        @objc func handlePan(_ recognizer: UIPanGestureRecognizer) {
+            let translation = recognizer.translation(in: recognizer.view)
+            switch recognizer.state {
+            case .changed:
+                onStrikeChanged(translation.x, abs(translation.y))
+            case .ended:
+                onStrikeEnded(translation.x, abs(translation.y))
+            case .cancelled, .failed:
+                onStrikeEnded(0, 0)
+            default:
+                break
+            }
+        }
+
+        // Permite que o gesto de risco conviva com o scroll da folha (e com
+        // a virada de página) em vez de brigar por exclusividade — quem
+        // decide se o risco "vale" é a lógica de dx/dy nos closures, não a
+        // exclusividade do reconhecedor.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
+    }
+}
+
+/// Um `UIPanGestureRecognizer` que só reconhece a Apple Pencil — qualquer
+/// toque de dedo faz o reconhecedor falhar imediatamente, sem consumir o
+/// gesto, deixando-o livre pro gesto de virar página por trás.
+private final class PencilOnlyPanGestureRecognizer: UIPanGestureRecognizer {
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesBegan(touches, with: event)
+        if touches.contains(where: { $0.type != .pencil }) {
+            state = .failed
+        }
+    }
+}
 
 /// Todo padre expulsa mortos-vivos — sem teto de tentativas por dia (em 2e
 /// só a rolagem decide se funciona, não uma carga que acaba), então é só
