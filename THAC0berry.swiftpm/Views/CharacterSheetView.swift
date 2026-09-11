@@ -10,6 +10,7 @@ struct CharacterSheetView: View {
     enum SheetPage: Hashable {
         case record
         case spells(UUID)
+        case campaignIndex
     }
 
     var body: some View {
@@ -26,14 +27,22 @@ struct CharacterSheetView: View {
                     ScrollView { OfficialRecordSheet(character: $character).padding(18) }
                 case .spells(let id):
                     spellSheet(id: id)
+                case .campaignIndex:
+                    ScrollView {
+                        CampaignIndexView(character: $character, page: $page)
+                            .padding(18)
+                    }
                 }
             }
         }
-        // Se a classe mudou pra uma sem ficha de magia enquanto uma folha
-        // estava aberta, volta pra Ficha — a aba nem existe mais.
+        // Se a classe mudou pra uma sem ficha de magia enquanto uma folha ou
+        // o índice estavam abertos, volta pra Ficha — nenhuma das duas abas
+        // existe mais.
         .onChange(of: character.characterClass) { _, newClass in
-            if !newClass.hasSpellSheet, case .spells = page {
-                page = .record
+            guard !newClass.hasSpellSheet else { return }
+            switch page {
+            case .spells, .campaignIndex: page = .record
+            case .record: break
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -43,17 +52,58 @@ struct CharacterSheetView: View {
     @ViewBuilder
     private func spellSheet(id: UUID) -> some View {
         if let index = character.spellSheets.firstIndex(where: { $0.id == id }) {
-            ScrollView {
-                SpellSheetView(sheet: $character.spellSheets[index],
-                               character: character)
-                    .padding(18)
+            ZStack {
+                ScrollView {
+                    SpellSheetView(sheet: $character.spellSheets[index],
+                                   character: character)
+                        .padding(18)
+                }
+                HStack {
+                    EdgeSwipeZone { navigateDay(from: id, forward: false) }
+                    Spacer()
+                    EdgeSwipeZone { navigateDay(from: id, forward: true) }
+                }
             }
         } else {
-            Text("Essa folha não está mais na pasta.")
+            Text("This sheet is no longer in the folder.")
                 .font(Paper.printedItalic(14))
                 .foregroundStyle(Paper.inkSoft)
                 .padding(40)
         }
+    }
+
+    /// Folheia pro dia anterior/seguinte, por data — dentro da mesma sessão
+    /// a maior parte do tempo, e passando pra sessão vizinha sozinho quando
+    /// chega na ponta, porque a ordem é só cronológica, sem parar em
+    /// fronteira de sessão de propósito.
+    private func navigateDay(from id: UUID, forward: Bool) {
+        let ordered = character.spellSheets.sorted { $0.date < $1.date }
+        guard let position = ordered.firstIndex(where: { $0.id == id }) else { return }
+        let nextIndex = forward ? position + 1 : position - 1
+        guard ordered.indices.contains(nextIndex) else { return }
+        page = .spells(ordered[nextIndex].id)
+    }
+}
+
+/// Faixa fina e invisível na borda da tela pra folhear com o dedo sem
+/// disputar gesto com o scroll da folha nem com o traço da caneta nos
+/// contadores — só reconhece um arrasto que já começa bem na beirada, longo
+/// o bastante pra não disparar num toque comum.
+private struct EdgeSwipeZone: View {
+    let action: () -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 22)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 32)
+                    .onEnded { value in
+                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                        action()
+                    }
+            )
     }
 }
 
@@ -62,84 +112,139 @@ struct CharacterSheetView: View {
 private struct SheetTabs: View {
     @Binding var character: PlayerCharacter
     @Binding var page: CharacterSheetView.SheetPage
+    @State private var expandedSessionID: UUID? = nil
+
+    /// Quantas divisórias de sessão cabem na faixa antes de precisar abrir
+    /// o índice inteiro — mesma ideia de antes com os dias.
+    private let maxVisibleSessions = 4
 
     var body: some View {
-        // Só quem tem ficha de magia (Clérigo, por ora) ganha as abas de
-        // folha do dia — as outras classes só veem "Ficha".
+        // Só quem tem ficha de magia (Clérigo, por ora) ganha as divisórias
+        // de sessão — as outras classes só veem "Sheet".
         let hasSpellSheet = character.characterClass.hasSpellSheet
-        let sheets: [SpellSheet] = hasSpellSheet ? character.sortedSpellSheets : []
+        // A fileira de sessões/dias fica escondida quando o índice já está
+        // aberto — mostrar a mesma lista de sessões duas vezes (na fileira
+        // de abas e no corpo do índice) não faz sentido nenhum.
+        let showSessionStrip = hasSpellSheet && page != .campaignIndex
 
-        HStack(alignment: .bottom, spacing: 6) {
-            PaperTab(title: "Ficha", isSelected: page == .record) {
-                page = .record
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .bottom, spacing: 6) {
+                PaperTab(title: "Sheet", isSelected: page == .record) {
+                    page = .record
+                }
 
-            if hasSpellSheet {
-                ForEach(sheets.prefix(3)) { sheet in
-                    PaperTab(title: sheet.displayTitle,
-                             isSelected: page == .spells(sheet.id)) {
-                        page = .spells(sheet.id)
-                    }
-                    .contextMenu {
-                        if sheets.count > 1 {
-                            Button("Apagar folha", role: .destructive) { deleteSheet(sheet) }
-                        }
+                if showSessionStrip {
+                    ForEach(recentSessions) { session in
+                        SessionDivisory(
+                            session: session,
+                            color: character.sessionColor(session),
+                            isSelected: expandedSessionID == session.id || isShowingSheet(in: session),
+                            action: { selectSession(session) }
+                        )
                     }
                 }
 
-                if sheets.count > 3 {
-                    Menu {
-                        ForEach(sheets) { sheet in
-                            Menu(sheet.displayTitle) {
-                                Button("Abrir") { page = .spells(sheet.id) }
-                                if sheets.count > 1 {
-                                    Button("Apagar", role: .destructive) { deleteSheet(sheet) }
-                                }
+                if hasSpellSheet {
+                    PaperTab(title: "index", isSelected: page == .campaignIndex) {
+                        page = .campaignIndex
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                if hasSpellSheet {
+                    Button(action: newSheet) {
+                        Text("+ day sheet")
+                            .font(Paper.printed(12))
+                            .tracking(1)
+                            .foregroundStyle(Paper.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.2))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if showSessionStrip, let expanded = expandedSession {
+                HStack(spacing: 6) {
+                    ForEach(daySheets(in: expanded)) { sheet in
+                        DayChip(title: sheet.displayTitle,
+                                isSelected: page == .spells(sheet.id)) {
+                            page = .spells(sheet.id)
+                        }
+                        .contextMenu {
+                            if character.spellSheets.count > 1 {
+                                Button("Delete sheet", role: .destructive) { deleteSheet(sheet) }
                             }
                         }
-                    } label: {
-                        PaperTabLabel(title: "outras folhas", isSelected: false)
                     }
                 }
+                .padding(.leading, 2)
             }
-
-            Spacer(minLength: 0)
-
-            if hasSpellSheet {
-                Button(action: newSheet) {
-                    Text("+ folha do dia")
-                        .font(Paper.printed(12))
-                        .tracking(1)
-                        .foregroundStyle(Paper.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.2))
-                }
-                .buttonStyle(.plain)
+        }
+        .onChange(of: page) { _, newPage in
+            // A sub-fileira de dias sempre acompanha a folha aberta, mesmo
+            // quando ela foi aberta por outro caminho (índice, swipe).
+            if case .spells(let id) = newPage,
+               let sheet = character.spellSheets.first(where: { $0.id == id }),
+               let sessionID = sheet.sessionID {
+                expandedSessionID = sessionID
             }
         }
     }
 
-    /// Nova folha herda o que estava preparado no dia anterior, com os
-    /// slots já zerados — que é o que o repouso faz na regra — mas a
-    /// quantidade de slots em si vem de "Spell Slots" na ficha, não do dia
-    /// anterior. Se o personagem subiu de nível ou você corrigiu a tabela,
-    /// a folha nova já nasce certa.
+    private var recentSessions: [Session] {
+        Array(character.sessions.filter { !$0.isArchived }
+            .sorted { $0.date > $1.date }
+            .prefix(maxVisibleSessions))
+    }
+
+    private var expandedSession: Session? {
+        guard let id = expandedSessionID else { return nil }
+        return character.sessions.first { $0.id == id }
+    }
+
+    private func daySheets(in session: Session) -> [SpellSheet] {
+        character.spellSheets
+            .filter { $0.sessionID == session.id }
+            .sorted { $0.date < $1.date }
+    }
+
+    private func isShowingSheet(in session: Session) -> Bool {
+        guard case .spells(let id) = page else { return false }
+        return daySheets(in: session).contains { $0.id == id }
+    }
+
+    private func selectSession(_ session: Session) {
+        expandedSessionID = session.id
+        if let latest = daySheets(in: session).max(by: { $0.date < $1.date }) {
+            page = .spells(latest.id)
+        }
+    }
+
+    /// Nova folha herda o que estava preparado no dia anterior da mesma
+    /// sessão, com os slots já zerados — que é o que o repouso faz na
+    /// regra — mas a quantidade de slots em si vem de "Spell Slots" na
+    /// ficha. Sem sessão ativa pra hoje, `activeSession()` cria uma sozinha.
     private func newSheet() {
-        let previous: SpellSheet? = character.sortedSpellSheets.first
+        let session = character.activeSession()
+        let previous = daySheets(in: session).last
         var sheet: SpellSheet = previous?.nextDay(keepingPreparations: true) ?? SpellSheet()
+        sheet.sessionID = session.id
         sheet.slotBoard = reconciled(sheet.slotBoard, with: character.spellSlotAllotments)
-        sheet.title = "Dia \(character.spellSheets.count + 1)"
+        sheet.title = "Dia \(daySheets(in: session).count + 1)"
         // Congela a Sabedoria de hoje na folha nova — é o valor que vale
         // pra esse dia, mesmo que o personagem mude depois.
         sheet.wisdomAtCreation = character.abilities.wisdom
         character.spellSheets.append(sheet)
+        expandedSessionID = session.id
         page = .spells(sheet.id)
     }
 
-    /// Apaga uma folha (segurando o dedo em cima dela, ou pelo menu de
-    /// "outras folhas"). Sempre sobra pelo menos uma — não dá pra apagar
-    /// a última, senão o personagem fica sem nenhuma folha pra abrir.
+    /// Apaga uma folha (pelo menu de contexto de um chip de dia). Sempre
+    /// sobra pelo menos uma no personagem inteiro — apagar sessões inteiras
+    /// é feito pelo índice, que não tem essa trava.
     private func deleteSheet(_ sheet: SpellSheet) {
         guard character.spellSheets.count > 1 else { return }
         let wasShowing = page == .spells(sheet.id)
@@ -170,6 +275,69 @@ private struct SheetTabs: View {
         }
 
         return result
+    }
+}
+
+/// Uma divisória de sessão — a metáfora de fichário: um retângulo colorido
+/// com os cantos de cima arredondados, "saindo" da faixa de abas.
+private struct SessionDivisory: View {
+    let session: Session
+    let color: Color
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(shortLabel)
+                .font(Paper.printed(11))
+                .tracking(0.6)
+                .lineLimit(1)
+                .foregroundStyle(Paper.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, isSelected ? 8 : 6)
+                .frame(minWidth: 64)
+                .background(color.opacity(isSelected ? 0.95 : 0.6))
+                .clipShape(divisoryShape)
+                .overlay(divisoryShape.stroke(Paper.ink, lineWidth: 1.2))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var divisoryShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: 7, bottomLeadingRadius: 0,
+                               bottomTrailingRadius: 0, topTrailingRadius: 7)
+    }
+
+    private var shortLabel: String {
+        if !session.title.isEmpty { return session.title }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter.string(from: session.date)
+    }
+}
+
+/// Um chip de dia, na sub-fileira que aparece embaixo da divisória
+/// expandida — o mesmo visual que as abas de dia tinham antes, só que
+/// agora escopado a uma sessão.
+private struct DayChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(Paper.printed(11))
+                .tracking(1)
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? Paper.sheet : Paper.ink)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(isSelected ? Paper.ink : Color.white.opacity(0.14))
+                .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -394,7 +562,9 @@ struct ClassField: View {
     private func select(_ option: CharacterClass) {
         character.characterClass = option
         guard option.hasSpellSheet, character.spellSheets.isEmpty else { return }
+        let session = character.activeSession()
         var sheet = SpellSheet()
+        sheet.sessionID = session.id
         sheet.title = "Primeiro dia"
         sheet.wisdomAtCreation = character.abilities.wisdom
         sheet.slotBoard = character.freshSlotBoard()

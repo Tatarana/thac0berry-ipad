@@ -11,6 +11,10 @@ import Foundation
 struct SpellSheet: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var date: Date = Date()
+    /// A sessão de mesa (data real) a que esse dia pertence. `nil` só em
+    /// folhas de uma versão anterior a Sessão — `migrateLegacySheetsIfNeeded`
+    /// resolve isso na primeira leitura.
+    var sessionID: UUID? = nil
     /// Como você chama esse dia na mesa ("3º dia em Elturel").
     var title: String = ""
     /// Os slots e o que foi memorizado neles neste dia.
@@ -38,7 +42,7 @@ struct SpellSheet: Codable, Identifiable, Hashable {
         if !title.isEmpty { return title }
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
-        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.locale = Locale(identifier: "en_US")
         return formatter.string(from: date)
     }
 

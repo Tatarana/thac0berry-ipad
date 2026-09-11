@@ -277,6 +277,23 @@ enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
     var hasSpellSheet: Bool { self == .cleric }
 }
 
+/// Uma sessão de mesa — a data real em que ela aconteceu, não a data do
+/// jogo. Cada folha de magia (`SpellSheet`) pertence a uma sessão através
+/// de `sessionID`; a sessão em si só guarda o cabeçalho (data, título,
+/// resumo), nunca as folhas — evita o mesmo tipo de binding aninhado que
+/// já doeu com os slots.
+struct Session: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    /// A data real da mesa — o dia em que vocês jogaram, não um dia dentro
+    /// da história.
+    var date: Date = Date()
+    var title: String = ""
+    var summary: String = ""
+    /// Sessões encerradas somem da faixa de abas e da lista principal do
+    /// índice, mas os dados continuam intactos — arquivar nunca apaga.
+    var isArchived: Bool = false
+}
+
 struct PlayerCharacter: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var name: String = ""
@@ -329,6 +346,12 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// discordariam sobre quantos slots ele tem.
     var spellSlotAllotments: [SpellSlotAllotment] = []
 
+    /// As sessões de mesa da campanha — cada uma agrupa um punhado de
+    /// folhas de dia. Vive à parte das folhas pelo mesmo motivo que os
+    /// slots: evita binding aninhado, e permite arquivar sem mexer nas
+    /// folhas em si.
+    var sessions: [Session] = []
+
     /// Uma grade de slots em branco (sem nada preparado ainda), do
     /// tamanho que a ficha do personagem diz que ele tem hoje.
     func freshSlotBoard() -> SpellSlotBoard {
@@ -342,6 +365,32 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// Folhas em ordem, da mais recente para a mais antiga.
     var sortedSpellSheets: [SpellSheet] {
         spellSheets.sorted { $0.date > $1.date }
+    }
+
+    /// A sessão "ativa": a mais recente que não está arquivada. Se não
+    /// existir nenhuma (personagem novo, ou todas encerradas), cria uma
+    /// sozinha, datada de hoje — é nela que "+ folha do dia" vai escrever.
+    @discardableResult
+    mutating func activeSession() -> Session {
+        if let existing = sessions.filter({ !$0.isArchived }).max(by: { $0.date < $1.date }) {
+            return existing
+        }
+        let created = Session(date: Date())
+        sessions.append(created)
+        return created
+    }
+
+    /// Antes de existir Sessão, as folhas viviam soltas na pasta. Na
+    /// primeira leitura de uma ficha salva por uma versão anterior, agrupa
+    /// as folhas órfãs numa sessão só, datada da mais antiga delas — sem
+    /// isso elas sumiriam da faixa de abas, que agora navega por sessão.
+    mutating func migrateLegacySheetsIfNeeded() {
+        let orphanIndices = spellSheets.indices.filter { spellSheets[$0].sessionID == nil }
+        guard !orphanIndices.isEmpty else { return }
+        let earliest = orphanIndices.map { spellSheets[$0].date }.min() ?? Date()
+        let legacy = Session(date: earliest, title: "Sessões antigas")
+        sessions.append(legacy)
+        for index in orphanIndices { spellSheets[index].sessionID = legacy.id }
     }
 
     /// A folha do dia em andamento — a última criada.

@@ -91,7 +91,19 @@ extension PlayerCharacter {
         kelmon.spellSlotAllotments = kelmonPreparation.map { level, spellIDs in
             SpellSlotAllotment(caster: .divine, level: level, count: spellIDs.count)
         }
-        kelmon.spellSheets = [kelmonYesterday(), kelmonToday()]
+
+        // Duas sessões de mesa de exemplo, pra mostrar o índice da campanha
+        // já povoado: a chegada em Elturel (ontem) e a sessão de hoje.
+        let arrivalSession = Session(date: Date().addingTimeInterval(-26 * 3600),
+                                     title: "Chegada em Elturel")
+        let todaySession = Session(date: Date(), title: "A trilha do templo")
+        kelmon.sessions = [arrivalSession, todaySession]
+
+        var yesterday = kelmonYesterday()
+        yesterday.sessionID = arrivalSession.id
+        var today = kelmonToday()
+        today.sessionID = todaySession.id
+        kelmon.spellSheets = [yesterday, today]
         return kelmon
     }
 

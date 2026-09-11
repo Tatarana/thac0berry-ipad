@@ -35,7 +35,13 @@ final class CharacterLibrary: ObservableObject {
             let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            characters = try decoder.decode([PlayerCharacter].self, from: data)
+            var decoded = try decoder.decode([PlayerCharacter].self, from: data)
+            // Fichas salvas antes de existir Sessão ganham uma sessão
+            // "Sessões antigas" agrupando as folhas soltas.
+            for index in decoded.indices {
+                decoded[index].migrateLegacySheetsIfNeeded()
+            }
+            characters = decoded
         } catch {
             // JSON gravado por uma versão anterior (sem equipamento, divindade
             // etc.) não decodifica. Melhor abrir com a ficha de exemplo do que

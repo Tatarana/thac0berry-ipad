@@ -21,6 +21,17 @@ enum Paper {
     /// não ser confundido de relance com a tarja preta dos círculos de magia.
     static let turnHeader = Color(red: 0.361, green: 0.145, blue: 0.129)
 
+    /// Paleta pastel das divisórias de sessão — tons discretos que ainda
+    /// combinam com o papel, em vez de cor saturada de app.
+    static let sessionPalette: [Color] = [
+        Color(red: 0.80, green: 0.62, blue: 0.38),  // ocre
+        Color(red: 0.55, green: 0.64, blue: 0.52),  // salvia
+        Color(red: 0.54, green: 0.60, blue: 0.72),  // azul-acinzentado
+        Color(red: 0.76, green: 0.48, blue: 0.42),  // terracota
+        Color(red: 0.66, green: 0.55, blue: 0.72),  // ameixa
+        Color(red: 0.80, green: 0.70, blue: 0.36)   // mostarda
+    ]
+
     // MARK: - Tipografia
 
     /// Texto impresso da ficha: rótulos, títulos, notas de rodapé.
@@ -78,6 +89,18 @@ enum Paper {
 
         return Image(decorative: cgImage, scale: 2)
     }()
+}
+
+extension PlayerCharacter {
+    /// Cor da divisória de uma sessão — sempre a mesma pra mesma sessão,
+    /// calculada pela posição cronológica dela entre todas as sessões (não
+    /// pela posição na lista filtrada/ordenada de exibição), pra não mudar
+    /// de cor conforme sessões são arquivadas ou criadas.
+    func sessionColor(_ session: Session) -> Color {
+        let chronological = sessions.sorted { $0.date < $1.date }
+        let index = chronological.firstIndex { $0.id == session.id } ?? 0
+        return Paper.sessionPalette[index % Paper.sessionPalette.count]
+    }
 }
 
 /// Fundo de pergaminho: base, manchas de envelhecimento, grão e sombra das
