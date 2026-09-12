@@ -24,7 +24,7 @@ struct Spell: Codable, Identifiable, Hashable {
     let name: String
     let level: Int
     let caster: CasterType
-    /// Escola (mago) ou esfera (sacerdote).
+    /// Escola de magia, como no livro ("Evocation", "Enchantment/Charm").
     let school: String
     /// Tempo de conjuração — em 2e é isso que entra no cálculo de iniciativa.
     let castingTime: String
@@ -37,6 +37,7 @@ struct Spell: Codable, Identifiable, Hashable {
     /// Fica intacto para a janela de descrição — quem calcula o valor do
     /// personagem é `damageDice`.
     let damage: String?
+    /// Resumo de uma linha, para lembrar rápido o que a magia faz.
     let summary: String
     /// Versão estruturada de `damage`, quando dá para reduzir a um dado +
     /// bônus. É o que a tabela da folha de magias usa para mostrar o valor
@@ -44,6 +45,17 @@ struct Spell: Codable, Identifiable, Hashable {
     /// `nil` quando a magia não tem dano numérico (ou o texto é livre
     /// demais para modelar, como "quase todos os PV" de Heal).
     let damageDice: SpellDamage?
+    /// Esferas de acesso (só faz sentido para sacerdote — ver TODO.md
+    /// item 4). Vazio para magias de mago ou entradas de exemplo antigas.
+    var spheres: [String] = []
+    /// Texto completo da descrição, quando disponível — `summary` continua
+    /// sendo o resumo curto usado no resto do app; este campo é só para a
+    /// janela de detalhe (`SpellDetailSheet`).
+    var fullDescription: String? = nil
+    /// Cenário/ambientação pra qual a magia é indicada ou possível
+    /// ("Generic", "Forgotten Realms", "Dark Sun"...). `nil` para entradas
+    /// de exemplo antigas que não vêm da base real.
+    var setting: String? = nil
 
     /// Nome normalizado usado pelo casamento aproximado da escrita à mão.
     var normalizedName: String { Fuzzy.normalize(name) }

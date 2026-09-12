@@ -352,6 +352,11 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// folhas em si.
     var sessions: [Session] = []
 
+    /// Ids de magia favoritada por este personagem — cada clérigo/druida
+    /// favorita coisas diferentes, então isso não é global. Usado pra
+    /// ordenar a lista de candidatos ao memorizar e pro Grimório.
+    var favoriteSpellIDs: Set<String> = []
+
     /// Uma grade de slots em branco (sem nada preparado ainda), do
     /// tamanho que a ficha do personagem diz que ele tem hoje.
     func freshSlotBoard() -> SpellSlotBoard {
@@ -401,6 +406,32 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
             newestIndex = index
         }
         return newestIndex
+    }
+
+    func isFavorite(_ spellID: String) -> Bool {
+        favoriteSpellIDs.contains(spellID)
+    }
+
+    mutating func toggleFavorite(_ spellID: String) {
+        if favoriteSpellIDs.contains(spellID) {
+            favoriteSpellIDs.remove(spellID)
+        } else {
+            favoriteSpellIDs.insert(spellID)
+        }
+    }
+
+    /// Quantas vezes cada magia apareceu memorizada em alguma folha deste
+    /// personagem — usado pra ordenar por "mais usada" sem precisar de um
+    /// contador dedicado (ver TODO.md item 3).
+    func spellUsageCounts() -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for sheet in spellSheets {
+            for slot in sheet.slotBoard.slots {
+                guard let id = slot.preparedSpellID else { continue }
+                counts[id, default: 0] += 1
+            }
+        }
+        return counts
     }
 
     var displayTitle: String {

@@ -12,6 +12,7 @@ struct CharacterSheetView: View {
         case record
         case spells(UUID)
         case campaignIndex
+        case spellbook
     }
 
     var body: some View {
@@ -42,6 +43,12 @@ struct CharacterSheetView: View {
                                 .padding(18)
                         }
                         .transition(.opacity)
+                    case .spellbook:
+                        ScrollView {
+                            SpellbookView(character: $character)
+                                .padding(18)
+                        }
+                        .transition(.opacity)
                     }
                 }
                 .animation(.easeInOut(duration: 0.3), value: page)
@@ -53,7 +60,7 @@ struct CharacterSheetView: View {
         .onChange(of: character.characterClass) { _, newClass in
             guard !newClass.hasSpellSheet else { return }
             switch page {
-            case .spells, .campaignIndex: page = .record
+            case .spells, .campaignIndex, .spellbook: page = .record
             case .record: break
             }
         }
@@ -126,7 +133,7 @@ private struct SheetTabs: View {
         // A fileira de sessões/dias fica escondida quando o índice já está
         // aberto — mostrar a mesma lista de sessões duas vezes (na fileira
         // de abas e no corpo do índice) não faz sentido nenhum.
-        let showSessionStrip = hasSpellSheet && page != .campaignIndex
+        let showSessionStrip = hasSpellSheet && page != .campaignIndex && page != .spellbook
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .bottom, spacing: 6) {
@@ -148,6 +155,9 @@ private struct SheetTabs: View {
                 if hasSpellSheet {
                     PaperTab(title: "index", isSelected: page == .campaignIndex) {
                         page = .campaignIndex
+                    }
+                    PaperTab(title: "Priest Spellbook", isSelected: page == .spellbook) {
+                        page = .spellbook
                     }
                 }
 

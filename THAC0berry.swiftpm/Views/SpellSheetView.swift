@@ -10,7 +10,7 @@ import UIKit
 /// seguinte ganha uma folha nova.
 struct SpellSheetView: View {
     @Binding var sheet: SpellSheet
-    let character: PlayerCharacter
+    @Binding var character: PlayerCharacter
     @EnvironmentObject private var spellbook: SpellDatabase
 
     @State private var editingSlot: SpellSlot? = nil
@@ -58,12 +58,14 @@ struct SpellSheetView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .sheet(item: $editingSlot) { slot in
-            SlotEditorSheet(slot: slot, sheet: $sheet)
+            SlotEditorSheet(slot: slot, sheet: $sheet, character: character)
                 .environmentObject(spellbook)
         }
         .sheet(item: $detailSlot) { slot in
             SpellDetailSheet(spell: slot.preparedSpellID.flatMap { spellbook.spell(id: $0) },
-                              freeName: slot.preparedSpellName)
+                              freeName: slot.preparedSpellName,
+                              isFavorite: slot.preparedSpellID.map(character.isFavorite) ?? false,
+                              onToggleFavorite: slot.preparedSpellID.map { id in { character.toggleFavorite(id) } })
         }
     }
 
@@ -244,12 +246,12 @@ private struct CircleBlock: View {
             VStack(spacing: 0) {
                 TableHeader()
                 ForEach(slots) { slot in
-                    MemorizedRow(spell: spellFor(slot),
-                                 freeName: slot.preparedSpellName,
-                                 isSpent: slot.isSpent,
+                    MemorizedRow(slot: slot,
+                                 spell: spellFor(slot),
                                  casterLevel: character.level,
                                  onStrike: { toggle(slot) },
-                                 onShowDetail: { onShowDetail(slot) })
+                                 onShowDetail: { onShowDetail(slot) },
+                                 onAssign: { name, spell in assign(slot, name: name, spell: spell) })
                 }
             }
             .padding(.horizontal, 8)
@@ -268,6 +270,16 @@ private struct CircleBlock: View {
         guard let index = sheet.slotBoard.slots.firstIndex(where: { $0.id == slot.id })
         else { return }
         sheet.slotBoard.slots[index].isSpent.toggle()
+    }
+
+    /// Escrito direto na linha (ou casado com a base) — memoriza o slot sem
+    /// passar pela folha de edição separada.
+    private func assign(_ slot: SpellSlot, name: String, spell: Spell?) {
+        guard let index = sheet.slotBoard.slots.firstIndex(where: { $0.id == slot.id })
+        else { return }
+        sheet.slotBoard.slots[index].preparedSpellID = spell?.id
+        sheet.slotBoard.slots[index].preparedSpellName = spell == nil ? name : nil
+        sheet.slotBoard.slots[index].isSpent = false
     }
 }
 
@@ -306,9 +318,8 @@ private struct TableHeader: View {
 }
 
 private struct MemorizedRow: View {
+    let slot: SpellSlot
     let spell: Spell?
-    let freeName: String?
-    let isSpent: Bool
     /// Nível do personagem — usado para calcular o dano/cura que escala
     /// por nível ("10d6" em vez de "1d6 per level (max 10d6)").
     let casterLevel: Int
@@ -317,52 +328,92 @@ private struct MemorizedRow: View {
     let onStrike: () -> Void
     /// Um toque simples, sem arrasto, abre a descrição sem mexer no slot.
     let onShowDetail: () -> Void
+    /// A magia escrita direto na linha (ou casada com a base, ou aceita
+    /// como veio) — mesma ideia de Magic Item Spells e Additional Spells.
+    let onAssign: (_ name: String, _ spell: Spell?) -> Void
 
+    @EnvironmentObject private var spellbook: SpellDatabase
     @State private var strikeWidth: CGFloat = 0
     @State private var isStriking: Bool = false
     @State private var rowWidth: CGFloat = 0
+    @State private var handwritten: String = ""
+
+    private var freeName: String? { slot.preparedSpellName }
+    private var isSpent: Bool { slot.isSpent }
 
     var body: some View {
-        HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                nameArea
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Mede só a coluna do nome, não a linha inteira — é
+                    // sobre ela que o traço de riscar é medido, então
+                    // "metade do campo" precisa ser metade dela, não da
+                    // linha com as colunas de Cast/Dmg incluídas.
+                    .background {
+                        GeometryReader { geo in
+                            Color.clear
+                                .onAppear { rowWidth = geo.size.width }
+                                .onChange(of: geo.size.width) { _, newValue in rowWidth = newValue }
+                        }
+                    }
+
+                cell(castingTimeValue, width: 42)
+                cell(dmgHealValue, width: 70)
+            }
+            .padding(.vertical, 2)
+            .overlay(alignment: .bottom) { DottedRule() }
+            .overlay(alignment: .leading) {
+                if isStriking {
+                    Rectangle()
+                        .fill(Paper.redInk)
+                        .frame(width: strikeWidth, height: 2.4)
+                        .rotationEffect(.degrees(-1), anchor: .leading)
+                }
+            }
+            .contentShape(Rectangle())
+            .overlay(strikeOverlay)
+
+            // Vazio + com algo escrito: as sugestões da base aparecem
+            // embaixo da própria linha, igual em Additional Spells — sem
+            // abrir nada, é só continuar olhando pra mesma linha.
+            if slot.isEmpty, !handwritten.isEmpty {
+                suggestions
+            }
+        }
+    }
+
+    /// Enquanto o slot está vazio, a linha vira um campo de escrita — igual
+    /// nas Magic Item Spells e nas Additional Spells: encosta a caneta e
+    /// escreve o nome direto ali, sem abrir nada. Assim que algo é
+    /// memorizado, a linha volta a mostrar o texto normal e ganha de volta
+    /// o gesto de riscar — os dois nunca dividem espaço na mesma hora, que é
+    /// como o campo de escrita evita engolir o traço de um risco vizinho.
+    @ViewBuilder
+    private var nameArea: some View {
+        if slot.isEmpty {
+            HandwritingField(text: $handwritten, placeholder: "write the spell",
+                             onCommit: confirmBest)
+                .frame(height: 28)
+        } else {
             Text(name)
                 .font(Paper.hand(20))
                 .foregroundStyle(isSpent ? Paper.redInk.opacity(0.8) : Paper.penInk)
                 .strikethrough(isSpent, color: Paper.redInk)
                 .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // Mede só a coluna do nome, não a linha inteira — é sobre
-                // ela que o traço de riscar é medido, então "metade do
-                // campo" precisa ser metade dela, não da linha com as
-                // colunas de Cast/Dmg incluídas.
-                .background {
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear { rowWidth = geo.size.width }
-                            .onChange(of: geo.size.width) { _, newValue in rowWidth = newValue }
-                    }
-                }
+        }
+    }
 
-            cell(castingTimeValue, width: 42)
-            cell(dmgHealValue, width: 70)
-        }
-        .padding(.vertical, 2)
-        .overlay(alignment: .bottom) { DottedRule() }
-        .overlay(alignment: .leading) {
-            if isStriking {
-                Rectangle()
-                    .fill(Paper.redInk)
-                    .frame(width: strikeWidth, height: 2.4)
-                    .rotationEffect(.degrees(-1), anchor: .leading)
-            }
-        }
-        .contentShape(Rectangle())
-        // Riscar com o dedo, sem querer, era confundido com o gesto de
-        // virar a página — o DragGesture do SwiftUI não tem como saber qual
-        // ferramenta fez o toque. `StrikeInteraction` é UIKit puro por
-        // baixo: só a Apple Pencil risca; um arrasto de dedo falha na hora
-        // e sobe livre pro UIPageViewController folhear. O toque simples
-        // (abrir a descrição) continua funcionando com as duas.
-        .overlay(
+    /// Riscar com o dedo, sem querer, era confundido com o gesto de virar a
+    /// página — o DragGesture do SwiftUI não tem como saber qual ferramenta
+    /// fez o toque. `StrikeInteraction` é UIKit puro por baixo: só a Apple
+    /// Pencil risca; um arrasto de dedo falha na hora e sobe livre pro
+    /// UIPageViewController folhear. O toque simples (abrir a descrição)
+    /// continua funcionando com as duas. Só existe com o slot já memorizado
+    /// — vazio, é a escrita quem manda na linha.
+    @ViewBuilder
+    private var strikeOverlay: some View {
+        if !slot.isEmpty {
             StrikeInteraction(
                 onTap: onShowDetail,
                 onStrikeChanged: { dx, dy in
@@ -379,7 +430,58 @@ private struct MemorizedRow: View {
                     if coveredEnough { onStrike() }
                 }
             )
-        )
+        }
+    }
+
+    /// Só as magias do círculo e do tipo de conjurador certos — a mesma
+    /// filtragem do antigo editor em folha separada.
+    private var candidates: [SpellMatch] {
+        guard !handwritten.isEmpty else { return [] }
+        return spellbook.matches(for: handwritten, limit: 5).filter {
+            $0.spell.level == slot.level && $0.spell.caster == slot.caster
+        }
+    }
+
+    @ViewBuilder
+    private var suggestions: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if candidates.isEmpty {
+                Button {
+                    assign(name: handwritten, spell: nil)
+                } label: {
+                    let title: String = "use \"" + handwritten + "\" as-is"
+                    Text(title)
+                        .font(Paper.printedItalic(12))
+                        .foregroundStyle(Paper.inkSoft)
+                }
+                .buttonStyle(.plain)
+            } else {
+                ForEach(candidates) { match in
+                    SuggestionLine(match: match) {
+                        assign(name: match.spell.name, spell: match.spell)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// Terminar de escrever já memoriza, quando o casamento é forte o
+    /// bastante — sem precisar tocar na sugestão depois.
+    private func confirmBest() {
+        guard let best = candidates.first, best.isStrong else { return }
+        assign(name: best.spell.name, spell: best.spell)
+    }
+
+    private func assign(name: String, spell: Spell?) {
+        // Larga o foco junto com a escolha: um campo em foco captura
+        // traços de caneta feitos longe dele, inclusive o risco de outra
+        // linha já memorizada.
+        defer {
+            handwritten = ""
+            resignPencilFocus()
+        }
+        onAssign(name, spell)
     }
 
     private var name: String {
@@ -448,14 +550,33 @@ private struct StrikeInteraction: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .clear
 
+        // O Scribble do iPadOS não precisa de um UITextField em foco pra
+        // agarrar um traço: ele mira o campo de escrita mais próximo, foco
+        // ou não, sempre que uma linha vizinha ainda estiver vazia (com o
+        // seu próprio HandwritingField). Sem isto, um risco horizontal virava
+        // letra ("Z") no campo da linha ao lado. A interaction abaixo avisa
+        // o sistema — "aqui é risco, não escrita" — e o toque inicial larga
+        // qualquer foco que ainda esteja pendurado em outro campo, mesma
+        // dupla usada nos contadores de traço (`TallyInput`).
+        view.addInteraction(UIScribbleInteraction(delegate: context.coordinator))
+
+        let touchDown = UILongPressGestureRecognizer(target: context.coordinator,
+                                                      action: #selector(Coordinator.handleTouchDown(_:)))
+        touchDown.minimumPressDuration = 0
+        touchDown.delegate = context.coordinator
+        view.addGestureRecognizer(touchDown)
+
         let tap = UITapGestureRecognizer(target: context.coordinator,
                                           action: #selector(Coordinator.handleTap))
+        tap.delegate = context.coordinator
         view.addGestureRecognizer(tap)
+        context.coordinator.tap = tap
 
         let pan = PencilOnlyPanGestureRecognizer(target: context.coordinator,
                                                   action: #selector(Coordinator.handlePan(_:)))
         pan.delegate = context.coordinator
         view.addGestureRecognizer(pan)
+        context.coordinator.pan = pan
 
         return view
     }
@@ -470,10 +591,12 @@ private struct StrikeInteraction: UIViewRepresentable {
         Coordinator(onTap: onTap, onStrikeChanged: onStrikeChanged, onStrikeEnded: onStrikeEnded)
     }
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate, UIScribbleInteractionDelegate {
         var onTap: () -> Void
         var onStrikeChanged: (_ dx: CGFloat, _ dy: CGFloat) -> Void
         var onStrikeEnded: (_ dx: CGFloat, _ dy: CGFloat) -> Void
+        weak var pan: PencilOnlyPanGestureRecognizer?
+        weak var tap: UITapGestureRecognizer?
 
         init(onTap: @escaping () -> Void,
              onStrikeChanged: @escaping (_ dx: CGFloat, _ dy: CGFloat) -> Void,
@@ -481,6 +604,19 @@ private struct StrikeInteraction: UIViewRepresentable {
             self.onTap = onTap
             self.onStrikeChanged = onStrikeChanged
             self.onStrikeEnded = onStrikeEnded
+        }
+
+        /// Aqui a caneta risca, não escreve — mesmo texto do `TallyInput`.
+        func scribbleInteraction(_ interaction: UIScribbleInteraction,
+                                 shouldBeginAt location: CGPoint) -> Bool {
+            false
+        }
+
+        /// A caneta encostou na linha: seja lá o que ela for fazer aqui,
+        /// nenhum campo de escrita vizinho pode continuar em foco.
+        @objc func handleTouchDown(_ gesture: UILongPressGestureRecognizer) {
+            guard gesture.state == .began else { return }
+            resignPencilFocus()
         }
 
         @objc func handleTap() {
@@ -501,13 +637,42 @@ private struct StrikeInteraction: UIViewRepresentable {
             }
         }
 
-        // Permite que o gesto de risco conviva com o scroll da folha (e com
-        // a virada de página) em vez de brigar por exclusividade — quem
-        // decide se o risco "vale" é a lógica de dx/dy nos closures, não a
-        // exclusividade do reconhecedor.
+        // Permite que o gesto de risco conviva com o scroll da folha em vez
+        // de brigar por exclusividade — quem decide se o risco "vale" é a
+        // lógica de dx/dy nos closures, não a exclusividade do reconhecedor.
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             true
+        }
+
+        /// Riscar não é virar a página — e tocar pra ver a descrição também
+        /// não é.
+        ///
+        /// Sem isto, um traço de caneta numa linha memorizada arrastava a
+        /// folha inteira pro lado ao mesmo tempo — o mesmo arrasto horizontal
+        /// que risca também é, aos olhos do UIPageViewController por trás,
+        /// um folhear. Quem começa um arrasto de caneta em cima da linha
+        /// está riscando, então qualquer outro `UIPanGestureRecognizer` —
+        /// inclusive o de virar página, mesmo não tendo referência direta a
+        /// ele — espera: só assume se este gesto falhar (o que só acontece
+        /// com o dedo, que já falha na hora em `PencilOnlyPanGestureRecognizer`).
+        ///
+        /// O mesmo vale pro toque simples — e aqui não basta olhar só pra
+        /// `UIPanGestureRecognizer`. O estilo `.pageCurl` do
+        /// `UIPageViewController` reconhece TOQUE também (não só arrasto)
+        /// pra virar página, tipo folhear um livro tocando na quina — e
+        /// esse reconhecedor interno não é público, então não dá pra checar
+        /// o tipo dele. Continuava fechando a janela e virando a folha
+        /// mesmo depois da trava por `UIPanGestureRecognizer`, e só não
+        /// acontecia na primeira folha da sessão — sem folha "antes" pra
+        /// virar, esse toque interno do UIPageViewController não tinha pra
+        /// onde ir. A trava agora vale pra QUALQUER reconhecedor de fora
+        /// desta view, de qualquer tipo: ele espera nosso toque ou nosso
+        /// risco decidir primeiro.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard gestureRecognizer === pan || gestureRecognizer === tap else { return false }
+            return otherGestureRecognizer.view !== gestureRecognizer.view
         }
     }
 }
@@ -1313,6 +1478,10 @@ private struct AdditionalSpellRow: View {
 private struct SlotEditorSheet: View {
     let slot: SpellSlot
     @Binding var sheet: SpellSheet
+    /// Só pra leitura — favoritos e histórico de uso, pra ordenar a lista
+    /// de candidatos (ver TODO.md itens 2 e 3). Marcar/desmarcar favorito
+    /// continua acontecendo em `SpellDetailSheet`/no Grimório.
+    let character: PlayerCharacter
     @EnvironmentObject private var spellbook: SpellDatabase
     @Environment(\.dismiss) private var dismiss
 
@@ -1411,8 +1580,23 @@ private struct SlotEditorSheet: View {
         }
     }
 
+    /// Favoritos do círculo primeiro, depois os mais usados no histórico
+    /// do personagem, depois o resto em ordem alfabética — sem isso,
+    /// achar uma magia específica numa base de quase 1.800 entradas vira
+    /// procurar agulha no palheiro (ver TODO.md itens 2 e 3).
     private var levelList: [Spell] {
-        spellbook.spells(caster: slot.caster, level: slot.level)
+        let all = spellbook.spells(caster: slot.caster, level: slot.level)
+        let favorites = character.favoriteSpellIDs
+        let counts = character.spellUsageCounts()
+        return all.sorted { lhs, rhs in
+            let lhsFav = favorites.contains(lhs.id)
+            let rhsFav = favorites.contains(rhs.id)
+            if lhsFav != rhsFav { return lhsFav }
+            let lhsCount = counts[lhs.id] ?? 0
+            let rhsCount = counts[rhs.id] ?? 0
+            if lhsCount != rhsCount { return lhsCount > rhsCount }
+            return lhs.name < rhs.name
+        }
     }
 
     private func assign(name: String, id: String?) {
@@ -1436,13 +1620,18 @@ private struct SlotEditorSheet: View {
 /// Aberta com um toque simples na linha memorizada. Não mexe no slot — só
 /// mostra a descrição. Quando a magia não está na base (nome livre), mostra
 /// um texto de placeholder no lugar da descrição real.
-private struct SpellDetailSheet: View {
+struct SpellDetailSheet: View {
     let spell: Spell?
     let freeName: String?
     /// Só vem preenchido pra magias de item mágico — o círculo de magia
     /// tem sua própria janela de troca, aberta pela grade, e não passa
     /// esse retorno.
     var onChangeSpell: (() -> Void)? = nil
+    /// A estrela de favorito só aparece quando a magia existe de verdade na
+    /// base (tem `spell` com `id`) — não faz sentido favoritar um nome
+    /// livre que não bate com nada. `nil` esconde a estrela por completo.
+    var isFavorite: Bool = false
+    var onToggleFavorite: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -1460,6 +1649,14 @@ private struct SpellDetailSheet: View {
                             .foregroundStyle(Paper.inkSoft)
                     }
                     Spacer()
+                    if spell != nil, let onToggleFavorite {
+                        Button(action: onToggleFavorite) {
+                            Text(isFavorite ? "★" : "☆")
+                                .font(Paper.printed(18))
+                                .foregroundStyle(isFavorite ? Paper.redInk : Paper.inkSoft)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if let onChangeSpell {
                         Button("change", action: onChangeSpell)
                             .font(Paper.printedItalic(13))
@@ -1484,6 +1681,18 @@ private struct SpellDetailSheet: View {
                             DetailField(label: "Components", value: spell?.components)
                             if let damage = spell?.damage {
                                 DetailField(label: "Damage", value: damage)
+                            }
+                            if let setting = spell?.setting {
+                                DetailField(label: "Setting", value: setting)
+                            }
+                        }
+
+                        if let spheres = spell?.spheres, !spheres.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                FieldLabel(text: "Spheres")
+                                Text(spheres.joined(separator: ", "))
+                                    .font(Paper.hand(18))
+                                    .foregroundStyle(Paper.penInk)
                             }
                         }
 
@@ -1516,7 +1725,7 @@ private struct SpellDetailSheet: View {
     /// Enquanto a magia não está na base, mostra um texto de exemplo — dá
     /// pra ver a janela funcionando antes de completar o spells.json.
     private var description: String {
-        if let spell { return spell.summary }
+        if let spell { return spell.fullDescription ?? spell.summary }
         return """
         This spell hasn't been added to the built-in spellbook yet, so \
         there's no real description to show — this is placeholder text \

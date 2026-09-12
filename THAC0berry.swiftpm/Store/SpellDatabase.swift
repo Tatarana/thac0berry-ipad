@@ -1,7 +1,15 @@
 import Foundation
 
-/// Base de magias embutida (Resources/spells.json) mais a busca aproximada
-/// usada pelo log escrito à mão.
+/// Base de magias embutida mais a busca aproximada usada pelo log escrito
+/// à mão.
+///
+/// A base fica espalhada em vários arquivos JSON em vez de um só
+/// `spells.json` gigante: `spells.json` continua com o punhado de exemplo
+/// (usado por `SampleCharacter`), e a base real de sacerdote entra aos
+/// poucos em arquivos `priest_*.json` — um por nível/tipo, no formato que
+/// `Scripts/convert_spells.py` gera a partir dos dados brutos da wiki (ver
+/// TODO.md item 1). Todo arquivo cujo nome comece com "priest" ou
+/// "spells" no bundle é carregado e somado num array só.
 final class SpellDatabase: ObservableObject {
     @Published private(set) var spells: [Spell] = []
     @Published private(set) var loadError: String? = nil
@@ -11,16 +19,52 @@ final class SpellDatabase: ObservableObject {
     }
 
     private func load() {
-        guard let url = Bundle.main.url(forResource: "spells", withExtension: "json") else {
-            loadError = "spells.json não foi encontrado no bundle."
-            return
+        let names = ["spells"] + priestFileNames()
+        var merged: [Spell] = []
+        var seenIDs: Set<String> = []
+        var errors: [String] = []
+
+        for name in names {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "json") else {
+                if name == "spells" { errors.append("spells.json não foi encontrado no bundle.") }
+                continue
+            }
+            do {
+                let data = try Data(contentsOf: url)
+                let batch = try JSONDecoder().decode([Spell].self, from: data)
+                for spell in batch {
+                    // Em caso de id repetido entre arquivos, o primeiro
+                    // arquivo carregado vence — spells.json (os exemplos de
+                    // Kelmon) sempre entra primeiro na lista `names` acima,
+                    // então ele nunca é sobrescrito por um id igual vindo
+                    // da base real.
+                    guard !seenIDs.contains(spell.id) else { continue }
+                    seenIDs.insert(spell.id)
+                    merged.append(spell)
+                }
+            } catch {
+                errors.append("Falha ao ler \(name).json: \(error.localizedDescription)")
+            }
         }
-        do {
-            let data = try Data(contentsOf: url)
-            spells = try JSONDecoder().decode([Spell].self, from: data)
-        } catch {
-            loadError = "Falha ao ler spells.json: \(error.localizedDescription)"
-        }
+
+        spells = merged
+        loadError = errors.isEmpty ? nil : errors.joined(separator: " ")
+    }
+
+    /// Nomes (sem extensão) de todo `priest_*.json` presente no bundle,
+    /// em ordem alfabética — assim a lista cresce sozinha conforme mais
+    /// arquivos da base real forem adicionados ao projeto, sem precisar
+    /// tocar neste arquivo de novo.
+    private func priestFileNames() -> [String] {
+        guard let resourceURL = Bundle.main.resourceURL,
+              let entries = try? FileManager.default.contentsOfDirectory(at: resourceURL,
+                                                                          includingPropertiesForKeys: nil)
+        else { return [] }
+
+        return entries
+            .filter { $0.pathExtension == "json" && $0.deletingPathExtension().lastPathComponent.hasPrefix("priest_") }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted()
     }
 
     func spell(id: String) -> Spell? {

@@ -80,7 +80,7 @@ struct DayPagerView: UIViewControllerRepresentable {
         }
         return AnyView(
             ScrollView {
-                SpellSheetView(sheet: $character.spellSheets[index], character: character)
+                SpellSheetView(sheet: $character.spellSheets[index], character: $character)
                     .padding(18)
             }
         )
@@ -129,7 +129,25 @@ struct DayPagerView: UIViewControllerRepresentable {
         }
 
         fileprivate func makePage(for id: UUID) -> DayPageController? {
-            DayPageController(sheetID: id, rootView: parent.pageContent(for: id))
+            let controller = DayPageController(sheetID: id, rootView: parent.pageContent(for: id))
+            // Uma folha criada agora mesmo (botão "+ day sheet") às vezes
+            // ainda não está em `character.spellSheets` no exato instante em
+            // que este método roda — o SwiftUI publica a mudança de `page`
+            // (local) e a de `character` (um binding, às vezes com mais
+            // saltos até o dado de verdade) em momentos ligeiramente
+            // diferentes. Resultado: a página nascia com o aviso "not in the
+            // folder" e só se corrigia quando o jogador folheava pra outro
+            // dia e voltava. Em vez de tentar acertar a ordem exata (frágil
+            // e difícil de reproduzir), se a folha não for encontrada agora,
+            // tenta de novo daqui a pouquíssimo tempo — na próxima volta do
+            // runloop os dados já com certeza chegaram.
+            if parent.character.spellSheets.first(where: { $0.id == id }) == nil {
+                DispatchQueue.main.async { [weak self, weak controller] in
+                    guard let self, let controller else { return }
+                    controller.rootView = self.parent.pageContent(for: id)
+                }
+            }
+            return controller
         }
 
         func pageViewController(_ pageViewController: UIPageViewController,
@@ -160,12 +178,19 @@ struct DayPagerView: UIViewControllerRepresentable {
                                 previousViewControllers: [UIViewController],
                                 transitionCompleted completed: Bool) {
             isTransitioning = false
-            // O usuário folheou com o próprio dedo — o curl já terminou de
-            // verdade, só avisa o SwiftUI qual dia ficou visível.
+            // Este delegate só dispara pra transição arrastada pelo dedo do
+            // usuário — uma chamada por código a `setViewControllers` (o
+            // caminho usado por "+ day sheet") NÃO passa por aqui, só pelo
+            // completion handler dela mesma. O reforço real pra folha nova
+            // ficando em branco está em `makePage`, acima.
             guard completed,
                   let visible = pageViewController.viewControllers?.first as? DayPageController
             else { return }
             parent.currentID = visible.sheetID
+            // Reconstrói mesmo assim com os dados mais recentes de `parent`
+            // — não custa nada e cobre qualquer outro caso parecido (também
+            // disparava este mesmo delegate). Agora ele sempre recarrega.
+            visible.rootView = parent.pageContent(for: visible.sheetID)
         }
     }
 }
