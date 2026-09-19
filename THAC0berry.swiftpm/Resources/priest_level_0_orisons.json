@@ -495,9 +495,18 @@
     "duration": "Special",
     "areaOfEffect": "1 object",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d2",
     "summary": "By means of this orison, the caster brings new life or freshness to the object desired. The magic applies to food and drink items such as milk, beer, meat, and raw vegetables.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 2,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "All"
     ],

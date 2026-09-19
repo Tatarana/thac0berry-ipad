@@ -11,9 +11,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "1 acorn/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d2",
     "summary": "By means of this spell, the priest can cause a barrage of acorns to launch from his or her hand, from the ground, or from an oak tree within 10 yards. The acorns, up to one acorn per level of the caster, fly up to 40 yards in the round of casting.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 2,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -32,7 +41,7 @@
     "duration": "1 rd. + 1 rd./level",
     "areaOfEffect": "1 creature",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The recipient of this spell gains the benefit of a bless spell (+1 to attack rolls and saving throws) and a special bonus of 1d8 addition…",
     "summary": "The recipient of this spell gains the benefit of a bless spell (+1 to attack rolls and saving throws) and a special bonus of 1d8 additional hit points for the duration of the spell.",
     "damageDice": null,
     "spheres": [
@@ -75,9 +84,18 @@
     "duration": "Special (1 rd./level maximum - PSC)",
     "areaOfEffect": "One creature (The caster - PSC)",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "3d6",
     "summary": "This spell creates a silver-hued, partially ethereal lance shaped in the form of an alicorn, the proper name for a unicorn horn. The alicorn lance hovers above the brow of the spellcaster for a maximum of 1 round per level of the spellcaster.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -264,9 +282,18 @@
     "duration": "1 turn/level",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d10",
     "summary": "==Powers & Pantheons Version==\nThis spell enables the priest to transform his or her forearms and hands into nonmagical adamantine hammers with which she or he can chip away solid rock.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 10,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -519,7 +546,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "The caster's arms (The caster - PSC)",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "This spell temporarily transforms the caster's arms into extremely durable furry limbs with raking talons and gives the caster 18/72 Stre…",
     "summary": "This spell temporarily transforms the caster's arms into extremely durable furry limbs with raking talons and gives the caster 18/72 Strength so that she or he can rend and rake for 2d4+4 points of damage (total), striking twice per round (once with each claw, unless holding something) at a +2 bonus to attack.",
     "damageDice": null,
     "spheres": [
@@ -604,7 +631,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "One of the caster's arms",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "The arm ends in a taloned claw that rakes foes for 1 d4 points of physical damage plus 1d4 points of unearthly magical cold damage (2d4 p…",
     "summary": "This spell temporarily transforms the caster's arm into a retractable, rubbery appendage that she or he can extend up to 10 feet and use to strike at foes with at +1 bonus to normal attack rolls.",
     "damageDice": null,
     "spheres": [
@@ -625,7 +652,7 @@
     "duration": "Special (1 turn maximum)",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Any damage caused by this action (harmful or beneficial to the recipient) is the maximum possible on a 1d8 roll of 1-6; otherwise, determ…",
     "summary": "This spell enables the recipient to use once any single thief skill or single weapon attack at a +15% ability bonus or a +3 attack bonus.",
     "damageDice": null,
     "spheres": [
@@ -688,7 +715,7 @@
     "duration": "4 rds.",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "To others, the spiny forest of blades augments the caster's Armor Class by 2 points, and inflicts harm as follows: If the caster charges,…",
     "summary": "This spell causes many dagger-like blades to sprout from all surfaces of the caster's body. They appear to be metallic but are not actually metal (and are therefore unaffected by heat metal spells, magnetic attraction, and the like).",
     "damageDice": null,
     "spheres": [
@@ -709,7 +736,7 @@
     "duration": "Special",
     "areaOfEffect": "One bone or bone fragment",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The bone bite jaws bite once for 1d6+4 points of damage and remain attached, bony fangs clinging, as they transform into a second, archin…",
     "summary": "This spell causes any bone or bone fragment to become a razor-sharp pair of jaws that bite any living being they strike except the caster. They either bite someone they are in contact with or someone they are thrown at and strike.",
     "damageDice": null,
     "spheres": [
@@ -796,9 +823,18 @@
     "duration": "1 turn +1 rd./level",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "When the spell is cast, the priest's fingernails lengthen and become as hard as stone.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Earth"
     ],
@@ -882,9 +918,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 spirit",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d3",
     "summary": "Through this spell a shaman can attempt to dismiss any spirit that is forcibly possessing a person or object. The spell does not drive spirits out of objects that are their proper homes (such as trees or fetishes), nor out of a willing host.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 3,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Summoning"
     ],
@@ -1008,7 +1053,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "One scythe",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The scythe is a two-handed, 7-foot-long device that is a +2 enchanted weapon, dealing 2d4+2 points of piercing and slashing (Type P/S) ph…",
     "summary": "This spell creates an oversized but weightless scythe that can be wielded by any living creature either as a tool or as weapon. The scythe appears in the hands of the spellcaster, but may be given to another to be wielded.",
     "damageDice": null,
     "spheres": [
@@ -1241,9 +1286,18 @@
     "duration": "Permanent",
     "areaOfEffect": "1 weapon",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "2d4",
     "summary": "A spiritknife is created by binding a spirit within range—any spirit, free or bound—into a weapon made of a natural material. The purpose of such weapons is to cause damage to spirits on the Prime Material Plane.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Summoning"
     ],
@@ -1347,9 +1401,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 1d10+1",
     "summary": "Somewhat less common than the well-known cure light wounds and cure serious wounds, this healing spell was created by a priest who found that his heroic companions required his skill at doctoring more than his advice and wisdom.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 10,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Healing"
     ],
@@ -1410,9 +1473,18 @@
     "duration": "2 rds./level",
     "areaOfEffect": "1 fire source",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4",
     "summary": "Darkfire flames give no light at all, although creatures with infravision see a signature brighter than normal flame.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -1431,7 +1503,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Touch or 1 creature within 15 ft.",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "If the flame comes from the caster's hand, a touch (successful attack) by the caster inflicts 1d4 points of damage, plus 1 additional poi…",
     "summary": "This spell enables the caster to emit a jet of black flame from his hand or eyes. The flame is oily, cool to the touch, and has no effect on flammable materials – it harms only living things.",
     "damageDice": null,
     "spheres": [
@@ -1811,7 +1883,7 @@
     "duration": "2 rds./level",
     "areaOfEffect": "5 x 4 ft. cone (Creates 1 dust devil - PSC)",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "This spell enables a priest to conjure up a weak air elemental(—a dust devil of AC 4, 2 HD, MV 180 feet per round, one attack for 1d4 poi…",
     "summary": "This spell enables a priest to conjure up a weak air elemental(—a dust devil of AC 4, 2 HD, MV 180 feet per round, one attack for 1d4 points of damage(—which can be hit by normal weapons.",
     "damageDice": null,
     "spheres": [
@@ -2316,9 +2388,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 being",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "4d4",
     "summary": "This spell causes an invisible fist of force to strike any being visible to the caster who is within range. The fist of faith strikes only once, but cannot miss.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -2337,9 +2418,18 @@
     "duration": "4 rds. + 1 rd./2 levels",
     "areaOfEffect": "3-ft. long blade",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+4",
     "summary": "With this spell, the caster causes a blazing ray of red-hot fire to spring forth from his hand. This bladelike ray is wielded as if it were a scimitar.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 4,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -2422,7 +2512,7 @@
     "duration": "1 turn",
     "areaOfEffect": "1 bowl of stew, etc./level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "In addition, for two hours plus one round per caster level, the creature receives 1d4+1 temporary hit points.",
     "summary": "Any bowl of broth, porridge, or stew the priest has concocted can be affected by the fortifying stew spell. A priest can enchant one bowl of stew (about 8 ounces) per experience level.",
     "damageDice": null,
     "spheres": [
@@ -2443,7 +2533,7 @@
     "duration": "2 rds./level",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The creature, after being brought to 0 hit points or less, can fight normally for 1d4+1 rounds with a hit point total of -1 to -9 before…",
     "summary": "This spell gives the recipient the ability to ignore mortal wounds and continue fighting. The creature, after being brought to 0 hit points or less, can fight normally for 1d4+1 rounds with a hit point total of -1 to -9 before collapsing.",
     "damageDice": null,
     "spheres": [
@@ -2506,9 +2596,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Beam, 5 ft. diameter x 20 ft. long",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4+2",
     "summary": "This spell brings into being a straight beam that moves away from the caster's chest (in the direction the caster is facing) to a distance of 20 feet.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 2,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Elemental Water"
@@ -2528,7 +2627,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "Flexible 6-foot-long beam 4 inches in diameter",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "If held in front of the body or across an opening, it can sometimes be made unavoidable so that foes must take damage from it, but it oth…",
     "summary": "This spell creates a beam of frost stretching from the caster's hand.",
     "damageDice": null,
     "spheres": [
@@ -2655,7 +2754,7 @@
     "duration": "1 turn",
     "areaOfEffect": "1d6+1 blades of grass within 10 ft.",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Taller varieties of grass, such as those found on savannahs, can be hurled as javelins for 1d6 points of damage.",
     "summary": "This spell causes 1d6+1 blades of grass to become stiff and sharp. Taller varieties of grass, such as those found on savannahs, can be hurled as javelins for 1d6 points of damage.",
     "damageDice": null,
     "spheres": [
@@ -2737,7 +2836,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 creature or a 10 ft. cube",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "This automatically hits one creature in a straight line from the caster for 1d4+1 points of damage.",
     "summary": "When a druid casts this spell, one large hailstone or a swarm of smaller stones burst from his or her finger, traveling in a straight line to the target creatures. The\n\ncaster chooses which form the spell takes at the time of casting.",
     "damageDice": null,
     "spheres": [
@@ -2758,7 +2857,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "The caster's palm",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "spell fails, the mouth's saliva corrodes the victim, doing 3d4 points of additional damage.",
     "summary": "This spell creates a fanged, biting mouth in the palm of the caster's hand. It can readily be concealed by curling the hand into a fist or by placing the palm of the hand against something.",
     "damageDice": null,
     "spheres": [
@@ -2780,9 +2879,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 spirit",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 2d6",
     "summary": "This spell can be used to heal a spirit of any damage it has taken. It does not heal damage taken by objects or people inhabited by the spirit.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Necromantic"
     ],
@@ -2907,9 +3015,18 @@
     "duration": "1 round/level",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "4d4",
     "summary": "This spell embodies the wrath of Hath or when her charges are threatened. When she casts horns of Hathor, the priestess grows a set of horns from her head and can use them to gore opponents, much like a minotaur.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Animal"
@@ -2929,9 +3046,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "1 rock (see below)",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell allows a dwarf to suddenly and violently use telekinesis on a loose rock, hurling it as a missile. Only stone can be used (either natural stone or petrified objects).",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -3076,9 +3202,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 creature",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "2d8+2",
     "summary": "This spell creates a spectral set of gaping, many-fanged jaws that are about as large across as a human head.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 8,
+      "bonus": 2,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -3349,7 +3484,7 @@
     "duration": "3 rds.",
     "areaOfEffect": "The caster",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "To others they form an armor that improves the caster's Armor Class by 2, and slashes any creature that comes into bodily contact with th…",
     "summary": "This spell covers the caster in thousands of bristling thorns.",
     "damageDice": null,
     "spheres": [
@@ -3371,9 +3506,18 @@
     "duration": "Permanent",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4",
     "summary": "Available to all dwarven priests, this spell places a magical glyph on each of the recipient's hands.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "All"
     ],
@@ -3875,9 +4019,18 @@
     "duration": "Special",
     "areaOfEffect": "One creature",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "3d6",
     "summary": "This spell creates a flickering brown radiance around the caster's hand or another chosen limb. Within 5 rounds of casting poison touch, the priest must touch a chosen victim, or the magic fades and is wasted.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Necromantic"
@@ -3918,9 +4071,18 @@
     "duration": "1 rd./level",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "A bright flame, equal in brightness to a torch, springs forth from the caster's palm when he casts a produce flame spell.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -4298,7 +4460,7 @@
     "duration": "Permanent",
     "areaOfEffect": "A body of liquid no larger in volume than the caster's head",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The drinker regains 1d2 lost Strength points and 1d4 lost hit points by quaffing the entire output of a single rosewater spell.",
     "summary": "This spell affects an existing body of liquid no greater in total volume than the caster's head (if employed against larger amounts, the spell fails and is wasted, without effect).",
     "damageDice": null,
     "spheres": [
@@ -4446,9 +4608,18 @@
     "duration": "1 turn/level",
     "areaOfEffect": "3 leaves/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d3",
     "summary": "When cast, this spell causes leaves of any type to become rigid and razor sharp, effectively becoming knives. These sharp leaves can be wielded or thrown, causing 1d3 points of damage if a successful attack roll is made.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 3,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -4467,9 +4638,18 @@
     "duration": "1 turn",
     "areaOfEffect": "40-ft. cube",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d4",
     "summary": "Like the 1st level priest spell, entangle, this spell enables the caster to cause plants in the area of effect to entangle creatures.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -4742,9 +4922,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 creature",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "4d4",
     "summary": "This spell brings into being a three-tined missile of temporarily hardened water, its piercing points hard enough to penetrate armor.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -4952,7 +5141,7 @@
     "duration": "2 rounds/level",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The extremity gains no attack bonus, but its slightest touch does the same slashing (Type S) damage as a sickle: 1d4+1 points of damage vs.",
     "summary": "By means of this spell, one of the caster's hands temporarily becomes a wooden magical weapon. The extremity is able to strike creatures who can be hit only by magical weapons of +2 enchantment or less.",
     "damageDice": null,
     "spheres": [
@@ -5268,7 +5457,7 @@
     "duration": "7 rounds",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "A whip of flame does damage by transmitting heat, searing whatever it touches for 1d8+3 points of damage per strike.",
     "summary": "This spell creates a blazing whip or flexible line of flames extending for 12 feet from one of the caster's hands (or, if lacking a hand, from the end of whatever is left of the caster's arm).",
     "damageDice": null,
     "spheres": [
@@ -5289,9 +5478,18 @@
     "duration": "1 round/level",
     "areaOfEffect": "5'-long, flexible beam of force",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell creates a flickering black beam of force 1 inch in thickness surrounded by a purple halo. It is wielded by the caster, whom it cannot harm.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Necromantic"
     ],
@@ -5458,9 +5656,18 @@
     "duration": "1 round/level",
     "areaOfEffect": "The caster's right hand",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell turns the priest's right hand into a pair of powerful wolflike jaws in memory of the way that Tyr lost his right hand to the monstrous wolf-like being Kezef the Chaos Hound.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Necromantic"

@@ -1,15 +1,42 @@
 import Foundation
+import SwiftUI
 
-/// Guarda os personagens em um JSON único no diretório Documents, com a
-/// mesma decisão de segurança do Just Pencil It: proteção de dados nativa
-/// do iOS na classe `.completeUnlessOpen`, sem criptografia própria por cima.
+/// Guarda campanhas e personagens em um JSON único no diretório Documents,
+/// com a mesma decisão de segurança do Just Pencil It: proteção de dados
+/// nativa do iOS na classe `.completeUnlessOpen`, sem criptografia própria
+/// por cima. As duas listas são irmãs, ligadas por
+/// `PlayerCharacter.campaignID` — não personagens aninhados dentro da
+/// campanha — porque um personagem pode existir SEM campanha (o Sandbox,
+/// pra preparar alguém antes da campanha começar de verdade).
 final class CharacterLibrary: ObservableObject {
+    @Published var campaigns: [Campaign] = [] {
+        didSet { scheduleSave() }
+    }
     @Published var characters: [PlayerCharacter] = [] {
+        didSet { scheduleSave() }
+    }
+    /// Magias favoritadas — pedido do usuário (2026-09-19): "quem escolhe
+    /// as magias são os jogadores", então um jogador que gosta de uma
+    /// spell tende a usá-la em QUALQUER personagem Priest que criar, não só
+    /// num específico. Por isso favoritar deixou de ser um campo de
+    /// `PlayerCharacter` e virou uma preferência global daqui — um jogador,
+    /// um conjunto de favoritas, usado em toda ficha e no Grimório
+    /// (inclusive aberto direto da Tela Principal, sem personagem nenhum).
+    @Published var favoriteSpellIDs: Set<String> = [] {
         didSet { scheduleSave() }
     }
     @Published private(set) var lastError: String? = nil
 
-    private let fileName = "characters.json"
+    private struct LibraryData: Codable {
+        var campaigns: [Campaign] = []
+        var characters: [PlayerCharacter] = []
+        /// Opcional só pra ler bibliotecas salvas ANTES de favoritar virar
+        /// global (chave ainda não existia) sem falhar o decode — mesma
+        /// convenção do resto do app pra campo novo em JSON antigo.
+        var favoriteSpellIDs: Set<String>? = nil
+    }
+
+    private let fileName = "library.json"
     private var saveWorkItem: DispatchWorkItem?
 
     private var fileURL: URL {
@@ -26,29 +53,41 @@ final class CharacterLibrary: ObservableObject {
 
     private func load() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            // Primeira execução: a pasta abre com uma ficha preenchida, para
-            // dar pra ver como o app fica em uso de verdade.
-            characters = [PlayerCharacter.kelmon()]
+            // Primeira execução: a pasta abre com uma campanha e uma ficha
+            // já preenchidas, para dar pra ver como o app fica em uso de
+            // verdade.
+            seedSample()
             return
         }
         do {
             let data = try Data(contentsOf: fileURL)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            var decoded = try decoder.decode([PlayerCharacter].self, from: data)
-            // Fichas salvas antes de existir Sessão ganham uma sessão
-            // "Sessões antigas" agrupando as folhas soltas.
-            for index in decoded.indices {
-                decoded[index].migrateLegacySheetsIfNeeded()
+            let decoded = try decoder.decode(LibraryData.self, from: data)
+            campaigns = decoded.campaigns
+            characters = decoded.characters
+            if let saved = decoded.favoriteSpellIDs {
+                favoriteSpellIDs = saved
+            } else {
+                // Migração: biblioteca salva antes de favoritar virar
+                // global — junta os favoritos que já existiam por
+                // personagem (campo legado em `PlayerCharacter`) num
+                // conjunto só, pra ninguém perder favorito nenhum na troca.
+                favoriteSpellIDs = Set(decoded.characters.flatMap(\.favoriteSpellIDs))
             }
-            characters = decoded
         } catch {
-            // JSON gravado por uma versão anterior (sem equipamento, divindade
-            // etc.) não decodifica. Melhor abrir com a ficha de exemplo do que
-            // com a pasta vazia e sem saída.
-            lastError = "Não consegui ler a ficha salva: \(error.localizedDescription)"
-            if characters.isEmpty { characters = [PlayerCharacter.kelmon()] }
+            // JSON gravado por uma versão anterior (sem campanha, sem os
+            // campos novos) não decodifica. Melhor abrir com o exemplo do
+            // que com a pasta vazia e sem saída.
+            lastError = "Couldn't read the saved library: \(error.localizedDescription)"
+            if characters.isEmpty && campaigns.isEmpty { seedSample() }
         }
+    }
+
+    private func seedSample() {
+        let (campaign, character) = PlayerCharacter.kelmonWithCampaign()
+        campaigns = [campaign]
+        characters = [character]
     }
 
     /// Salva com um pequeno atraso, para não escrever no disco a cada toque
@@ -67,15 +106,76 @@ final class CharacterLibrary: ObservableObject {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(characters)
+            let data = try encoder.encode(LibraryData(campaigns: campaigns, characters: characters,
+                                                       favoriteSpellIDs: favoriteSpellIDs))
             try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUnlessOpen])
             lastError = nil
         } catch {
-            lastError = "Não consegui salvar: \(error.localizedDescription)"
+            lastError = "Couldn't save: \(error.localizedDescription)"
         }
     }
 
-    // MARK: - Operações sobre a lista
+    // MARK: - Magias favoritas
+
+    func isFavorite(_ spellID: String) -> Bool {
+        favoriteSpellIDs.contains(spellID)
+    }
+
+    func toggleFavorite(_ spellID: String) {
+        if favoriteSpellIDs.contains(spellID) {
+            favoriteSpellIDs.remove(spellID)
+        } else {
+            favoriteSpellIDs.insert(spellID)
+        }
+    }
+
+    // MARK: - Campanhas
+
+    func campaign(with id: UUID) -> Campaign? {
+        campaigns.first { $0.id == id }
+    }
+
+    func campaignIndex(of id: UUID) -> Int? {
+        campaigns.firstIndex { $0.id == id }
+    }
+
+    /// Um binding pra campanha do personagem — `nil` se ele estiver no
+    /// Sandbox, ou se (por algum motivo) o id apontar pra uma campanha que
+    /// não existe mais. Índice recalculado a cada chamada de propósito
+    /// (mesmo padrão dos outros bindings computados do app): é leve, e
+    /// evita guardar um índice que pode ficar velho se a lista mudar.
+    func binding(forCampaignID id: UUID?) -> Binding<Campaign>? {
+        guard let id, let index = campaignIndex(of: id) else { return nil }
+        return Binding(
+            get: { self.campaigns[index] },
+            set: { self.campaigns[index] = $0 }
+        )
+    }
+
+    @discardableResult
+    func addCampaign(name: String = "") -> Campaign {
+        var new = Campaign()
+        new.name = name
+        campaigns.append(new)
+        return new
+    }
+
+    func updateCampaign(_ campaign: Campaign) {
+        guard let index = campaignIndex(of: campaign.id) else { return }
+        campaigns[index] = campaign
+    }
+
+    /// Apaga a campanha — os personagens dela NÃO são apagados junto, só
+    /// perdem o vínculo e voltam pro Sandbox (sessões/caderno da campanha
+    /// é que somem de verdade, junto com o resto da campanha).
+    func deleteCampaign(_ campaign: Campaign) {
+        for index in characters.indices where characters[index].campaignID == campaign.id {
+            characters[index].campaignID = nil
+        }
+        campaigns.removeAll { $0.id == campaign.id }
+    }
+
+    // MARK: - Personagens
 
     func character(with id: UUID) -> PlayerCharacter? {
         characters.first { $0.id == id }
@@ -85,27 +185,107 @@ final class CharacterLibrary: ObservableObject {
         characters.firstIndex { $0.id == id }
     }
 
+    /// Um binding pro personagem — mesma ideia do `binding(forCampaignID:)`
+    /// acima, usado onde uma lista filtrada (Sandbox, Elenco de uma
+    /// campanha) precisa de um binding pra um item que não é o array
+    /// `characters` inteiro.
+    func binding(forCharacterID id: UUID) -> Binding<PlayerCharacter>? {
+        guard let index = index(of: id) else { return nil }
+        return Binding(
+            get: { self.characters[index] },
+            set: { self.characters[index] = $0 }
+        )
+    }
+
+    /// Personagens sem campanha — o Sandbox.
+    var sandboxCharacters: [PlayerCharacter] {
+        characters.filter { $0.campaignID == nil }
+    }
+
+    func characters(in campaignID: UUID) -> [PlayerCharacter] {
+        characters.filter { $0.campaignID == campaignID }
+    }
+
+    /// Cria a primeira folha de magia de um personagem que ainda não tem
+    /// nenhuma, na sessão ativa da campanha — usado tanto ao criar um
+    /// personagem já dentro de uma campanha quanto ao associar um
+    /// personagem do Sandbox a uma. Sem campanha (ainda no Sandbox), não há
+    /// onde criar a folha — fica pendente até ele ser associado.
+    private func seedFirstSpellSheetIfNeeded(_ character: inout PlayerCharacter) {
+        guard character.characterClass.hasSpellSheet, character.spellSheets.isEmpty,
+              let campaignID = character.campaignID,
+              let campaignIdx = campaignIndex(of: campaignID)
+        else { return }
+        let session = campaigns[campaignIdx].activeSession()
+        var sheet = SpellSheet()
+        sheet.sessionID = session.id
+        sheet.title = "First day"
+        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.slotBoard = character.freshSlotBoard()
+        character.spellSheets = [sheet]
+    }
+
     @discardableResult
-    func addCharacter() -> PlayerCharacter {
+    func addCharacter(campaignID: UUID? = nil) -> PlayerCharacter {
         var new = PlayerCharacter()
         new.name = ""
-        // Só quem tem ficha de magia (Clérigo, por ora) já nasce com uma
-        // folha do primeiro dia — as outras classes nem mostram a aba.
-        if new.characterClass.hasSpellSheet {
-            var firstSheet = SpellSheet()
-            firstSheet.title = "Primeiro dia"
-            firstSheet.wisdomAtCreation = new.abilities.wisdom
-            // Vazia por enquanto: sem nada preenchido em "Spell Slots" na
-            // ficha ainda, não há o que herdar.
-            firstSheet.slotBoard = new.freshSlotBoard()
-            new.spellSheets = [firstSheet]
-        }
+        new.campaignID = campaignID
+        seedFirstSpellSheetIfNeeded(&new)
         characters.append(new)
         return new
     }
 
-    func delete(at offsets: IndexSet) {
-        characters.remove(atOffsets: offsets)
+    /// Duplica um personagem — nova identidade, sem histórico de sessões,
+    /// pronto pra recomeçar. A ficha em si (atributos, equipamento,
+    /// proficiências, magias favoritas...) é copiada como ponto de
+    /// partida; o clone nasce vivo, mesmo que o original esteja morto.
+    @discardableResult
+    func cloneCharacter(_ original: PlayerCharacter, into campaignID: UUID?) -> PlayerCharacter {
+        var clone = original
+        clone.id = UUID()
+        clone.campaignID = campaignID
+        clone.status = .alive
+        clone.diedOn = nil
+        clone.deathNote = nil
+        clone.clonedFromCharacterID = original.id
+        clone.spellSheets = []
+        seedFirstSpellSheetIfNeeded(&clone)
+        characters.append(clone)
+        return clone
+    }
+
+    /// Associa um personagem do Sandbox a uma campanha — se ele já tiver
+    /// classe com ficha de magia e nenhuma folha ainda, ganha a primeira
+    /// folha na sessão ativa da campanha, igual a um personagem que já
+    /// nasceu dentro dela.
+    func assign(_ character: PlayerCharacter, toCampaignID campaignID: UUID?) {
+        guard let idx = index(of: character.id) else { return }
+        characters[idx].campaignID = campaignID
+        seedFirstSpellSheetIfNeeded(&characters[idx])
+    }
+
+    func markDead(_ character: PlayerCharacter, on date: Date, note: String) {
+        guard let idx = index(of: character.id) else { return }
+        characters[idx].status = .dead
+        characters[idx].diedOn = date
+        characters[idx].deathNote = note.isEmpty ? nil : note
+    }
+
+    func toggleArchived(_ character: PlayerCharacter) {
+        guard let idx = index(of: character.id) else { return }
+        characters[idx].status = characters[idx].status == .archived ? .alive : .archived
+    }
+
+    /// Traz um personagem morto ou aposentado de volta pro elenco ativo.
+    func reviveToAlive(_ character: PlayerCharacter) {
+        guard let idx = index(of: character.id) else { return }
+        characters[idx].status = .alive
+        characters[idx].diedOn = nil
+        characters[idx].deathNote = nil
+    }
+
+    func deleteCharacter(_ character: PlayerCharacter) {
+        characters.removeAll { $0.id == character.id }
     }
 
     func update(_ character: PlayerCharacter) {

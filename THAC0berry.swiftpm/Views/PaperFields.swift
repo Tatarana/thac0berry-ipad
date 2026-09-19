@@ -1,5 +1,32 @@
 import SwiftUI
 
+/// Ponte entre um campo Optional do modelo (ver comentário de Codable-
+/// safety em `Character.swift` — todo campo novo tem que ser Optional pra
+/// não quebrar a leitura de fichas salvas antigas) e o `Binding` não-
+/// Optional que os campos de papel (`EditableText`, `EditableNumber`)
+/// esperam.
+extension Binding {
+    /// Para um `String?`/`Int?` etc.: lê o valor guardado ou o padrão, e
+    /// grava direto de volta no Optional (nunca precisa materializar nada).
+    func orDefault<T>(_ fallback: T) -> Binding<T> where Value == T? {
+        Binding<T>(
+            get: { self.wrappedValue ?? fallback },
+            set: { self.wrappedValue = $0 }
+        )
+    }
+
+    /// Para um struct Optional inteiro (ex.: `combat: CombatDetails?`): lê
+    /// o valor guardado ou um struct novo em folha, e materializa o
+    /// Optional na primeira escrita — assim os outros campos do struct que
+    /// forem preenchidos depois não se perdem.
+    func orInit<T>(_ makeDefault: @autoclosure @escaping () -> T) -> Binding<T> where Value == T? {
+        Binding<T>(
+            get: { self.wrappedValue ?? makeDefault() },
+            set: { self.wrappedValue = $0 }
+        )
+    }
+}
+
 /// Campos editáveis que continuam parecendo escrita na ficha: o valor fica
 /// à mostra em letra de mão e, ao ser tocado, abre um balão pequeno onde a
 /// caneta escreve por cima — nada de teclado nem de célula de formulário.
@@ -67,7 +94,7 @@ private struct NumberPad: View {
                 .overlay(alignment: .bottom) { DottedRule() }
             PadButton(symbol: "+") { onStep(1) }
             Button(action: onDone) {
-                Text("pronto")
+                Text("done")
                     .font(Paper.printed(13))
                     .foregroundStyle(Paper.ink)
             }
@@ -99,6 +126,10 @@ struct EditableText: View {
     var size: CGFloat = 26
     var tilt: Double = -0.4
     var underline: Bool = true
+    /// Disparado quando o balão fecha e o valor é gravado — usado por
+    /// campos que precisam reagir ao valor final (ex.: Wounds descontando
+    /// dos Hit Points), não só guardá-lo.
+    var onCommit: (String) -> Void = { _ in }
 
     @State private var isEditing = false
     @State private var draft = ""
@@ -124,7 +155,7 @@ struct EditableText: View {
             get: { isEditing },
             set: { open in
                 isEditing = open
-                if !open { value = draft }
+                if !open { value = draft; onCommit(draft) }
             }
         )) {
             HStack(spacing: 12) {
@@ -132,6 +163,7 @@ struct EditableText: View {
                                  allowsSoftwareKeyboard: true) {
                     value = draft
                     isEditing = false
+                    onCommit(draft)
                 }
                 .frame(width: 340, height: 64)
                 .overlay(alignment: .bottom) { DottedRule() }
@@ -139,8 +171,9 @@ struct EditableText: View {
                 Button {
                     value = draft
                     isEditing = false
+                    onCommit(draft)
                 } label: {
-                    Text("pronto")
+                    Text("done")
                         .font(Paper.printed(13))
                         .foregroundStyle(Paper.ink)
                 }
@@ -148,6 +181,30 @@ struct EditableText: View {
             .padding(14)
             .background(Paper.sheet)
             .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+/// Campo de texto livre que escreve DIRETO na página — sem abrir balão,
+/// como já fazíamos na Ficha de Magias (`HandwritingField` puro). Pra
+/// campos de nome/descrição onde o usuário quer digitar ou usar a Apple
+/// Pencil ali mesmo, em vez de tocar pra abrir um popover primeiro.
+struct InlineTextField: View {
+    @Binding var value: String
+    var placeholder: String = "—"
+    var fontSize: CGFloat = 16
+    var underline: Bool = false
+    var textColor: Color = Paper.penInk
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HandwritingField(text: $value, placeholder: placeholder,
+                             allowsSoftwareKeyboard: true, fontSize: fontSize,
+                             textColor: textColor)
+                .frame(height: fontSize + 16)
+            if underline {
+                Rectangle().fill(Paper.hairline).frame(height: 1)
+            }
         }
     }
 }

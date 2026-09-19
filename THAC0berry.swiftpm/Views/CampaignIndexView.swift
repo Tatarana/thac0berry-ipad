@@ -1,12 +1,17 @@
 import SwiftUI
 
-/// The campaign summary: table sessions (by the real-world date they
-/// happened) grouped by month, each with the handful of day sheets it
-/// contains. This is where a new session gets created, closed (archived,
-/// not deleted) or deleted for good.
+/// Um picker de sessões, do ponto de vista de UM personagem: table sessions
+/// (by the real-world date they happened) grouped by month, each with the
+/// handful of day sheets THIS character has in it — jogadas de sessão em
+/// si (criar, renomear, arquivar, apagar) mexem na campanha inteira, já que
+/// a sessão agora é compartilhada por quem mais estiver jogando nela; a
+/// visão completa do elenco/todas as sessões fica na tela da campanha
+/// (`CampaignDetailView`), aberta pelo ☰ ou voltando com "Back".
 struct CampaignIndexView: View {
     @Binding var character: PlayerCharacter
+    @Binding var campaign: Campaign
     @Binding var page: CharacterSheetView.SheetPage
+    @EnvironmentObject private var library: CharacterLibrary
 
     @State private var showNewSession = false
     @State private var showArchived = false
@@ -16,7 +21,7 @@ struct CampaignIndexView: View {
             header
 
             if activeSessions.isEmpty {
-                Text("No sessions yet — start one below, or tap “+ day sheet” on the character sheet.")
+                Text("No sessions yet — start one below.")
                     .font(Paper.printedItalic(13))
                     .foregroundStyle(Paper.inkSoft)
             }
@@ -30,8 +35,9 @@ struct CampaignIndexView: View {
 
                     ForEach(group.sessions) { session in
                         SessionRow(character: $character,
+                                   campaign: $campaign,
                                    session: session,
-                                   color: character.sessionColor(session),
+                                   color: campaign.sessionColor(session),
                                    dayCount: sheets(in: session).count,
                                    onOpen: { open(session) },
                                    onToggleArchive: { toggleArchive(session) },
@@ -51,11 +57,13 @@ struct CampaignIndexView: View {
         }
     }
 
-    /// Every new session is born with its first Priest Spell Sheet already
-    /// attached — a session with no day to open isn't much use at the table.
+    /// Every new session is born with this character's first Priest Spell
+    /// Sheet already attached — a session with no day to open isn't much
+    /// use at the table. Other characters in the same campaign pick up the
+    /// session itself the moment they open this same picker.
     private func createSession(date: Date, title: String) {
         let session = Session(date: date, title: title)
-        character.sessions.append(session)
+        campaign.sessions.append(session)
 
         var sheet = SpellSheet()
         sheet.sessionID = session.id
@@ -74,24 +82,17 @@ struct CampaignIndexView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Campaign Index")
+                Text("Sessions")
                     .font(Paper.hand(30))
                     .foregroundStyle(Paper.penInk)
-                Text("\(character.sessions.count) sessions logged")
+                Text("\(campaign.sessions.count) sessions logged in \(campaign.displayTitle)")
                     .font(Paper.printedItalic(12))
                     .foregroundStyle(Paper.inkSoft)
             }
             Spacer()
-            Button { showNewSession = true } label: {
-                Text("+ new session")
-                    .font(Paper.printed(12))
-                    .tracking(1)
-                    .foregroundStyle(Paper.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.2))
-            }
-            .buttonStyle(.plain)
+            RoundIconButton(systemImage: "calendar.badge.plus", style: .paper, action: {
+                showNewSession = true
+            }, accessibilityLabel: "New session")
         }
     }
 
@@ -107,8 +108,9 @@ struct CampaignIndexView: View {
             if showArchived {
                 ForEach(archivedSessions) { session in
                     SessionRow(character: $character,
+                               campaign: $campaign,
                                session: session,
-                               color: character.sessionColor(session),
+                               color: campaign.sessionColor(session),
                                dayCount: sheets(in: session).count,
                                onOpen: { open(session) },
                                onToggleArchive: { toggleArchive(session) },
@@ -121,11 +123,11 @@ struct CampaignIndexView: View {
     // MARK: - Derived data
 
     private var activeSessions: [Session] {
-        character.sessions.filter { !$0.isArchived }.sorted { $0.date > $1.date }
+        campaign.sessions.filter { !$0.isArchived }.sorted { $0.date > $1.date }
     }
 
     private var archivedSessions: [Session] {
-        character.sessions.filter { $0.isArchived }.sorted { $0.date > $1.date }
+        campaign.sessions.filter { $0.isArchived }.sorted { $0.date > $1.date }
     }
 
     private struct SessionGroup { let label: String; let sessions: [Session] }
@@ -151,18 +153,32 @@ struct CampaignIndexView: View {
 
     // MARK: - Actions
 
+    /// Abre a folha mais recente deste personagem na sessão — ou, se ele
+    /// ainda não tiver nenhuma ali (entrou na campanha depois, ou só ainda
+    /// não jogou esse dia), cria a primeira folha dele nessa sessão.
     private func open(_ session: Session) {
-        guard let latest = sheets(in: session).max(by: { $0.date < $1.date }) else { return }
-        page = .spells(latest.id)
+        if let latest = sheets(in: session).max(by: { $0.date < $1.date }) {
+            page = .spells(latest.id)
+            return
+        }
+        var sheet = SpellSheet()
+        sheet.sessionID = session.id
+        sheet.title = "Day 1"
+        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.slotBoard = character.freshSlotBoard()
+        character.spellSheets.append(sheet)
+        page = .spells(sheet.id)
     }
 
     private func toggleArchive(_ session: Session) {
-        guard let index = character.sessions.firstIndex(where: { $0.id == session.id }) else { return }
-        character.sessions[index].isArchived.toggle()
+        guard let index = campaign.sessions.firstIndex(where: { $0.id == session.id }) else { return }
+        campaign.sessions[index].isArchived.toggle()
     }
 
-    /// Deletes the session and every sheet in it along with it — otherwise
-    /// they'd be left orphaned, with no session to show up under.
+    /// Deletes this character's day sheets from the session. The session
+    /// itself — shared with whoever else is playing this campaign — is
+    /// only removed from the campaign if no OTHER character still has a
+    /// sheet pointing at it; otherwise their history would dangle.
     private func deleteSession(_ session: Session) {
         let deletedIDs = Set(sheets(in: session).map(\.id))
         let wasShowingDeleted: Bool = {
@@ -170,13 +186,20 @@ struct CampaignIndexView: View {
             return false
         }()
         character.spellSheets.removeAll { deletedIDs.contains($0.id) }
-        character.sessions.removeAll { $0.id == session.id }
         if wasShowingDeleted { page = .record }
+
+        let stillUsed = library.characters(in: campaign.id).contains { other in
+            other.id != character.id && other.spellSheets.contains { $0.sessionID == session.id }
+        }
+        if !stillUsed {
+            campaign.sessions.removeAll { $0.id == session.id }
+        }
     }
 }
 
 private struct SessionRow: View {
     @Binding var character: PlayerCharacter
+    @Binding var campaign: Campaign
     let session: Session
     let color: Color
     let dayCount: Int
@@ -185,6 +208,8 @@ private struct SessionRow: View {
     let onDelete: () -> Void
 
     @State private var showReport = false
+    @State private var isRenaming = false
+    @State private var renameDraft = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -199,8 +224,14 @@ private struct SessionRow: View {
                         .font(Paper.printed(11))
                         .foregroundStyle(Paper.inkSoft)
 
-                    EditableText(value: titleBinding, placeholder: "unnamed session",
-                                 size: 16, underline: false)
+                    // Só exibe — não é mais um botão de edição: tocar em
+                    // qualquer lugar da linha (inclusive aqui) abre a
+                    // sessão. Renomear virou uma opção do menu ⋯.
+                    HandValue(text: session.title.isEmpty ? "unnamed session" : session.title,
+                              size: 16,
+                              color: session.title.isEmpty ? Paper.inkSoft.opacity(0.6) : Paper.penInk,
+                              tilt: -0.4)
+                        .lineLimit(1)
 
                     Spacer(minLength: 4)
 
@@ -209,23 +240,51 @@ private struct SessionRow: View {
                         .foregroundStyle(Paper.inkSoft)
 
                     Button { showReport = true } label: {
-                        Text("report")
-                            .font(Paper.printedItalic(10))
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 13))
                             .foregroundStyle(Paper.inkSoft)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Session report")
 
                     Menu {
+                        Button("Rename session") {
+                            renameDraft = session.title
+                            isRenaming = true
+                        }
                         Button(session.isArchived ? "Reopen session" : "Close session",
                                action: onToggleArchive)
                         Button("Delete session", role: .destructive, action: onDelete)
                     } label: {
-                        Text("⋯")
-                            .font(Paper.printed(16))
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 15))
                             .foregroundStyle(Paper.inkSoft)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 2)
                     }
                     .buttonStyle(.plain)
+                    .popover(isPresented: $isRenaming) {
+                        HStack(spacing: 12) {
+                            HandwritingField(text: $renameDraft, placeholder: "unnamed session",
+                                             allowsSoftwareKeyboard: true) {
+                                titleBinding.wrappedValue = renameDraft
+                                isRenaming = false
+                            }
+                            .frame(width: 340, height: 64)
+                            .overlay(alignment: .bottom) { DottedRule() }
+
+                            Button {
+                                titleBinding.wrappedValue = renameDraft
+                                isRenaming = false
+                            } label: {
+                                Text("done")
+                                    .font(Paper.printed(13))
+                                    .foregroundStyle(Paper.ink)
+                            }
+                        }
+                        .padding(14)
+                        .background(Paper.sheet)
+                        .presentationCompactAdaptation(.popover)
+                    }
                 }
 
                 if !session.summary.isEmpty {
@@ -254,10 +313,10 @@ private struct SessionRow: View {
 
     private var titleBinding: Binding<String> {
         Binding(
-            get: { character.sessions.first { $0.id == session.id }?.title ?? "" },
+            get: { campaign.sessions.first { $0.id == session.id }?.title ?? "" },
             set: { newValue in
-                if let index = character.sessions.firstIndex(where: { $0.id == session.id }) {
-                    character.sessions[index].title = newValue
+                if let index = campaign.sessions.firstIndex(where: { $0.id == session.id }) {
+                    campaign.sessions[index].title = newValue
                 }
             }
         )

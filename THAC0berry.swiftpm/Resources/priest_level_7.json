@@ -32,7 +32,7 @@
     "duration": "1 turn",
     "areaOfEffect": "Special",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "A chain lightning stroke inflicts 1d6 points of damage per level of the caster to a maximum of 12d6 points and loses one die of damage ea…",
     "summary": "==Faiths & Avatars Version==\nThis spell is exactly like the winds of Akadi spell in effect except that the lightning that issues forth from the cloud behaves like that produced by the 6th-level wizard spell chain lightning.",
     "damageDice": null,
     "spheres": [
@@ -74,7 +74,7 @@
     "duration": "1 rd./level",
     "areaOfEffect": "2 cu. ft./level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "While the exact details of the animated rock are decided by the DM, its Armor Class is no worse than 5, and it has 1d3 hit points per cub…",
     "summary": "By employing an animate rock spell, the caster causes a stone object of up to the indicated size to move (see the 6th-level animate object spell.). The animated stone object must be separate (not a part of a huge boulder or the like).",
     "damageDice": null,
     "spheres": [
@@ -138,7 +138,7 @@
     "duration": "Permanent",
     "areaOfEffect": "1 item",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Roll 1d6; a result of 1 or 2 means an explosion occurs similar to a fireball centered on the item that deals 1d6 points of damage per lev…",
     "summary": "This spell is used to activate a touched magical item bearing multiple enchantments or exhibiting multiple functions. It is an alternative to the better-known enchant an item spell, but accomplishes less.",
     "damageDice": null,
     "spheres": [
@@ -222,9 +222,18 @@
     "duration": "Special",
     "areaOfEffect": "Creature touched",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "1d10",
     "summary": "By touching a creature, the caster bestows a major curse upon it. The caster can choose any effect from the list of major curse effects (see list).",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 10,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "All"
     ],
@@ -243,9 +252,18 @@
     "duration": "6 rds.",
     "areaOfEffect": "Up to twelve 10 x 10-ft. cubes",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "6d6",
     "summary": "A more powerful version of the slicing shadow spell, this spell creates a smoky cloud in which spectral dark mouths lined with glittering black fangs appear and disappear.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 6,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Protection"
@@ -328,9 +346,18 @@
     "duration": "5 turns/level",
     "areaOfEffect": "5 square yards + 50 square yards/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d12",
     "summary": "SFP: 200\n\nThis spell draws on seismic energy and the elemental power of ice to create a small area of intense cold. This 5-square-yards area is ground zero for a cryovolcanic eruption, an explosion of ice and volatile elements.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 12,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental",
       "Combat"
@@ -477,9 +504,18 @@
     "duration": "Special",
     "areaOfEffect": "The caster's staff",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "4d6",
     "summary": "By means of this spell, the caster is able to change a specially prepared staff into a treantlike creature of the largest size, about 24 feet tall.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Creation",
       "Plant"
@@ -499,9 +535,18 @@
     "duration": "12 hours",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "When this spell is cast, it brings forth a large, flaming chariot pulled by two fiery horses from the elemental plane of Fire. These appear in a clap of thunder amid a cloud of smoke.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire",
       "Creation"
@@ -521,7 +566,7 @@
     "duration": "Special",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The cloak heals 4d8 hit points of damage.",
     "summary": "This powerful spell surrounds the protected creature with a faint magical aura. It takes effect (days or perhaps years later) when the being it is cast on must make a system shock survival roll, or when the being reaches 6 hit points or less.",
     "damageDice": null,
     "spheres": [
@@ -971,9 +1016,18 @@
     "duration": "Special",
     "areaOfEffect": "1 creature",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "3d8+3",
     "summary": "The curse of Yondalla is reserved for creatures that have done something horrible to offend Yondalla—for example, destroying a halfling community completely or killing innocent and defenseless halflings, such as the aged or children.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 8,
+      "bonus": 3,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Time"
     ],
@@ -992,9 +1046,18 @@
     "duration": "Special",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "3d8",
     "summary": "When this spell is cast, a clap of thunder sounds and a billowing cloud of smoke erupts from around the caster or at a spot within 10 yards of him or her. Within this cloud appears a flaming chariot pulled by two fiery horses.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -1013,7 +1076,7 @@
     "duration": "Special",
     "areaOfEffect": "One individual (usually caster)",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "* Any physical damage sustained by the individual is completely healed except for 2–5 (1d4+1) points of damage.",
     "summary": "By completing this ritual, a high priest forges a powerful pact with his or her deity. The covenant ensures that a chosen individual will survive an untimely death.",
     "damageDice": null,
     "spheres": [
@@ -1035,7 +1098,7 @@
     "duration": "Permanent (Special - PSC)",
     "areaOfEffect": "Special",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "This energy blast does 3d8 points of damage to all creatures within 10 feet, 2d8 points to all within 11 to 20 feet, 1d8 to all within 21…",
     "summary": "The Risen Cult of Bane uses a special symbol created long ago with the direct assistance of the god Bane.",
     "damageDice": null,
     "spheres": [
@@ -1056,7 +1119,7 @@
     "duration": "Concentration",
     "areaOfEffect": "1 creature",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Drinking a canteen of water stops all damage for 4 rounds and restores 1d4 points of damage taken from this spell.",
     "summary": "This awful spell causes water to evaporate rapidly from the target creature's body. The creature loses 1 hit point per round as its body fluids seep to the surface of the skin and are absorbed by the spell.",
     "damageDice": null,
     "spheres": [
@@ -1078,9 +1141,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "One magedoom",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "10d8",
     "summary": "This spell was recently developed by the church of Azuth in response to the creation of a mage-killing horror known as a magedoom by the powerful wizards of the Zhentarim.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 10,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Summoning",
       "Protection"
@@ -1122,7 +1194,7 @@
     "duration": "1 turn/level",
     "areaOfEffect": "1/2 sq. mile/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The force of these winds is such that small boats are automatically capsized, large ships are capsized 70% of the time, branches are dope…",
     "summary": "This spell summons mighty hurricane-force winds at the shukenja's command.",
     "damageDice": null,
     "spheres": [
@@ -1164,9 +1236,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "5-ft. diameter/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "5d12",
     "summary": "When this spell is cast by a priest, a local tremor of fairly high strength rips the ground. The shock is over in one round.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 5,
+      "sides": 12,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Earth"
     ],
@@ -1227,9 +1308,18 @@
     "duration": "1 rd./level",
     "areaOfEffect": "30-ft. diameter",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "1d8",
     "summary": "This spell can be cast only upon ground with a foundation of earth or natural rock. It causes the area to erupt into geysers of molten rock.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Magma"
     ],
@@ -1334,7 +1424,7 @@
     "duration": "1 rd.",
     "areaOfEffect": "two 10-ft. cubes/level",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "Creatures within the area of fire and 10 feet or less from the edge of the affected area receive 2d8 points of damage plus additional dam…",
     "summary": "When a fire storm spell is cast, the whole area is shot through with sheets of roaring flame that equal a wall of fire spell in effect.",
     "damageDice": null,
     "spheres": [
@@ -1397,9 +1487,18 @@
     "duration": "1 round/level",
     "areaOfEffect": "10 square feet per level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d6",
     "summary": "This spell creates a wall of energy from the Negative Energy Plane that is actually a portal to that fell place. A gate of doom appears as a shimmering curtain of lightless black.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Summoning"
     ],
@@ -1418,7 +1517,7 @@
     "duration": "1 rd./level",
     "areaOfEffect": "30 ft. radius",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Living and undead creatures take 2d8 points of damage per round until they leave the path of the storm.",
     "summary": "This powerful version of the sand spray spell not only lifts and separates tiny crystal shards from sand or silt, it creates a terrible wind to propel them.",
     "damageDice": null,
     "spheres": [
@@ -1481,9 +1580,18 @@
     "duration": "1 turn or less",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "9d6",
     "summary": "This spell creates a five-stringed silver harp of glowing force in the caster's hands. This is a weightless instrument that can be \"hung\" in midair to allow the caster to cast other spells or engage in other activities.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 9,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -1502,9 +1610,18 @@
     "duration": "Permanent",
     "areaOfEffect": "One creature",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "5d8",
     "summary": "This spell requires intense concentration (hence the long casting time) and can only be delivered by touch, requiring a successful attack roll to deliver on any but totally immobilized opponents.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 5,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Necromantic"
@@ -1524,9 +1641,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 undead or lower planar creature 1 creature (EM)",
     "savingThrow": "Special See below (EM)",
-    "damage": null,
+    "damage": "2d8",
     "summary": "This powerful spell is used against undead and Negative Material Plane creatures.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Creation"
     ],
@@ -1545,9 +1671,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 creature",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d8+1",
     "summary": "This spell transforms a sprig of holly into a deadly missile, which must be hurled immediately at a living creature.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 8,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -1714,7 +1849,7 @@
     "duration": "1d4 rds.",
     "areaOfEffect": "Variable",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Unprotected creatures with 4 or more Hit Dice take 3d6 points of damage per round of exposure.",
     "summary": "This spell creates a huge, racing wall of water that destroys structures of less than the sturdiest stone construction. The size and destructive power of the wave depends on the amount of water pressure.",
     "damageDice": null,
     "spheres": [
@@ -1756,9 +1891,18 @@
     "duration": "1 turn",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell causes a large body of water (a pond having a 60-foot-deep area that is itself 120 feet across or larger, a lake, or the sea) to sink and whirl into a sucking, drowning cone.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Water"
     ],
@@ -1926,9 +2070,18 @@
     "duration": "1 turn",
     "areaOfEffect": "1 incomplete writing or diagram",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d6",
     "summary": "This spell is an entreaty to Oghma himself to complete a missing, partial, or obscured word, inscription, or diagram in a writing found by the priest.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Divination"
     ],
@@ -1969,9 +2122,18 @@
     "duration": "Permanent",
     "areaOfEffect": "One moonwell (Moonwell touched - PSC)",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "3d4",
     "summary": "This complicated evil ritual to magically veil moonwells was recently rediscovered and developed by certain priests of Bane.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Water"
     ],
@@ -2075,9 +2237,18 @@
     "duration": "2–3 rounds",
     "areaOfEffect": "150' radius/level (or wall 3,000 x 1,000 yards, see below)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d8",
     "summary": "SFP: 300+1d20/level of caster\n\nThis spell creates a pyroclastic surge: an incandescent, ground-hugging cloud of hot dust and pumice that races along the earth's surface at MV 36. Anyone in its path must make a successful saving throw vs.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental"
     ],
@@ -2328,7 +2499,7 @@
     "duration": "1 turn",
     "areaOfEffect": "1 item",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Curative energy gained is 1d4 points of healing for every spell level used up; a partially transformed spell cannot be cast forth, and ex…",
     "summary": "This complicated cooperative spell ritual allows its participants to cast spells into a prepared item or being; to transfer charges of magical energy from one item to another; or to infuse an item or being with powers from another magical item, altar, artifact, or other item of great power.",
     "damageDice": null,
     "spheres": [
@@ -2519,9 +2690,18 @@
     "duration": "2 rds./level",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "10d6",
     "summary": "By casting this spell on the Sea of Silt, the priest creates a powerful whirlwind of silt.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 10,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Air",
       "Earth"
@@ -2541,9 +2721,18 @@
     "duration": "1d6 turns",
     "areaOfEffect": "10 ft./level",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d10",
     "summary": ": ''Spelt \"Sirocco\" in Priest's Spell Compendium''\n\nWith this spell, a caster summons up a sirocco, the burning desert wind of legend. The caster must be able to see the sky to cast this spell, and must be in an area covered with sand or loose stone.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 10,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Air or Silt"
     ],
@@ -2583,9 +2772,18 @@
     "duration": "1 round/level",
     "areaOfEffect": "50-foot-diameter sphere",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "5d6",
     "summary": "==Tome of Magic Text==\nAccording to one view of the universe, what we perceive as gravity is actually a localized warping of the fabric of space-time. The spacewarp spell creates a temporary but very intense warping in a limited area.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 5,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Numbers"
     ],
@@ -2625,7 +2823,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "One being",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Casters who use this spell on themselves can—at an immediate cost of 1d6 points of damage to themselves—transfer the protection of the wa…",
     "summary": "This powerful magic confers upon the caster or a single living touched spell recipient complete personal immunity to one specific, named wizard spell of each level (for example, lightning bolt, not just any lightning spell), which must be determined during casting.",
     "damageDice": null,
     "spheres": [
@@ -2732,9 +2930,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "Special",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "2d8+14",
     "summary": "When a stone storm spell is cast, the area of effect is enmeshed in a vortex of swirling, battering rock and stone.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 8,
+      "bonus": 14,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Earth"
     ],
@@ -2817,7 +3024,7 @@
     "duration": "1+1d4 rds.",
     "areaOfEffect": "5-ft. radius (special)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Undead caught within the sunray's area of effect receive 8d6 points of damage, one-half if a saving throw vs.",
     "summary": "With this spell, the caster can evoke a dazzling beam of light each round in which no action other than movement is performed. The sunray is like a ray of natural sunlight.",
     "damageDice": null,
     "spheres": [
@@ -2901,9 +3108,18 @@
     "duration": "Special",
     "areaOfEffect": "50-foot cube",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d6",
     "summary": "Tentacle walls enables the caster to enchant a single room whose volume is less than or equal to the area of effect. The spell activates 1d4 rounds after any creature other than the caster enters the room.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Wards"
     ],
@@ -3027,7 +3243,7 @@
     "duration": "Special",
     "areaOfEffect": "Wave 2 ft. high and 10 ft. long per level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Creatures caught in the area sustain 1d4 points of damage for every 5 feet of height the tsunami currently possesses and are carried alon…",
     "summary": "This mighty spell summons a tsunami, or gigantic wave, from any major body of water. The body of water must be at least 1 mile in width, so in most circumstances the tsunami can only be summoned from the sea, large lakes, or extremely big rivers.",
     "damageDice": null,
     "spheres": [
@@ -3048,7 +3264,7 @@
     "duration": "1d4 rounds",
     "areaOfEffect": "Variable",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Unprotected creatures with 4 or more Hit Dice take 3d6 points of damage per round of exposure.",
     "summary": "This spell creates a huge, racing wall of water that destroys structures of less than the sturdiest stone construction.",
     "damageDice": null,
     "spheres": [
@@ -3324,9 +3540,18 @@
     "duration": "Special",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "10d10",
     "summary": "The potent spell allows the priest to call directly on the Weave to fashion nonliving matter out of magic or to reshape existing matter. Given enough time and energy, nearly any object can be created or shaped.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 10,
+      "sides": 10,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Creation"
     ],
@@ -3345,7 +3570,7 @@
     "duration": "3+1d4 rounds",
     "areaOfEffect": "A 270-foot-high cone with an apex 30 feet in diameter and a 10-foot-diameter base",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "Unprotected creatures with 4 or more Hit Dice take 3d6 points of damage per round of exposure from buffeting, flying debris, etc.",
     "summary": "This spell creates damaging, gale-force winds capable of destroying structures of less than the sturdiest stone construction. On land, the whirlwind appears as a tornado; at sea, it appears as a hurricane.",
     "damageDice": null,
     "spheres": [

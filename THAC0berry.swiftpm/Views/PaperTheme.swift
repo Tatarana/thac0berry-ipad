@@ -1,6 +1,22 @@
 import SwiftUI
 import UIKit
 
+extension Image {
+    /// Carrega um PNG do bundle pelo nome (sem extensão) via `UIImage`, não
+    /// via `Image(_:)` direto — mesmo truque que `HomeView.mascotBadge` já
+    /// usava sozinha: o catálogo de assets do Swift Playgrounds às vezes
+    /// não enxerga um PNG solto em `Resources/`, mas `Bundle.main.url`
+    /// sempre encontra. Usado pelos ícones ilustrados entregues pela LLM de
+    /// imagem (ver `Docs/icon-button-spec.md`) — todos PNG com fundo
+    /// transparente.
+    static func bundled(_ name: String) -> Image? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
+              let uiImage = UIImage(contentsOfFile: url.path)
+        else { return nil }
+        return Image(uiImage: uiImage)
+    }
+}
+
 /// A identidade visual do app é uma folha de ficha: pergaminho, tinta
 /// marrom-escura, valores escritos à caneta azul, correções em vermelho.
 /// Nada de Form, List ou controle padrão do sistema à vista.
@@ -16,6 +32,14 @@ enum Paper {
     static let redInk = Color(red: 0.549, green: 0.184, blue: 0.133)  // #8C2F22
 
     static let hairline = Color(red: 0.184, green: 0.153, blue: 0.110).opacity(0.42)
+
+    /// A "capa" do caderno — fundo escuro de couro que envolve a navegação
+    /// (a fileira de abas, o menu) por fora das folhas de verdade. Só o
+    /// conteúdo (a ficha, a folha de magia, a página do caderno) continua
+    /// com cara de pergaminho; a moldura ao redor agora é a capa, não mais
+    /// mais uma folha igual às de dentro.
+    static let chrome = Color(red: 0.176, green: 0.129, blue: 0.098)   // #2D2119 couro escuro
+    static let chromeDeep = Color(red: 0.129, green: 0.094, blue: 0.071)
 
     /// Tarja de cabeçalho só do bloco de Turn Undead — um vinho escuro, pra
     /// não ser confundido de relance com a tarja preta dos círculos de magia.
@@ -91,11 +115,11 @@ enum Paper {
     }()
 }
 
-extension PlayerCharacter {
+extension Campaign {
     /// Cor da divisória de uma sessão — sempre a mesma pra mesma sessão,
-    /// calculada pela posição cronológica dela entre todas as sessões (não
-    /// pela posição na lista filtrada/ordenada de exibição), pra não mudar
-    /// de cor conforme sessões são arquivadas ou criadas.
+    /// calculada pela posição cronológica dela entre todas as sessões da
+    /// campanha (não pela posição na lista filtrada/ordenada de exibição),
+    /// pra não mudar de cor conforme sessões são arquivadas ou criadas.
     func sessionColor(_ session: Session) -> Color {
         let chronological = sessions.sorted { $0.date < $1.date }
         let index = chronological.firstIndex { $0.id == session.id } ?? 0
@@ -128,6 +152,39 @@ struct PaperBackground: View {
                 .stroke(Paper.ink.opacity(0.30), lineWidth: 34)
                 .blur(radius: 26)
                 .padding(-16)
+        }
+        .drawingGroup()
+        .ignoresSafeArea()
+    }
+}
+
+/// Fundo da capa de couro que envolve a navegação (fileira de abas) — o
+/// mesmo grão de ruído do pergaminho, só que multiplicado sobre um marrom
+/// bem mais escuro, com manchas de desgaste e uma linha de costura sutil
+/// rente à borda de baixo, como a lombada de um caderno de couro de verdade.
+struct ChromeBackground: View {
+    var body: some View {
+        ZStack {
+            Paper.chrome
+
+            RadialGradient(colors: [Color.white.opacity(0.07), Color.clear],
+                           center: UnitPoint(x: 0.2, y: 0.1),
+                           startRadius: 4, endRadius: 260)
+
+            RadialGradient(colors: [Paper.chromeDeep.opacity(0.8), Color.clear],
+                           center: UnitPoint(x: 0.85, y: 0.9),
+                           startRadius: 10, endRadius: 320)
+
+            Paper.grain
+                .resizable(resizingMode: .tile)
+                .blendMode(.multiply)
+                .opacity(0.24)
+
+            // Um fio de costura, rente à borda de baixo da capa.
+            Rectangle()
+                .fill(Paper.chromeDeep)
+                .frame(height: 1)
+                .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .drawingGroup()
         .ignoresSafeArea()
@@ -228,5 +285,130 @@ struct SlotCircle: View {
         }
         .frame(width: diameter, height: diameter)
         .contentShape(Circle())
+    }
+}
+
+/// Um ícone redondo — a mesma "moeda" visual usada em vários cantos do
+/// app pra ações que antes eram caixinhas de texto ("+ new campaign",
+/// "Archive", "< Campaigns"...). Só o desenho, sem ação própria: quem usa
+/// decide se embrulha num `Button` simples (`RoundIconButton`, logo
+/// abaixo) ou no label de um `NavigationLink`, pra nunca acabar com um
+/// botão dentro de outro botão.
+struct RoundIconBadge: View {
+    let systemImage: String
+    var style: Style = .badge
+
+    enum Style {
+        /// Selo escuro de couro — pra ação "especial", meio fora do fluxo
+        /// normal de conteúdo (o Grimório, atalhos de topo de tela).
+        case badge
+        /// Contorno de tinta sobre pergaminho — pro resto dos ícones de
+        /// ação dentro do conteúdo (arquivar, voltar, os "+").
+        case paper
+    }
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: style == .badge ? 18 : 14, weight: .medium))
+            .foregroundStyle(style == .badge ? Paper.sheet : Paper.ink)
+            .frame(width: style == .badge ? 42 : 34, height: style == .badge ? 42 : 34)
+            .background(style == .badge ? Paper.ink : Color.white.opacity(0.16))
+            .clipShape(Circle())
+            .overlay(Circle().stroke(style == .badge ? Paper.chromeDeep : Paper.ink,
+                                     lineWidth: style == .badge ? 1.5 : 1.2))
+            .shadow(color: Paper.ink.opacity(style == .badge ? 0.3 : 0), radius: 3, y: 1.5)
+            // O círculo desenhado (34-42pt) fica menor que o mínimo de
+            // 44×44pt que a Apple recomenda pra alvo de toque — sem isso,
+            // um toque perto da borda (não bem no centro) não registra, e
+            // o botão parece "não funcionar" de primeira. `clipShape`
+            // sozinho restringe o toque à forma recortada; o
+            // `contentShape` por cima devolve a área cheia.
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+    }
+}
+
+/// Atalho pra quando o ícone É o botão inteiro (sem `NavigationLink` por
+/// perto pra fornecer a ação) — "+ novo", arquivar, voltar.
+struct RoundIconButton: View {
+    let systemImage: String
+    var style: RoundIconBadge.Style = .badge
+    let action: () -> Void
+    var accessibilityLabel: String = ""
+    /// Texto que aparece num balãozinho ao tocar e segurar — só vale a
+    /// pena nos botões maiores/mais importantes (a estante de Campanhas e
+    /// a tela de uma Campanha); nos outros o ícone já fala por si, e um
+    /// tooltip a mais só polui a tela.
+    var tooltip: String? = nil
+
+    var body: some View {
+        Button(action: action) {
+            RoundIconBadge(systemImage: systemImage, style: style)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .modifier(OptionalTooltip(text: tooltip))
+    }
+}
+
+/// Toque e segure num botão pra ver o nome da ação escrito — pensado pra
+/// quem ainda não decorou o que cada ícone novo faz. `simultaneousGesture`
+/// (em vez de substituir o gesto do Button) garante que o toque normal
+/// continua funcionando exatamente igual, o long press só é mais uma
+/// observação por cima.
+struct LongPressTooltip: ViewModifier {
+    let text: String
+    @State private var isShowing = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .top) {
+                if isShowing {
+                    Text(text)
+                        .font(Paper.printed(11))
+                        .tracking(0.4)
+                        .foregroundStyle(Paper.sheet)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Paper.ink)
+                        .clipShape(Capsule())
+                        .fixedSize()
+                        .offset(y: -40)
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                        .zIndex(1)
+                        .allowsHitTesting(false)
+                }
+            }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+                    withAnimation(.easeOut(duration: 0.15)) { isShowing = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+                        withAnimation(.easeIn(duration: 0.2)) { isShowing = false }
+                    }
+                }
+            )
+    }
+}
+
+/// Aplica o `LongPressTooltip` só quando há texto — deixa `RoundIconButton`
+/// usável sem tooltip nenhum sem precisar de dois inits diferentes.
+private struct OptionalTooltip: ViewModifier {
+    let text: String?
+
+    func body(content: Content) -> some View {
+        if let text {
+            content.modifier(LongPressTooltip(text: text))
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// Mesmo tooltip de toque-e-segure do `RoundIconButton`, exposto pra
+    /// quando o botão de verdade não é um `Button` (o label de um
+    /// `NavigationLink`, por exemplo — o Grimório na estante).
+    func actionTooltip(_ text: String) -> some View {
+        modifier(LongPressTooltip(text: text))
     }
 }

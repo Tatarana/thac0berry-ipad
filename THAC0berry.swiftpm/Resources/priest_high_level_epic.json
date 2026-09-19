@@ -277,7 +277,7 @@
     "duration": "1 day",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Items that fail are destroyed; creatures take 10d6 points of damage.",
     "summary": "With this spell, the priest calls up a ring of enormous mountains. The priest must spend the entire day of preparation time in careful meditation in the vicinity of existing mountains, within the distance shown on the table.",
     "damageDice": null,
     "spheres": [
@@ -584,9 +584,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "50-foot square, 5' high (1,250 cubic feet)",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "20d8+20",
     "summary": "This spell creates a blast of force that inflicts 20d8+20 points of damage to all creatures within the area of effect.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 20,
+      "sides": 8,
+      "bonus": 20,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [],
     "fullDescription": "This spell creates a blast of force that inflicts 20d8+20 points of damage to all creatures within the area of effect. At least one target creature must already be engaged in some form of combat (missile, melee, or offensive spellcasting); the spell cannot be used preemptively (a rare condition).\n\nThe material components are any weapon (common), a tooth or claw from a huge or gargantuan creature, a horseshoe worn into battle by a warhorse (rare), the shards of a diamond shattered by a single blow from a titan, and a bit of cloth dampened with a widow's tears (exotic).",
     "setting": "Generic"

@@ -76,9 +76,18 @@ struct SpellDamage: Codable, Hashable {
     /// 10d6 mesmo com um conjurador de nível mais alto).
     var maxDice: Int? = nil
     var isHealing: Bool = false
+    /// Bônus que cresce com o nível do conjurador (diferente de `dice`
+    /// escalando: aqui o DADO fica fixo, só o bônus somado sobe) — ex.:
+    /// "1d3 points of damage plus 2 points per level" (Frost Fingers).
+    /// Some com `bonus` (que continua sendo o valor fixo, se houver os
+    /// dois ao mesmo tempo).
+    var bonusPerLevel: Int = 0
+    /// Teto pro bônus TOTAL já escalado (`bonusPerLevel * nível`), quando
+    /// o texto original menciona um máximo explícito. `nil` = sem teto.
+    var maxBonus: Int? = nil
 
     /// O valor já calculado para o nível do conjurador, pronto para a
-    /// tabela: "10d6", "2d8 + 1", "1d4".
+    /// tabela: "10d6", "2d8 + 1", "1d4", "1d3 + 10".
     func text(casterLevel: Int) -> String {
         let count: Int
         if scalesWithLevel {
@@ -87,9 +96,14 @@ struct SpellDamage: Codable, Hashable {
         } else {
             count = dice
         }
+        var totalBonus = bonus
+        if bonusPerLevel > 0 {
+            let scaled = bonusPerLevel * max(casterLevel, 1)
+            totalBonus += min(scaled, maxBonus ?? scaled)
+        }
         var text = sides > 0 ? "\(count)d\(sides)" : "\(count)"
-        if bonus > 0 { text += " + \(bonus)" }
-        if bonus < 0 { text += " - \(abs(bonus))" }
+        if totalBonus > 0 { text += " + \(totalBonus)" }
+        if totalBonus < 0 { text += " - \(abs(totalBonus))" }
         return text
     }
 }

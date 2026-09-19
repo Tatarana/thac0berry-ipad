@@ -55,20 +55,37 @@ enum Fuzzy {
         if lhs == rhs { return 1 }
         if lhs.isEmpty || rhs.isEmpty { return 0 }
 
+        // Escrever só o começo do nome é o caso mais comum na mesa
+        // ("cure", "mag mis") — bem mais comum que um erro de digitação no
+        // meio do nome. Antes isso ganhava só um empurrão fixo (+0.15) em
+        // cima da pontuação de Levenshtein do texto INTEIRO, que despenca
+        // com a diferença de tamanho: "cure" x "cure light wounds" (a
+        // magia certa) pontuava menos que "cure" x "courage" (uma palavra
+        // sem nada a ver, só coincidentemente parecida letra a letra) — a
+        // sugestão errada vinha na frente. Prefixo de verdade agora tem sua
+        // própria conta, alta e proporcional ao quanto falta completar (não
+        // o texto inteiro), em vez de herdar a penalidade de comprimento do
+        // resto do nome. Só conta a partir de três letras, senão "s" viraria
+        // "Sleep" com alta confiança.
+        if lhs.count >= 3 {
+            if rhs.hasPrefix(lhs) {
+                return 0.75 + 0.25 * (Double(lhs.count) / Double(rhs.count))
+            }
+            if lhs.hasPrefix(rhs) {
+                return 0.75 + 0.25 * (Double(rhs.count) / Double(lhs.count))
+            }
+        }
+
         let a = Array(lhs), b = Array(rhs)
         let distance = levenshtein(a, b)
         let base = Double(max(a.count, b.count))
         var score = 1 - Double(distance) / base
 
-        // Escrever só o começo do nome é comum na mesa ("mag mis"), então
-        // prefixo e substring valem um empurrão — exclusivos entre si e só a
-        // partir de três letras, senão "s" viraria "Sleep" com alta confiança.
-        if lhs.count >= 3 {
-            if rhs.hasPrefix(lhs) || lhs.hasPrefix(rhs) {
-                score += 0.15
-            } else if rhs.contains(lhs) || lhs.contains(rhs) {
-                score += 0.10
-            }
+        // Substring no meio do nome (não no começo, esse já voltou acima)
+        // ainda vale um empurrão menor — "mag mis" não é um bom exemplo
+        // disso, mas "hammer" dentro de "spiritual hammer" é.
+        if lhs.count >= 3, rhs.contains(lhs) || lhs.contains(rhs) {
+            score += 0.10
         }
 
         // Iniciais das palavras: "mm" acha "Magic Missile".

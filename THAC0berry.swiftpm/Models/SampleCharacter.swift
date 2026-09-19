@@ -8,21 +8,35 @@ import Foundation
 /// nível mais 2/2/1 de bônus por Sabedoria 17 — total 7/6/5/3/2/1.
 extension PlayerCharacter {
 
-    static func kelmon() -> PlayerCharacter {
+    /// O exemplo de primeira execução agora vem com sua própria campanha —
+    /// personagem e campanha são entidades separadas desde esta versão.
+    static func kelmonWithCampaign() -> (Campaign, PlayerCharacter) {
+        var campaign = Campaign()
+        campaign.name = "The Elturel Campaign"
+        campaign.startedDate = Date().addingTimeInterval(-26 * 3600)
+
+        // Duas sessões de mesa de exemplo, pra mostrar o índice já povoado:
+        // a chegada em Elturel (ontem) e a sessão de hoje.
+        let arrivalSession = Session(date: Date().addingTimeInterval(-26 * 3600),
+                                     title: "Arrival in Elturel")
+        let todaySession = Session(date: Date(), title: "The Temple Trail")
+        campaign.sessions = [arrivalSession, todaySession]
+
         var kelmon = PlayerCharacter()
+        kelmon.campaignID = campaign.id
         kelmon.name = "Kelmon"
         kelmon.playerName = "Fernando"
-        kelmon.race = "Humano"
+        kelmon.race = "Human"
         kelmon.characterClass = .cleric
         kelmon.level = 11
-        kelmon.alignment = "Leal e Bom"
+        kelmon.alignment = "Lawful Good"
         kelmon.deity = "Torm"
         kelmon.sex = "M"
         kelmon.age = "41"
-        kelmon.height = "1,78"
-        kelmon.weight = "82 kg"
-        kelmon.hair = "Grisalhos"
-        kelmon.eyes = "Castanhos"
+        kelmon.height = "5'10\""
+        kelmon.weight = "180 lb"
+        kelmon.hair = "Gray"
+        kelmon.eyes = "Brown"
         kelmon.movement = 9
 
         kelmon.abilities = AbilityScores(
@@ -54,36 +68,36 @@ extension PlayerCharacter {
         kelmon.details = kelmonDetails()
 
         kelmon.weapons = [
-            WeaponEntry(name: "Maça +2", attacks: "1", thac0: "12",
+            WeaponEntry(name: "Mace +2", attacks: "1", thac0: "12",
                         damageSmall: "1d6+3", damageLarge: "1d6+3", range: "—"),
-            WeaponEntry(name: "Funda", attacks: "1", thac0: "14",
+            WeaponEntry(name: "Sling", attacks: "1", thac0: "14",
                         damageSmall: "1d4", damageLarge: "1d4", range: "5/10/20")
         ]
 
         kelmon.equipment = [
-            EquipmentItem(name: "Cota de placas", note: "50"),
-            EquipmentItem(name: "Escudo grande +1", note: "10"),
-            EquipmentItem(name: "Símbolo sagrado de prata", note: "1"),
-            EquipmentItem(name: "Poção de cura ×2", note: "2"),
-            EquipmentItem(name: "Mochila, corda, tochas", note: "14"),
-            EquipmentItem(name: "Rações de viagem (5 dias)", note: "5")
+            EquipmentItem(name: "Plate mail", note: "50"),
+            EquipmentItem(name: "Large shield +1", note: "10"),
+            EquipmentItem(name: "Silver holy symbol", note: "1"),
+            EquipmentItem(name: "Potion of healing ×2", note: "2"),
+            EquipmentItem(name: "Backpack, rope, torches", note: "14"),
+            EquipmentItem(name: "Trail rations (5 days)", note: "5")
         ]
 
-        kelmon.weaponProficiencies = ["Maça", "Funda", "Martelo de guerra"]
+        kelmon.weaponProficiencies = ["Mace", "Sling", "War hammer"]
 
         kelmon.skills = [
-            EquipmentItem(name: "Religião", note: "Sab 17"),
-            EquipmentItem(name: "Cura", note: "Sab 15"),
-            EquipmentItem(name: "Herbalismo", note: "Int 10"),
-            EquipmentItem(name: "Leitura e escrita", note: "Int 12"),
-            EquipmentItem(name: "Etiqueta", note: "Car 15")
+            EquipmentItem(name: "Religion", note: "Wis 17"),
+            EquipmentItem(name: "Healing", note: "Wis 15"),
+            EquipmentItem(name: "Herbalism", note: "Int 10"),
+            EquipmentItem(name: "Reading/Writing", note: "Int 12"),
+            EquipmentItem(name: "Etiquette", note: "Cha 15")
         ]
 
-        kelmon.languages = ["Comum", "Élfico"]
-        kelmon.magicItems = ["Maça +2", "Escudo grande +1",
-                             "Periapto de proteção contra veneno"]
-        kelmon.allies = ["Dorn, guerreiro — companheiro de estrada",
-                         "Irmã Ivet, acólita"]
+        kelmon.languages = ["Common", "Elvish"]
+        kelmon.magicItems = ["Mace +2", "Large shield +1",
+                             "Periapt of proof against poison"]
+        kelmon.allies = ["Dorn, fighter — traveling companion",
+                         "Sister Ivet, acolyte"]
 
         kelmon.treasure = Treasure(platinum: 3, gold: 214, electrum: 18,
                                    silver: 40, copper: 65)
@@ -92,19 +106,13 @@ extension PlayerCharacter {
             SpellSlotAllotment(caster: .divine, level: level, count: spellIDs.count)
         }
 
-        // Duas sessões de mesa de exemplo, pra mostrar o índice da campanha
-        // já povoado: a chegada em Elturel (ontem) e a sessão de hoje.
-        let arrivalSession = Session(date: Date().addingTimeInterval(-26 * 3600),
-                                     title: "Chegada em Elturel")
-        let todaySession = Session(date: Date(), title: "A trilha do templo")
-        kelmon.sessions = [arrivalSession, todaySession]
-
         var yesterday = kelmonYesterday()
         yesterday.sessionID = arrivalSession.id
         var today = kelmonToday()
         today.sessionID = todaySession.id
         kelmon.spellSheets = [yesterday, today]
-        return kelmon
+
+        return (campaign, kelmon)
     }
 
     // MARK: - Ajustes de atributo já preenchidos
@@ -128,7 +136,7 @@ extension PlayerCharacter {
         details.constitutionPoison = "0"
 
         details.intelligenceLanguages = "2"
-        details.intelligenceMaxLevel = "5º"
+        details.intelligenceMaxLevel = "5th"
         details.intelligenceLearn = "45%"
         details.intelligenceMaxPerLevel = "7"
 
@@ -145,17 +153,29 @@ extension PlayerCharacter {
     // MARK: - Folhas de magia
 
     /// Quantidade de slots por círculo e a lista memorizada do dia.
+    ///
+    /// IDs no formato real da base importada (`priest-<círculo>-<slug>`,
+    /// ver `Scripts/convert_spells.py`) — antes usavam o prefixo curto
+    /// "pri1-"/"pri2-"/... que só existia nos ~62 exemplos do Kelmon de
+    /// antes da importação real (TODO.md item 1). Depois da importação
+    /// (1.795 magias reais) esses IDs curtos pararam de bater com
+    /// qualquer entrada da base: `preparedSpellID` ficava preenchido (não
+    /// nulo) mas sem resolver pra magia nenhuma, então cada slot memorizado
+    /// do personagem de exemplo contava como "não vazio" pro
+    /// `SpellSlot.isEmpty` — perdia o campo de escrita da linha e, ao
+    /// tocar, abria o detalhe com "Unnamed spell" em vez do nome. Corrigido
+    /// trocando pelo ID real de cada magia.
     private static let kelmonPreparation: [(Int, [String])] = [
-        (1, ["pri1-bless", "pri1-cure-light-wounds", "pri1-cure-light-wounds",
-             "pri1-command", "pri1-sanctuary", "pri1-detect-magic", "pri1-light"]),
-        (2, ["pri2-silence-15-radius", "pri2-hold-person", "pri2-spiritual-hammer",
-             "pri2-aid", "pri2-chant", "pri2-slow-poison"]),
-        (3, ["pri3-prayer", "pri3-dispel-magic", "pri3-cure-disease",
-             "pri3-remove-curse", "pri3-continual-light"]),
-        (4, ["pri4-cure-serious-wounds", "pri4-divination",
-             "pri4-protection-from-evil-10-radius"]),
-        (5, ["pri5-raise-dead", "pri5-flame-strike"]),
-        (6, ["pri6-heal"])
+        (1, ["priest-1-bless", "priest-1-cure-light-wounds", "priest-1-cure-light-wounds",
+             "priest-1-command", "priest-1-sanctuary", "priest-1-detect-magic", "priest-1-light"]),
+        (2, ["priest-2-silence-15-radius", "priest-2-hold-person", "priest-2-spiritual-hammer",
+             "priest-2-aid", "priest-2-chant", "priest-2-slow-poison"]),
+        (3, ["priest-3-prayer", "priest-3-dispel-magic", "priest-3-cure-disease",
+             "priest-3-remove-curse", "priest-3-continual-light"]),
+        (4, ["priest-4-cure-serious-wounds", "priest-4-divination",
+             "priest-4-protection-from-evil-10-radius"]),
+        (5, ["priest-5-raise-dead", "priest-5-flame-strike"]),
+        (6, ["priest-6-heal"])
     ]
 
     private static func kelmonBoard(spent: [Int: Int]) -> SpellSlotBoard {
@@ -181,7 +201,7 @@ extension PlayerCharacter {
     /// campanha fica guardado folha a folha.
     private static func kelmonYesterday() -> SpellSheet {
         var sheet = SpellSheet()
-        sheet.title = "2º dia em Elturel"
+        sheet.title = "Day 2 in Elturel"
         sheet.date = Date().addingTimeInterval(-26 * 3600)
         sheet.wisdomAtCreation = 17
         sheet.turnUndeadUsed = 5
@@ -202,7 +222,7 @@ extension PlayerCharacter {
     /// A folha do dia em andamento.
     private static func kelmonToday() -> SpellSheet {
         var sheet = SpellSheet()
-        sheet.title = "3º dia em Elturel"
+        sheet.title = "Day 3 in Elturel"
         sheet.date = Date()
         sheet.wisdomAtCreation = 17
         sheet.turnUndeadUsed = 1
@@ -222,7 +242,7 @@ extension PlayerCharacter {
                           + "10 charges; recharges at a temple of Torm once a season.",
                       spells: [
                           ItemSpellUse(spellName: "Cure Light Wounds",
-                                       matchedSpellID: "pri1-cure-light-wounds",
+                                       matchedSpellID: "priest-1-cure-light-wounds",
                                        damageNote: "1d8+1",
                                        maxUses: 10,
                                        usedCount: 3)

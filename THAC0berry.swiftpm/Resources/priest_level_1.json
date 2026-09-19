@@ -707,9 +707,18 @@
     "duration": "3 rds. +1 rd./level",
     "areaOfEffect": "1 dwarf",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+2",
     "summary": "This spell transforms the hands of a willing dwarf into rending talons known as the claws of Thard Harr. Each talon inflicts 1d4+2 points of damage with a successful attack.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 2,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -936,9 +945,18 @@
     "duration": "Permanent (Instantaneous - PSC)",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 1d8",
     "summary": "When casting this spell and laying his hand upon a creature, the priest causes 1d8 points of wound or other injury damage to the creature's body to be healed.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Healing"
     ],
@@ -1042,9 +1060,18 @@
     "duration": "1 rd./level",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d6",
     "summary": "With this spell, the caster allows one creature to take a single breath that lasts for the duration of the spell.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Air"
     ],
@@ -1591,9 +1618,18 @@
     "duration": "Permanent",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 1d4+1",
     "summary": "With this spell the priest attempts to repair physical damage done to another being or creature. In an elemental sense, part of the damage incurred by combat wounds or disease is, in fact, an imbalance created in the body's elemental proportions.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental"
     ],
@@ -1759,7 +1795,7 @@
     "duration": "Permanent",
     "areaOfEffect": "1 plant",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "If someone tries to move through the bush, he suffers 1d4 hp damage for every five feet of bramble.",
     "summary": ": Note: Dryad only spell. With nothing but a touch and a whisper of magic, a dryad can cause a plant to grow faster than normal.",
     "damageDice": null,
     "spheres": [
@@ -1843,7 +1879,7 @@
     "duration": "4 hrs. + 1 hr./2 levels",
     "areaOfEffect": "1 object",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Firelight inflicts 1d2 points of damage per caster level if cast on creatures of living or elemental fire, but has no other effect on the…",
     "summary": "This variant of the spell log of everburning changes one small fire no larger than a campfire into firelight.",
     "damageDice": null,
     "spheres": [
@@ -1928,9 +1964,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "The caster",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "1d3+2/level (max +20)",
     "summary": "Frost fingers is a cold form of the burning hands 1st-level wizard spell. When cast, it causes freezing cold and shards of ice to blast from the caster's fingertips to a distance of 3 feet in a 120-degree arc in front of the caster.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 3,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 2,
+      "maxBonus": 20
+    },
     "spheres": [
       "Combat",
       "Weather"
@@ -1971,9 +2016,18 @@
     "duration": "Special",
     "areaOfEffect": "The caster's hand",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+3",
     "summary": "This spell causes one of the caster's hands (or the end of a chosen limb) to be surrounded by tiny winking motes of light that resemble a cluster of constantly renewed sparks.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 3,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -1992,9 +2046,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "10-ft./level square or 1 creature",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 2d4",
     "summary": "This spell heals natural, non-monstrous living plants of up to man-size within the area of effect. All damage from Tire, frost, cutting, trampling, parasites, mold, fungus, or disease is cured.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -2352,9 +2415,18 @@
     "duration": "2 rds. +1 rd./level",
     "areaOfEffect": "Vine up to 20-ft. long",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4",
     "summary": "This spell allows the druid to temporarily animate up to 20 feet of a single natural vegetable vine or creeper.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -2373,9 +2445,18 @@
     "duration": "Special",
     "areaOfEffect": "3 pebbles",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "1d4",
     "summary": "By using this spell, the priest can temporarily enchant up to three small pebbles, no larger than sling bullets. The magical stones can then be hurled or slung at an opponent.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -3113,7 +3194,7 @@
     "duration": "Special",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "However, it allows the creature to regenerate 1 hit point per round for 1d4+1 rounds.",
     "summary": "This spell is much like the 1st level clerical spell, cure light wounds. However, it allows the creature to regenerate 1 hit point per round for 1d4+1 rounds.",
     "damageDice": null,
     "spheres": [
@@ -3176,9 +3257,18 @@
     "duration": "Permanent (Instantaneous - PSC)",
     "areaOfEffect": "One animal",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 1d4",
     "summary": "==The Complete Ranger's Handbook Text==\nThis spell allows the caster to heal an animal by transferring life force (hit points) from himself to the animal.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Animal"
     ],
@@ -3281,7 +3371,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "2 ounces/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "When drunk the holy ghi acts as a mild curative healing 1d3 points of damage per ounce.",
     "summary": "This augments the holy clarification of butter into a liquid substance called ghi. Cow or buffalo milk is be churned, boiled, and blessed to make holy ghi, which can be used on undead as holy water.",
     "damageDice": null,
     "spheres": [
@@ -3386,9 +3476,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "1 creature",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4+2",
     "summary": "This spell creates a tiny, bright speck of light in one of the caster's hands (or in his mouth or emerging from his forehead, or one of his eyes, as needed).",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 2,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Sun"
     ],
@@ -3514,9 +3613,18 @@
     "duration": "4 rds. +1 rd./level",
     "areaOfEffect": "1 oak club",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell enables the caster to change his own oak cudgel or unshod staff into a magical weapon that gains a +1 bonus to its attack roll and inflicts 2d4 points of damage on opponents up to man size, and 1d4+1 points of damage on larger opponents.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Plant"
@@ -3980,9 +4088,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 creature",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "1d6+1/level",
     "summary": "This spell creates a brilliant ray of scorching heat that slants down from the sky to strike one target of the caster’s choice. The victim is entitled to a saving throw vs.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 1,
+      "maxBonus": null
+    },
     "spheres": [
       "Sun"
     ],
@@ -4109,7 +4226,7 @@
     "duration": "Special",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "If ramming a living creature, the vessel inflicts 2d6 points of damage per 20 cargo tons (to a maximum of 9d6) against living creatures.",
     "summary": "Totemic magic is invoked by the practitioner painting or inscribing an image that conveys magical powers upon anyone bearing that image.",
     "damageDice": null,
     "spheres": [

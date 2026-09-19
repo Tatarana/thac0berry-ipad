@@ -392,9 +392,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Creature touched",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "Bane of Yondalla is similar in effect to a strike by a staff of withering. A target creature that fails a saving throw vs.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Necromantic"
     ],
@@ -581,9 +590,18 @@
     "duration": "4 rounds",
     "areaOfEffect": "One creature",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "==Faiths & Avatars Version==\nThis spell creates a beam of smoky gray radiance that streaks unerringly from the priest to a single chosen target who must be within view and range of the caster as casting begins.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Necromantic"
@@ -689,7 +707,7 @@
     "duration": "1 turn/level",
     "areaOfEffect": "3,000 lbs. of stone",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Stone Guardian: AC 2; MV 9; HD 4+4; #AT 2, THAC0 15; Drag 1d8+1/1d8+1; SD One-quarter damage from edged weapons, half damage from cold, f…",
     "summary": "This powerful spell enables the priest to temporarily form a stone guardian from a solid block of stone of sufficient volume (3.000 pounds minimum). The stone guardian has all the abilities and restrictions of a creature of this type.",
     "damageDice": null,
     "spheres": [
@@ -1155,9 +1173,18 @@
     "duration": "2 rds./level",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "The conjure aurumvorax spell enables the priest to magically create an aurumvorax to attack his opponents.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Animal",
       "Summoning"
@@ -1330,7 +1357,7 @@
     "duration": "1 turn/level",
     "areaOfEffect": "Caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The caster becomes a blazingly hot beacon of the powers of good, burning all innately evil creatures within 10 feet for 2d6 points of dam…",
     "summary": "The crown of flame is often seen among the sword archons, who invoke it before going into battle. The caster becomes a blazingly hot beacon of the powers of good, burning all innately evil creatures within 10 feet for 2d6 points of damage per round.",
     "damageDice": null,
     "spheres": [
@@ -1351,7 +1378,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 cubic foot/level",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Mindless corporeal undead like zombies and skeletons take 1d6 points of damage for every 3 levels of the caster.",
     "summary": "The crumble spell instantly reduces an inanimate objects water content to zero. Up to one cubic foot of clay, rock, soil, or other solid per level of the caster can be desiccated to the point that it loses cohesion, cracks, and crumbles.",
     "damageDice": null,
     "spheres": [
@@ -1394,9 +1421,18 @@
     "duration": "Permanent (Instantaneous - PSC)",
     "areaOfEffect": "1 creature",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 3d8+3",
     "summary": "The cure critical wounds spell is a very potent version of the cure light wounds spell. The priest lays his hand upon a creature and heals 3d8+3 points of damage from wounds or other damage.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 8,
+      "bonus": 3,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Healing"
     ],
@@ -1522,9 +1558,18 @@
     "duration": "1 rd./level",
     "areaOfEffect": "Up to 5 objects/level",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "4d4",
     "summary": "This spell allows a priest to animate nonliving chunks of space debris (man-size or smaller) into motion. It is effective in wildspace, phlogiston, and atmosphere alike.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Guardian"
     ],
@@ -1672,9 +1717,18 @@
     "duration": "2 turns",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "4d6",
     "summary": "When this spell is cast, priests becomes attuned to the rock surrounding them, allowing them to use rocks of at least the same volume as themselves and the nonliving material they carry as teleport gateways.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Earth"
     ],
@@ -1693,7 +1747,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "3-foot diameter/level",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "spell or be thrown to the ground and stunned (unable to act) for 1d4 rounds and take 2d8 points of damage.",
     "summary": "This spell is a weaker and more targetable form of the 7th-level priest spell earthquake.",
     "damageDice": null,
     "spheres": [
@@ -1735,7 +1789,7 @@
     "duration": "5 rds.",
     "areaOfEffect": "Special",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "The arms attack with the same chance to hit as the priest casting the spell, inflicting 1d10+2 points of corrosive and constriction damage.",
     "summary": "This spell summons a lump of blackness five feet in diameter with four 10-foot arms radiating from it, 90º apart. Touching the central lump causes death unless a successful saving throw vs.",
     "damageDice": null,
     "spheres": [
@@ -1756,9 +1810,18 @@
     "duration": "1 turn +1 turn/2 levels",
     "areaOfEffect": "Caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "5d6",
     "summary": "==Of Ships And Sea Text==\nThis spell allows the caster to send out a large variety of sound pulses and receive clear, three-dimensional representations of his underwater surroundings from the rebounding sound waves – just as a dolphin does.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 5,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Water"
     ],
@@ -1952,9 +2015,18 @@
     "duration": "4 rds./level",
     "areaOfEffect": "10 sq. ft./level in a 40-ft. radius",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell is a variant of the 1st level priest spell, faerie fire. Except as noted here, this spell conforms to the characteristics of the lesser spell.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Weather"
@@ -2038,7 +2110,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "1 being",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The fire of justice spell induces corrosive internal energy surges in the recipient, causing 1d4+1 points of damage per level of the cast…",
     "summary": "The fire of justice spell induces corrosive internal energy surges in the recipient, causing 1d4+1 points of damage per level of the caster (10d4+10 points maximum). Undead suffer double damage.",
     "damageDice": null,
     "spheres": [
@@ -2080,9 +2152,18 @@
     "duration": "Special",
     "areaOfEffect": "Special",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "1d4",
     "summary": "This powerful spell creates a trap of a large field, copse of trees, or other flammable area, triggered by certain, predefined conditions.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -2101,9 +2182,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "5 ft. radius x 30 ft. column",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "6d8",
     "summary": "When the priest evokes a flame strike spell, a vertical column of fire roars downward in the location called for by the caster. Any creatures within the area of effect must roll a saving throw vs.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 6,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -2251,9 +2341,18 @@
     "duration": "1 rd.",
     "areaOfEffect": "10 x 20 ft. to 45 x 90 ft.",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "3d12",
     "summary": "This spell causes a geyser to erupt from the ground, shooting scalding steam and water high into the air. The geyser shoots up to a height of 20 to 90 feet instantaneously (1d8+1 x 10 feet), and continues to spout for 1 round.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 12,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Water"
     ],
@@ -2336,7 +2435,7 @@
     "duration": "2 rounds/level",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The extremity has a +2 attack bonus, and its slightest touch does slashing (Type S) damage as a sickle +2: 1d4+3 points of damage vs.",
     "summary": "By means of this spell, one of the caster's hands temporarily becomes a wooden magical weapon. The extremity is able to strike all creatures who can be hit only by magical weapons.",
     "damageDice": null,
     "spheres": [
@@ -2591,9 +2690,18 @@
     "duration": "1 turn/level",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "==Powers & Pantheons Version==\nThis spell is a limited form of the 9th-level wizard spell shape change.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Animal",
       "Combat"
@@ -2803,7 +2911,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The priest gains 1d4 hit points per point of Constitution drained, but cannot exceed his or her normal maximum hit point total.",
     "summary": "This spell allows the priest to drain the vital force of a humanoid creature and use the energy personally. The priest must make an attack roll to touch the target creature.",
     "damageDice": null,
     "spheres": [
@@ -2845,9 +2953,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "Creature touched",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d8+1/level",
     "summary": "This spell is often employed by Loviatan clergy to recover from wounds caused in holy rituals.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 1,
+      "maxBonus": null
+    },
     "spheres": [
       "Healing"
     ],
@@ -2950,9 +3067,18 @@
     "duration": "12 hours",
     "areaOfEffect": "One priest",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d6",
     "summary": "This cooperative spell requires only one priest to cast it, but can be cast only on another priest of the same faith. The recipient of the spell must voluntarily surrender himself to the spell.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Charm"
     ],
@@ -3165,7 +3291,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "10 ft. wide x 30 ft. long path",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Moonfire also chills living creatures, doing 2d4 points of damage to those who come into contact with it.",
     "summary": "This spell unleashes a flash of “cold white fire” akin to bright moonlight in appearance that begins at any point within range chosen by the caster and flows out from that spot in a straight line away from the caster for 30 feet in a 10-foot-wide strip.",
     "damageDice": null,
     "spheres": [
@@ -3208,7 +3334,7 @@
     "duration": "Up to 2 rds.",
     "areaOfEffect": "20-ft.-radius",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "Unless magically protected against those attack forms, a target creature suffers both kinds of damage, as follows: 4d4 points of fire dam…",
     "summary": "This dramatic spell causes a construct that looks like a moss-covered skull to form in the caster's hand and fly from there to strike at a chosen target. The skull travels at MV Fly 21 (A), striking with a THAC0 of 9.",
     "damageDice": null,
     "spheres": [
@@ -3252,9 +3378,18 @@
     "duration": "1 round",
     "areaOfEffect": "10 cubic feet/level (90 cubic feet minimum)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "5d4",
     "summary": "This spell must be used with extreme care by priests of Silvanus for its reckless use could undo much of the growth and revitalization of sylvan lands that their god stands for.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 5,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant",
       "Necromantic"
@@ -3274,7 +3409,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "A mystic lash does 2d8 points of electrical damage per strike.",
     "summary": "Casting this spell creates a long whip of ghostly, glowing red force that emanates from the priest's hand. With this lash of lightning, the caster can attack once per round at a +3 bonus to his or her attack roll.",
     "damageDice": null,
     "spheres": [
@@ -3525,7 +3660,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The probing arm can punch for 2d4+7 points of damage, launch weapon attacks at distant foes at a THAC0 one point better than the caster's…",
     "summary": "This spell creates a weightless mechanical arm of steel that has an upper arm 3 feet in length, a ball-swivel elbow joint, a forearm 3 feet long, a ball-swivel wrist joint, and a fully articulated hand with four fingers and a perfectly opposed thumb (that is, the thumb is centered opposite the fingers across the palm, not located to one side).",
     "damageDice": null,
     "spheres": [
@@ -3546,7 +3681,7 @@
     "duration": "2 rds./level",
     "areaOfEffect": "Cube 1 ft./level (Cube. 1 ft./level on a side - PSC)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "This can have several effects; first of all, any creature caught in the area of effect when the temperature is lowered suffers 2d4 damage…",
     "summary": "==Spells and Magic Version==\nThis spell creates supernatural cold in the area of effect, condensing all atmospheric and standing water into a thick rime of ice.",
     "damageDice": null,
     "spheres": [
@@ -3737,9 +3872,18 @@
     "duration": "Special",
     "areaOfEffect": "Creature touched",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Heal 3d4+6",
     "summary": "This spell is the same as the 1st level priest spell regenerate light wounds, except for its duration (72 hours per level of the caster) and magnitude. This spell heals 3d4+6 points of damage at a rate of 1 hit point per round.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 4,
+      "bonus": 6,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": true,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Healing"
     ],
@@ -3801,7 +3945,7 @@
     "duration": "Special (Instantaneous - PSC)",
     "areaOfEffect": "One item (Item touched - PSC)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "If both succeed, a permanent, “good as new” repair is crafted and the caster loses 2d4 hit points – damage that can be regained readily b…",
     "summary": ":''Was called \"Repair\" in \"Prayers from the Faithful\" but renamed \"Repair Item\" in \"Priest's Spell Compendium\".''\n\nThis spell creates and correctly places a replacement part for an item equal in strength, material, dimensions, and sturdiness to what the original was when new.",
     "damageDice": null,
     "spheres": [
@@ -3908,7 +4052,7 @@
     "duration": "1 rd./level",
     "areaOfEffect": "30-ft. radius",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Allies who are fighting on the side of the priest are affected as if they had received an aid spell, gaining a +1 bonus to attack rolls a…",
     "summary": "==Spells and Magic Text==\nWhen a priest casts this spell, he fires his allies and companions with a divine madness or fury that greatly enhances their combat ability.",
     "damageDice": null,
     "spheres": [
@@ -3929,9 +4073,18 @@
     "duration": "Special",
     "areaOfEffect": "One creature",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d8+2",
     "summary": "This spell generates a glowing brown or green beam of light that stabs out from the caster to unerringly strike a chosen target creature, who must be visible to the caster and within range when spellcasting begins.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 8,
+      "bonus": 2,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat",
       "Necromantic"
@@ -3972,9 +4125,18 @@
     "duration": "Permanent until discharged",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d4",
     "summary": "This special type of magical inscription, more powerful than a glyph of warding but less powerful than most symbols, was once the heart of ancient dwarven magic, usable by all dwarves (with differing degrees of power and reliability – modern dwarves do not have this power).",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Guardian"
     ],
@@ -4015,9 +4177,18 @@
     "duration": "3 rounds/level",
     "areaOfEffect": "Special",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "2d6",
     "summary": "This spell allows a priest to conjure a very large version of a dust devil; one that can engage and attack a number of targets at once.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Air"
     ],
@@ -4078,7 +4249,7 @@
     "duration": "2 rds./level",
     "areaOfEffect": "1 skull",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "The skull has AC 0, MV 21 (flying), 4+4 HD, 1 bite for 1d6 damage, ML 20.",
     "summary": "By casting this spell, the priest animates a single human or humanoid skull (the material component) to be capable of flight and attack as the priest wills. The skull has AC 0, MV 21 (flying), 4+4 HD, 1 bite for 1d6 damage, ML 20.",
     "damageDice": null,
     "spheres": [
@@ -4121,7 +4292,7 @@
     "duration": "Permanent",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "At the end of that time, they slip into a coma, lose 4d4 hit points, and a day later, if they survived the damage, awaken fully cured.",
     "summary": "This spell was developed by priests of Moander centuries ago as a method of enslaving sentient beings to the will of Moander. The spell itself results in the creation of a seed of Moander, which can then transform a victim into a servant of Moander.",
     "damageDice": null,
     "spheres": [
@@ -4142,9 +4313,18 @@
     "duration": "Instantaneous",
     "areaOfEffect": "5-foot radius/level (minimum 5-foot radius) (5-ft./level radius - PSC)",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "2d6",
     "summary": "This spell creates an explosion of seeds. The seed shoot out forcefully from the center of the area of effect in all directions to the limits of the area of effect.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plane",
       "Combat"
@@ -4249,7 +4429,7 @@
     "duration": "5 rds.",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "A shield set to block a foe strikes at THAC0 6, with the choice of blocking the foe's attack (if it hits) or dealing damage (2d4+4 points…",
     "summary": "This spell creates an invisible shield of force in front of the caster that moves to deal with charging foes (one opponent per round, but the priest can move the shield to defend against a different foe at the end of each round, if desired), slowing them to half movement rate and hampering their attacks.",
     "damageDice": null,
     "spheres": [
@@ -4333,9 +4513,18 @@
     "duration": "3 ids.",
     "areaOfEffect": "Up to twelve 10-ft. cubes",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "4d4",
     "summary": "This spell creates a smoky, immobile cloud in which black, whip like whorls of deeper darkness appear and disappear. They have only momentary solidity, yet they slice as if they were unbreakable, razor-sharp ribbons of steel.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -4375,7 +4564,7 @@
     "duration": "1 rd.",
     "areaOfEffect": "Hemisphere, 10-ft. radius",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "It smashes down in a dome-shaped area 20 feet in diameter, extinguishing any fires present in that zone and crushing for 6d4 points of da…",
     "summary": "This spell can only be cast to affect an area where there is an amount of snow of at least twice the caster's body volume. It causes the snow to rise up in a serpentine mass and strike at targets in an area of the caster's choosing.",
     "damageDice": null,
     "spheres": [
@@ -4397,7 +4586,7 @@
     "duration": "Permanent",
     "areaOfEffect": "Up to 12 creatures in a 30-ft. radius",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "A song of healing restores 1d8 hit points, plus 1 point per level of the caster, to all recipients.",
     "summary": "The casting time of this spell is one round, plus one round per creature to be affected.",
     "damageDice": null,
     "spheres": [
@@ -4504,9 +4693,18 @@
     "duration": "3d4 turns +1/level",
     "areaOfEffect": "10 ft. sq./level, 1 spike/sq. ft.",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4",
     "summary": "The spike stones spell causes rock to shape itself into long, sharp points that tend to blend into the background. It is effective on both natural rock and worked stone.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Earth"
     ],
@@ -4654,7 +4852,7 @@
     "duration": "4 rounds +1 round/3 levels above 9th",
     "areaOfEffect": "60-foot-long cone, 20 in diameter at its mouth (Cone, 20-ft.-wide x 60 ft. long - PSC)",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "fall and crushing blow for all worn or carried items and inflicts on all creatures 5d4 points of damage.",
     "summary": "This spell creates a whirling vortex of wind in a 60-foot-long cone shape that flares from its apex close to the caster to a mouth 20 feet in diameter. The caster can move the storm cone up, down, or sideways 10 feet in each round of its existence.",
     "damageDice": null,
     "spheres": [
@@ -4889,9 +5087,18 @@
     "duration": "1 thorn/level",
     "areaOfEffect": "1 person",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "1d3",
     "summary": "Thornwrack causes long, painful thorns to grow out of the spell recipient's flesh, piercing the skin from the inside. One thorn appears each round, inflicting 1d3 points of damage, until all the thorns have appeared.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 3,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Plant"
     ],
@@ -5125,7 +5332,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "One undead",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "With this spell, the priest can \"heal\" an undead, restoring to its unlife 2d4 hit points plus one point per level of the caster's experie…",
     "summary": "With this spell, the priest can \"heal\" an undead, restoring to its unlife 2d4 hit points plus one point per level of the caster's experience.",
     "damageDice": null,
     "spheres": [
@@ -5188,7 +5395,7 @@
     "duration": "1 rd./level",
     "areaOfEffect": "1 creature per 3 levels",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Damage inflicted by a successful attack with venomed claws is 1d4 points per two levels of experience of the priest (round fractions down…",
     "summary": "By casting this spell, the priest gives himself and up to one additional creature per three levels of experience of the priest (round fractions up) the ability to strike in hand-to-hand combat with venomous claw attacks.",
     "damageDice": null,
     "spheres": [
@@ -5209,9 +5416,18 @@
     "duration": "1 rd./3 levels",
     "areaOfEffect": "The caster",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4",
     "summary": "This spell allows the caster to attack a nearby creature with a vicious bite of magic fangs. The bite inflicts 1d4 points of damage on a successful attack roll.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Animal"
     ],
@@ -5230,7 +5446,7 @@
     "duration": "4 rds.",
     "areaOfEffect": "30-ft.-diameter sphere",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "Creatures in contact with the sphere are slashed for 4d6 points of damage per round, but are allowed a saving throw vs.",
     "summary": "This spell fills a spherical area of air with ghostly whips of force that fly about, circling and writhing so violently that they cause a moaning and wailing sound.",
     "damageDice": null,
     "spheres": [
@@ -5251,9 +5467,18 @@
     "duration": "Special",
     "areaOfEffect": "Special",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "2d4",
     "summary": "The wall of fire spell brings forth an immobile, blazing curtain of magical fire of shimmering color—yellow-green or amber (different from the 4th-level wizard version).",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Fire"
     ],
@@ -5336,9 +5561,18 @@
     "duration": "6 rds.",
     "areaOfEffect": "A body of water at least three times the caster's body volume",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "3d8",
     "summary": "This spell causes a pre-existing body of water of at least thrice the caster's body volume and within spell range to animate in accordance with the caster's wishes.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 3,
+      "sides": 8,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental Water"
     ],
@@ -5378,9 +5612,18 @@
     "duration": "1 rd./level",
     "areaOfEffect": "Special",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "2d4",
     "summary": "This spell creates a weightless, spectral glistening black whip of magical force extending from one of the caster's hands. It does not actually have to be grasped and leaves the hand free to conduct other spellcasting or activities.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 2,
+      "sides": 4,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Combat"
     ],
@@ -5399,7 +5642,7 @@
     "duration": "1 round/level",
     "areaOfEffect": "Special",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "Each scimitar inflicts 1d8 points of slashing and piercing damage but is considered a + 2 enchanted weapon for purposes of determining wh…",
     "summary": "This spell creates five phantom arms wielding scimitars. Both limbs and weapons are magical constructs and not actual, tangible things.",
     "damageDice": null,
     "spheres": [
@@ -5441,9 +5684,18 @@
     "duration": "6 rounds",
     "areaOfEffect": "One creature touched",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "This spell enables a priest of Myrkul to duplicate the powers of a staff of withering. Once cast, the spell lasts for up to six rounds ot until a successful attack to touch a victim is made.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Necromantic"
     ],
@@ -5483,7 +5735,7 @@
     "duration": "Permanent (Instantaneous - PSC)",
     "areaOfEffect": "One target being (1 creature - PSC)",
     "savingThrow": "Neg.",
-    "damage": null,
+    "damage": "A ranged version of the spell cause serious wounds, this spell does 2d8+1 points of damage to the target creature.",
     "summary": "A ranged version of the spell cause serious wounds, this spell does 2d8+1 points of damage to the target creature. If the target being succeeds at a saving throw vs.",
     "damageDice": null,
     "spheres": [

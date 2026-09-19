@@ -19,8 +19,8 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.tatarana.thac0berry",
             teamIdentifier: "",
-            displayVersion: "0.5",
-            bundleVersion: "3",
+            displayVersion: "0.80",
+            bundleVersion: "86",
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad

@@ -97,9 +97,18 @@
     "duration": "3 turns",
     "areaOfEffect": "60-foot-radius hemisphere",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "By casting circle of sunmotes, the priest creates a hemispherical shell filled with sparkling, glowing motes of bright sunlight. A one-foot radius globe of sunlight appears at the height of the caster's head in the exact center of the circle.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Sun"
     ],
@@ -356,9 +365,18 @@
     "duration": "1 day",
     "areaOfEffect": "200-foot cube/level",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "4d6",
     "summary": "==Tome of Magic Text==\nThis powerful spell affects all enemies of the spellcasting priest who enter the area of effect. The spell inflicts a -2 penalty on saving throws, a -1 penalty to armor class, and a -1 penalty to attack and damage rolls.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 4,
+      "sides": 6,
+      "bonus": 0,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Chaos",
       "Law",
@@ -569,7 +587,7 @@
     "duration": "1 hour",
     "areaOfEffect": "One robe",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "By touching the robe, a wounded creature is cured of 1d4+4 hit points.",
     "summary": "This spell enchants the priest's robe or cloak, enabling him to walk among wounded creatures and heal them. By touching the robe, a wounded creature is cured of 1d4+4 hit points.",
     "damageDice": null,
     "spheres": [
@@ -632,7 +650,7 @@
     "duration": "Instantaneous",
     "areaOfEffect": "40-yard radius",
     "savingThrow": "1/2",
-    "damage": null,
+    "damage": "Within the area of effect, all creatures suffer 6d10 points of combined fire and electrical damage.",
     "summary": "A priest casting shooting stars creates a violent turbulence in the air above the area of effect, from which a number of fiery-orange, electrically-charged miniature fireballs erupt and shower onto the ground.",
     "damageDice": null,
     "spheres": [
@@ -655,7 +673,7 @@
     "duration": "Special",
     "areaOfEffect": "One building",
     "savingThrow": "None",
-    "damage": null,
+    "damage": "Damage or AD caused by war machines is reduced by 2 die levels (if normal damage is 1d12, 1d8 is rolled instead; if damage is 1d10, 1d6 i…",
     "summary": "==Tome of Magic Text==\nA siege wall uses magical energy to fortify all external areas of a fortified building, such as walls, battlements, drawbridges, and gates. External surfaces to be protected must be contiguous.",
     "damageDice": null,
     "spheres": [
@@ -743,9 +761,18 @@
     "duration": "1 turn",
     "areaOfEffect": "120-yard radius circle",
     "savingThrow": "Special",
-    "damage": null,
+    "damage": "1d4+1",
     "summary": "This spell requires the priest to concentrate and cast the spell for the full duration of the spell. The casting time and duration are simultaneous; both activities occur in the same turn.",
-    "damageDice": null,
+    "damageDice": {
+      "dice": 1,
+      "sides": 4,
+      "bonus": 1,
+      "scalesWithLevel": false,
+      "maxDice": null,
+      "isHealing": false,
+      "bonusPerLevel": 0,
+      "maxBonus": null
+    },
     "spheres": [
       "Elemental",
       "War",

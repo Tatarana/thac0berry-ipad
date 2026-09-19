@@ -12,6 +12,7 @@ struct SpellSheetView: View {
     @Binding var sheet: SpellSheet
     @Binding var character: PlayerCharacter
     @EnvironmentObject private var spellbook: SpellDatabase
+    @EnvironmentObject private var library: CharacterLibrary
 
     @State private var editingSlot: SpellSlot? = nil
     @State private var detailSlot: SpellSlot? = nil
@@ -60,12 +61,13 @@ struct SpellSheetView: View {
         .sheet(item: $editingSlot) { slot in
             SlotEditorSheet(slot: slot, sheet: $sheet, character: character)
                 .environmentObject(spellbook)
+                .environmentObject(library)
         }
         .sheet(item: $detailSlot) { slot in
             SpellDetailSheet(spell: slot.preparedSpellID.flatMap { spellbook.spell(id: $0) },
                               freeName: slot.preparedSpellName,
-                              isFavorite: slot.preparedSpellID.map(character.isFavorite) ?? false,
-                              onToggleFavorite: slot.preparedSpellID.map { id in { character.toggleFavorite(id) } })
+                              isFavorite: slot.preparedSpellID.map(library.isFavorite) ?? false,
+                              onToggleFavorite: slot.preparedSpellID.map { id in { library.toggleFavorite(id) } })
         }
     }
 
@@ -434,12 +436,13 @@ private struct MemorizedRow: View {
     }
 
     /// Só as magias do círculo e do tipo de conjurador certos — a mesma
-    /// filtragem do antigo editor em folha separada.
+    /// filtragem do antigo editor em folha separada. Filtrado dentro de
+    /// `matches` (não depois): senão as 5 vagas do `limit` podiam ser
+    /// tomadas por magias de mesmo nome parecido em OUTRO círculo, deixando
+    /// este slot sem nenhum candidato.
     private var candidates: [SpellMatch] {
         guard !handwritten.isEmpty else { return [] }
-        return spellbook.matches(for: handwritten, limit: 5).filter {
-            $0.spell.level == slot.level && $0.spell.caster == slot.caster
-        }
+        return spellbook.matches(for: handwritten, limit: 5, caster: slot.caster, level: slot.level)
     }
 
     @ViewBuilder
@@ -507,19 +510,21 @@ private struct MemorizedRow: View {
     /// Só o valor — "1d8", "10d6", "3d8 + 3" — sem dizer se é dano ou cura;
     /// a coluna já deixa isso implícito. Quando a magia tem uma versão
     /// estruturada (`damageDice`), o valor já sai calculado para o nível do
-    /// personagem; senão cai para o texto livre, com "Heal"/"Heals" cortado.
+    /// personagem. Quando NÃO tem — mas existe dano/cura descrito em texto
+    /// livre demais pra reduzir a um dado+bônus (`damage` preenchido) — a
+    /// célula não tenta mais encaixar a frase inteira (não cabe, e ficava
+    /// espremida/ilegível); mostra só "*", sinalizando "tem algo, olha o
+    /// detalhe da magia" — diferente de "—", que é só pra quem realmente
+    /// não tem dano nem cura nenhum.
     private var dmgHealValue: String? {
         guard let spell else { return nil }
         if let dice = spell.damageDice {
             return dice.text(casterLevel: casterLevel)
         }
-        guard var value = spell.damage else { return nil }
-        if value.hasPrefix("Heal") {
-            value.removeFirst(4)
-            if value.hasPrefix("s") { value.removeFirst() }
-            value = value.trimmingCharacters(in: .whitespaces)
+        if spell.damage != nil {
+            return "*"
         }
-        return value
+        return nil
     }
 
     private func cell(_ text: String?, width: CGFloat) -> some View {
@@ -977,7 +982,7 @@ private struct ItemDescriptionSheet: View {
 /// desenha um traço e soma um uso — a mesma cena do detento riscando a
 /// parede da cela. Um toque simples (sem arrasto) apaga o último traço.
 /// Nada vem pré-desenhado; os traços só existem depois de riscados.
-private struct TallyBoard: View {
+struct TallyBoard: View {
     let count: Int
     let isExhausted: Bool
     let onAdd: () -> Void
@@ -1029,7 +1034,7 @@ private struct TallyBoard: View {
 /// Os traços agrupados de cinco em cinco, com o quinto cruzando os outros
 /// quatro — a marca de contagem clássica. Pretos enquanto sobra carga;
 /// todos viram vermelhos quando o item chega ao fim dela.
-private struct TallyMarks: View {
+struct TallyMarks: View {
     let count: Int
     let isExhausted: Bool
 
@@ -1238,7 +1243,6 @@ private struct AdditionalSpellsBlock: View {
     @Binding var sheet: SpellSheet
     @EnvironmentObject private var spellbook: SpellDatabase
 
-    @State private var expandedID: UUID? = nil
     @State private var handwritten: String = ""
 
     var body: some View {
@@ -1248,8 +1252,6 @@ private struct AdditionalSpellsBlock: View {
                     let entryID = entry.id
                     AdditionalSpellRow(
                         entry: $entry,
-                        isExpanded: expandedID == entryID,
-                        onToggle: { expandedID = (expandedID == entryID) ? nil : entryID },
                         onDelete: {
                             DispatchQueue.main.async {
                                 sheet.entries.removeAll { $0.id == entryID }
@@ -1397,17 +1399,21 @@ private struct SuggestionLine: View {
 
 private struct AdditionalSpellRow: View {
     @Binding var entry: SpellLogEntry
-    let isExpanded: Bool
-    let onToggle: () -> Void
     let onDelete: () -> Void
 
     @EnvironmentObject private var spellbook: SpellDatabase
+    @State private var showDetail = false
     @State private var showingNamePicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
-                Button(action: onToggle) {
+                // Mesmo padrão de Magic Item Spells: tocar o nome abre a
+                // janela de descrição (com "change" lá dentro), em vez de
+                // expandir uma linha "change name" solta embaixo — que
+                // destoava do resto do layout (era o único lugar da folha
+                // com esse comportamento de expandir/recolher).
+                Button { showDetail = true } label: {
                     Text(entry.displayName)
                         .font(Paper.hand(22))
                         .foregroundStyle(Paper.penInk)
@@ -1447,19 +1453,14 @@ private struct AdditionalSpellRow: View {
             .padding(.vertical, 5)
 
             Rectangle().fill(Paper.hairline).frame(height: 1)
-
-            if isExpanded {
-                HStack(spacing: 10) {
-                    Button { showingNamePicker = true } label: {
-                        Text("change name")
-                            .font(Paper.printedItalic(11))
-                            .foregroundStyle(Paper.inkSoft)
-                    }
-                    .buttonStyle(.plain)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 7)
-            }
+        }
+        .sheet(isPresented: $showDetail) {
+            SpellDetailSheet(spell: entry.matchedSpellID.flatMap { spellbook.spell(id: $0) },
+                              freeName: entry.displayName,
+                              onChangeSpell: {
+                                  showDetail = false
+                                  DispatchQueue.main.async { showingNamePicker = true }
+                              })
         }
         .sheet(isPresented: $showingNamePicker) {
             SpellWritingSheet(title: "Spell name", initialText: entry.displayName) { name, spell in
@@ -1478,11 +1479,14 @@ private struct AdditionalSpellRow: View {
 private struct SlotEditorSheet: View {
     let slot: SpellSlot
     @Binding var sheet: SpellSheet
-    /// Só pra leitura — favoritos e histórico de uso, pra ordenar a lista
-    /// de candidatos (ver TODO.md itens 2 e 3). Marcar/desmarcar favorito
-    /// continua acontecendo em `SpellDetailSheet`/no Grimório.
+    /// Só pra leitura — histórico de uso, pra ordenar a lista de
+    /// candidatos (ver TODO.md itens 2 e 3). Favoritos vêm de `library`
+    /// (preferência global do jogador, não deste personagem). Marcar/
+    /// desmarcar favorito continua acontecendo em `SpellDetailSheet`/no
+    /// Grimório.
     let character: PlayerCharacter
     @EnvironmentObject private var spellbook: SpellDatabase
+    @EnvironmentObject private var library: CharacterLibrary
     @Environment(\.dismiss) private var dismiss
 
     @State private var handwritten: String = ""
@@ -1571,22 +1575,21 @@ private struct SlotEditorSheet: View {
         }
     }
 
+    // Filtrado dentro de `matches` (não depois) pelo mesmo motivo do
+    // `MemorizedRow.candidates` acima: senão as vagas do `limit` podiam ser
+    // tomadas por magias de mesmo nome parecido em outro círculo.
     private var candidates: [SpellMatch] {
-        let all: [SpellMatch] = spellbook.matches(for: handwritten, limit: 8)
-        let level: Int = slot.level
-        let caster: CasterType = slot.caster
-        return all.filter { (match: SpellMatch) -> Bool in
-            match.spell.level == level && match.spell.caster == caster
-        }
+        return spellbook.matches(for: handwritten, limit: 8, caster: slot.caster, level: slot.level)
     }
 
-    /// Favoritos do círculo primeiro, depois os mais usados no histórico
-    /// do personagem, depois o resto em ordem alfabética — sem isso,
-    /// achar uma magia específica numa base de quase 1.800 entradas vira
-    /// procurar agulha no palheiro (ver TODO.md itens 2 e 3).
+    /// Favoritos do jogador primeiro (globais, não deste personagem —
+    /// 2026-09-19), depois os mais usados no histórico do personagem,
+    /// depois o resto em ordem alfabética — sem isso, achar uma magia
+    /// específica numa base de quase 1.800 entradas vira procurar agulha
+    /// no palheiro (ver TODO.md itens 2 e 3).
     private var levelList: [Spell] {
         let all = spellbook.spells(caster: slot.caster, level: slot.level)
-        let favorites = character.favoriteSpellIDs
+        let favorites = library.favoriteSpellIDs
         let counts = character.spellUsageCounts()
         return all.sorted { lhs, rhs in
             let lhsFav = favorites.contains(lhs.id)

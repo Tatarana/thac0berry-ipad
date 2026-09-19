@@ -14,15 +14,23 @@ struct HandwritingField: UIViewRepresentable {
     /// Quando falso, o teclado de software não aparece — só a caneta escreve.
     var allowsSoftwareKeyboard: Bool = false
     var onCommit: () -> Void = {}
+    /// Tamanho da fonte de "letra de mão" — células pequenas (nome de arma,
+    /// proficiência) precisam de algo menor que o nome do personagem.
+    var fontSize: CGFloat = 25
+    /// Cor da tinta — caneta azul por padrão (as três folhas de papel), mas
+    /// as telas de navegação em couro escuro (Fase 1 da proposta de Design)
+    /// passam um tom claro aqui, já que o campo é a única entrada de texto
+    /// que sobrou fora do pergaminho (o nome da campanha).
+    var textColor: Color = Paper.penInk
 
     func makeUIView(context: Context) -> UITextField {
         let field = UITextField()
         field.delegate = context.coordinator
         field.placeholder = placeholder
-        field.font = UIFont(name: "Bradley Hand", size: 25)
-            ?? UIFont(name: "Noteworthy-Bold", size: 24)
-            ?? .systemFont(ofSize: 24)
-        field.textColor = UIColor(red: 0.118, green: 0.208, blue: 0.341, alpha: 1) // caneta azul
+        field.font = UIFont(name: "Bradley Hand", size: fontSize)
+            ?? UIFont(name: "Noteworthy-Bold", size: fontSize - 1)
+            ?? .systemFont(ofSize: fontSize - 1)
+        field.textColor = UIColor(textColor)
         field.backgroundColor = .clear
         field.borderStyle = .none
         field.autocorrectionType = .no
@@ -49,6 +57,7 @@ struct HandwritingField: UIViewRepresentable {
             uiView.text = text
         }
         uiView.placeholder = placeholder
+        uiView.textColor = UIColor(textColor)
         let wantsKeyboard = allowsSoftwareKeyboard
         let hasKeyboard = uiView.inputView == nil
         if wantsKeyboard != hasKeyboard {
@@ -237,6 +246,82 @@ struct TallyInput: UIViewRepresentable {
         /// Um toque parado, sem arrasto, apaga o último traço.
         @objc func handleErase() {
             parent.onRemove()
+        }
+    }
+}
+
+/// Escrita livre de mais de uma linha — a página em branco do caderno de
+/// anotações. Mesma linguagem visual do `HandwritingField` (Bradley Hand,
+/// tinta azul), mas sobre um `UITextView` em vez de `UITextField`, pra
+/// caber parágrafo. O Scribble funciona sozinho num UITextView, sem
+/// nenhuma configuração extra.
+struct NotebookTextArea: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String = ""
+    var fontSize: CGFloat = 18
+
+    private var inkColor: UIColor { UIColor(red: 0.118, green: 0.208, blue: 0.341, alpha: 1) }
+    private var placeholderColor: UIColor { UIColor(red: 0.420, green: 0.361, blue: 0.275, alpha: 0.55) }
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.delegate = context.coordinator
+        view.font = UIFont(name: "Bradley Hand", size: fontSize)
+            ?? UIFont(name: "Noteworthy-Bold", size: fontSize - 1)
+            ?? .systemFont(ofSize: fontSize - 1)
+        view.backgroundColor = .clear
+        view.autocorrectionType = .no
+        view.spellCheckingType = .no
+        view.textContainerInset = UIEdgeInsets(top: 6, left: 4, bottom: 6, right: 4)
+
+        // UITextView não tem placeholder nativo — a própria caixa mostra o
+        // texto guia em cinza até o toque, e o coordinator troca pelo
+        // conteúdo real no primeiro foco.
+        if text.isEmpty {
+            view.text = placeholder
+            view.textColor = placeholderColor
+            context.coordinator.showingPlaceholder = true
+        } else {
+            view.text = text
+            view.textColor = inkColor
+            context.coordinator.showingPlaceholder = false
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        context.coordinator.parent = self
+        guard !context.coordinator.showingPlaceholder, uiView.text != text else { return }
+        uiView.text = text
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: NotebookTextArea
+        var showingPlaceholder = false
+
+        init(_ parent: NotebookTextArea) {
+            self.parent = parent
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            guard showingPlaceholder else { return }
+            textView.text = ""
+            textView.textColor = parent.inkColor
+            showingPlaceholder = false
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            guard textView.text.isEmpty else { return }
+            textView.text = parent.placeholder
+            textView.textColor = parent.placeholderColor
+            showingPlaceholder = true
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            guard !showingPlaceholder else { return }
+            parent.text = textView.text
         }
     }
 }
