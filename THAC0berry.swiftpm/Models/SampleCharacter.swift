@@ -83,14 +83,23 @@ extension PlayerCharacter {
             EquipmentItem(name: "Trail rations (5 days)", note: "5")
         ]
 
-        kelmon.weaponProficiencies = ["Mace", "Sling", "War hammer"]
-
-        kelmon.skills = [
-            EquipmentItem(name: "Religion", note: "Wis 17"),
-            EquipmentItem(name: "Healing", note: "Wis 15"),
-            EquipmentItem(name: "Herbalism", note: "Int 10"),
-            EquipmentItem(name: "Reading/Writing", note: "Int 12"),
-            EquipmentItem(name: "Etiquette", note: "Cha 15")
+        // Cada entrada tinha o que devia estar em "Chk" (número-alvo pra
+        // rolar no dado, ex. "Wis 17") ou nem devia existir ("weapon")
+        // espremido dentro de "Slots" — bug relatado pelo usuário
+        // 2026-09-22, o campo "Slots" era texto livre até essa mudança.
+        // Corrigido: `slots` agora é sempre a contagem de espaços gastos
+        // (1, o valor mais comum — ver `Proficiency.mechanics.
+        // slotsRequired` na base de 372 proficiências) e o número-alvo de
+        // cada checagem de habilidade foi pro `target`, que é pra isso.
+        kelmon.proficiencies = [
+            ProficiencyEntry(name: "Mace", slots: 1),
+            ProficiencyEntry(name: "Sling", slots: 1),
+            ProficiencyEntry(name: "War hammer", slots: 1),
+            ProficiencyEntry(name: "Religion", slots: 1, target: "17"),
+            ProficiencyEntry(name: "Healing", slots: 1, target: "15"),
+            ProficiencyEntry(name: "Herbalism", slots: 1, target: "10"),
+            ProficiencyEntry(name: "Reading/Writing", slots: 1, target: "12"),
+            ProficiencyEntry(name: "Etiquette", slots: 1, target: "15")
         ]
 
         kelmon.languages = ["Common", "Elvish"]

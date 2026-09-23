@@ -30,7 +30,7 @@ struct MarkDeadSheet: View {
                         .foregroundStyle(Paper.penInk)
                     Spacer()
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -45,7 +45,7 @@ struct MarkDeadSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     FieldLabel(text: "How did it happen? (optional)")
                     HandwritingField(text: $note, placeholder: "e.g. Swallowed by a purple worm",
-                                     allowsSoftwareKeyboard: true, onCommit: {})
+                                     allowsSoftwareKeyboard: false, onCommit: {})
                         .frame(height: 54)
                         .overlay(alignment: .bottom) { DottedRule() }
                 }

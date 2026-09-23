@@ -11,8 +11,31 @@ import UIKit
 struct HandwritingField: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String
-    /// Quando falso, o teclado de software não aparece — só a caneta escreve.
+    /// Quando falso (o padrão), o teclado de software não aparece — só a
+    /// caneta escreve. Quando verdadeiro, `inputView` fica `nil` e o
+    /// teclado de verdade passa a estar disponível — mas junto dele o
+    /// iPadOS também passa a oferecer, assim que a caneta encosta, um
+    /// painel Scribble flutuante (desfazer, idioma, ditado, confirmar)
+    /// plantado no canto da tela, empurrando a folha/popover pra cima pra
+    /// manter o campo visível acima dele (TODO.md item 31 — usuário
+    /// relatou "a janela pulando"). Não existe API pública pra manter o
+    /// teclado disponível e suprimir só esse painel: a única forma de
+    /// nunca mostrá-lo é `inputView` não-nulo mesmo vazio, ou seja,
+    /// `false`. Por isso este campo nasce `false` em toda parte — a caneta
+    /// já escreve perfeitamente sozinha — e só vira `true` quando o
+    /// PRÓPRIO usuário pede explicitamente, tocando o botão de teclado do
+    /// `SearchField` (abaixo) — nunca como estado inicial de uma tela.
     var allowsSoftwareKeyboard: Bool = false
+    /// Liga pra pedir foco (e, com `allowsSoftwareKeyboard` também
+    /// verdadeiro, abrir o teclado de verdade) já na próxima atualização,
+    /// sem esperar o usuário tocar no campo — usado pelo botão de teclado
+    /// do `SearchField` (abaixo), que abre o teclado no mesmo toque em vez
+    /// de só "destravar" e deixar o usuário ainda ter que tocar o campo
+    /// duas vezes. Quem liga desliga sozinho de volta depois de um
+    /// instante (ver `updateUIView`) — não precisa (nem deve) ficar `true`
+    /// depois do primeiro foco, senão qualquer outro re-render do campo
+    /// roubaria o foco de novo à força.
+    var requestsFocus: Binding<Bool> = .constant(false)
     var onCommit: () -> Void = {}
     /// Tamanho da fonte de "letra de mão" — células pequenas (nome de arma,
     /// proficiência) precisam de algo menor que o nome do personagem.
@@ -66,6 +89,18 @@ struct HandwritingField: UIViewRepresentable {
                 uiView.reloadInputViews()
             }
         }
+        if requestsFocus.wrappedValue, !uiView.isFirstResponder {
+            // Assíncrono: `updateUIView` já está no meio de um ciclo de
+            // atualização da SwiftUI, então mexer no `Binding` de volta
+            // (pra desligar o pedido depois de atendido) precisa esperar
+            // esse ciclo terminar — senão é "modifying state during view
+            // update", o mesmo cuidado que o resto do app já toma com
+            // `DispatchQueue.main.async` nesses casos.
+            DispatchQueue.main.async {
+                uiView.becomeFirstResponder()
+                requestsFocus.wrappedValue = false
+            }
+        }
         context.coordinator.parent = self
     }
 
@@ -92,6 +127,67 @@ struct HandwritingField: UIViewRepresentable {
     }
 }
 
+/// Campo de busca — usado por todo Compendium/seletor ("campo de texto +
+/// lista de itens pra escolher", TODO.md item 31) — que nasce só-caneta
+/// (sem o teclado de verdade, então sem o painel flutuante de Scribble que
+/// empurrava a tela) e só liga o teclado quando o PRÓPRIO usuário pede,
+/// tocando o ícone de teclado. Repõe a opção de digitar (útil pra soletrar
+/// algo que a caneta reconheceu errado, ou pra quem prefere teclado físico)
+/// sem trazer de volta o "pula na tela" pro caso comum, que continua sendo
+/// só escrever com a caneta.
+///
+/// Ficou como um componente único (em vez de repetir os 14 lugares que
+/// tinham exatamente este mesmo `VStack` antes) — trocar aqui uma vez só
+/// resolve pra todo Compendium/seletor de uma vez, e evita um novo campo
+/// nascer com `allowsSoftwareKeyboard: true` fixo por engano de novo.
+struct SearchField: View {
+    @Binding var text: String
+    var placeholder: String
+    var onCommit: () -> Void = {}
+    var fontSize: CGFloat = 25
+
+    /// Começa desligado em TODA tela — mesmo alguém tendo ligado antes em
+    /// OUTRO Compendium, cada campo tem seu próprio estado (nunca é global
+    /// nem persiste entre telas), porque o padrão seguro é sempre
+    /// só-caneta; ligar o teclado é sempre um gesto explícito, feito de
+    /// novo cada vez que faz falta.
+    @State private var typingEnabled = false
+    /// Liga junto com `typingEnabled` (nunca sozinho) só no toque que
+    /// LIGA o teclado — pedir foco ao DESLIGAR não faria sentido, e o
+    /// próprio `HandwritingField` desliga isto de volta sozinho assim que
+    /// atende o pedido.
+    @State private var focusRequested = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                FieldLabel(text: "Search")
+                Spacer()
+                Button {
+                    typingEnabled.toggle()
+                    // Liga o teclado JÁ no mesmo toque, em vez de só
+                    // destravar a possibilidade e obrigar o usuário a
+                    // tocar o campo uma segunda vez pra então ver o
+                    // teclado aparecer.
+                    if typingEnabled { focusRequested = true }
+                } label: {
+                    Image(systemName: typingEnabled ? "keyboard.fill" : "keyboard")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(typingEnabled ? Paper.penInk : Paper.inkSoft)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(typingEnabled ? "Turn off software keyboard" : "Turn on software keyboard")
+            }
+            HandwritingField(text: $text, placeholder: placeholder,
+                             allowsSoftwareKeyboard: typingEnabled,
+                             requestsFocus: $focusRequested,
+                             onCommit: onCommit, fontSize: fontSize)
+                .frame(height: 44)
+            DottedRule()
+        }
+    }
+}
+
 /// Tira o foco de qualquer campo de escrita da folha.
 ///
 /// Um campo de texto em foco anuncia ao iPadOS uma área de captura de
@@ -103,6 +199,43 @@ struct HandwritingField: UIViewRepresentable {
 func resignPencilFocus() {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                     to: nil, from: nil, for: nil)
+}
+
+/// Avisa o iPadOS "não é escrita, aqui não" pra uma área inteira que não
+/// tem NENHUM campo de escrita seu (ex.: a linha "Class / Kit" + "Level"
+/// do cabeçalho, que só tem Menu/botão/balão) mas fica perto o bastante
+/// de um `HandwritingField` de verdade (Character Name, na linha de
+/// cima) pra a caneta, às vezes, tentar escrever ali por engano.
+///
+/// Diferente do `resignPencilFocus()` (que larga o foco de um campo já
+/// focado), isto ataca a outra metade do problema, documentada em
+/// `StrikeInteraction` (`SpellSheetView.swift`): o Scribble mira o campo
+/// de escrita mais próximo INDEPENDENTE de quem está em foco — então só
+/// tirar o foco não bastava aqui. É só a `UIScribbleInteraction`
+/// recusando começar, sem gesto nenhum: `isUserInteractionEnabled`
+/// continua o padrão (`true`, a interaction precisa disso pra ser
+/// consultada) mas a view não tem NENHUM `UIGestureRecognizer` próprio,
+/// então nunca ganha um toque no hit-test contra o Menu/botão de verdade
+/// por cima dela — só fica ali, num `.background()`, respondendo "não"
+/// quando o sistema pergunta se pode escrever naquele pedaço da tela.
+struct ScribbleGuard: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.addInteraction(UIScribbleInteraction(delegate: context.coordinator))
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIScribbleInteractionDelegate {
+        func scribbleInteraction(_ interaction: UIScribbleInteraction,
+                                 shouldBeginAt location: CGPoint) -> Bool {
+            false
+        }
+    }
 }
 
 /// A entrada de caneta dos contadores de traço.

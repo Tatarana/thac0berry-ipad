@@ -13,6 +13,7 @@ import UIKit
 struct HomeView: View {
     @EnvironmentObject private var library: CharacterLibrary
     @EnvironmentObject private var spellbook: SpellDatabase
+    @EnvironmentObject private var kits: KitDatabase
     @State private var path = NavigationPath()
 
     private var mascotBadge: Image? {
@@ -96,7 +97,7 @@ struct HomeView: View {
                     }
                     .frame(maxWidth: 760)
 
-                    if let error = spellbook.loadError ?? library.lastError {
+                    if let error = spellbook.loadError ?? kits.loadError ?? library.lastError {
                         Text(error)
                             .font(Paper.printedItalic(12))
                             .foregroundStyle(Ember.glowBright)

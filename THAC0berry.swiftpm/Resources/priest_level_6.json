@@ -1274,7 +1274,7 @@
     "summary": "This spell act a a limited form of the permanency spell available to wizards. Any glyph of wardings, symbol, or priest spell from the sphere of wards is made permanent if followed by the casting of this spell.",
     "damageDice": null,
     "spheres": [
-      "Ward"
+      "Wards"
     ],
     "fullDescription": "This spell act a a limited form of the permanency spell available to wizards. Any glyph of wardings, symbol, or priest spell from the sphere of wards is made permanent if followed by the casting of this spell. Only one such spell can be affected per ca ting of an enduring ward.\n\nThis spell can be canceled by the successful casting of a dispel magic or Mordenkainen's disjunction spell (or similar magics), but a second such spell is typically required for the warding spell itself, whoee finite duration (if applicable) does not commence until the ending of the enduring ward.\n\nThe material component of this spell is a crushed diamond of at least 200 gp value.\n\nNotes: Granted by the Mulhorandi goddess Nephthys of the Forgotten Realms setting.",
     "setting": "Forgotten Realms"
@@ -2874,7 +2874,8 @@
     "summary": "This spell requires a sword made of a crystalline stone (such as quartz) or glass. The weapon must be of the highest quality and craftsmanship, and forged without aid of magic or psionics.",
     "damageDice": null,
     "spheres": [
-      "Elemental Earth or Silt"
+      "Elemental Earth",
+      "Silt"
     ],
     "fullDescription": "This spell requires a sword made of a crystalline stone (such as quartz) or glass. The weapon must be of the highest quality and craftsmanship, and forged without aid of magic or psionics.\n\nThe enchantment of the sword takes an entire day, and at day's end the caster must make an unmodified saving throw vs. spells. Failure indicates that the blade must be enchanted for another day and another save vs. spells required, now at -1. The caster is permitted a number of attempts equal to 1/4 his or her level (round down). Each additional attempt is made at a cumulative -1 penalty. If the save is made, the sword has been enchanted. If all fail, the sword is ruined and can never be used for this spell again.\n\nA successfully enchanted sand Made is razor-sharp, inflicting +2 damage to opponents. It has no attack bonus, and cannot affect creatures immune to ordinary weapons. It is very difficult to see, and is effectively invisible in dim light, from a distance, or underwater. A sand Made is also completely invisible to magic that detects metal and minerals.\n\nIf a wielder rolls an unmodified “1” while using the sword against an armored target (chitin, metal, bone armor, or skin), it splinters into thousands of deadly shards. The damage from the blow is doubled due to the spray of glass, but the sword is shattered and now forever useless.\n\nNotes: Uncommon for priests of Elemental Earth from the Dark Sun setting: otherwise, very",
     "setting": "Dark Sun"
@@ -2980,7 +2981,7 @@
     "damageDice": null,
     "spheres": [
       "Elemental Air",
-      "Earth"
+      "Elemental Earth"
     ],
     "fullDescription": "With this spell a priest can create an area of abnormally low tides in the Sea of Silt. The area of silt affected is a circle with a radius of 10 yards per level of the caster. Within the circle, the silt drops 10 feet below its normal level, which is usually enough to expose the maze of rock walkways common to the coastal areas of the Sea. The spell's area of effect moves with the caster, so he can travel the rock walkways while exposed to the air. Strong winds and the like affect the silt normally.\n\nIf cast outside the Sea of Silt, this spell has no effect. The material component is a small, oval lump of lead that has been cast by moonlight.\n\nThe reverse of this spell, high silt tides, causes the silt to rise 10 feet higher within the circular area of effect. The silt can overwhelm vessels or wading creatures that are not tall enough to wade through ten additional feet of depth.\n\nNotes: Uncommon for priests from the Dark Sun setting; otherwise, very rare.",
     "setting": "Dark Sun"
@@ -3935,7 +3936,7 @@
     "summary": "By casting this spell, the priest brings into existence a malign, freezing mist in a hemispheric area with a radius up to 20 yards plus 2 yards per level of the priest.",
     "damageDice": null,
     "spheres": [
-      "Necromancy"
+      "Necromantic"
     ],
     "fullDescription": "By casting this spell, the priest brings into existence a malign, freezing mist in a hemispheric area with a radius up to 20 yards plus 2 yards per level of the priest. Within the mist, visibility is reduced to 10 yards and movement is reduced by 25%. Each round a creature spends within the mist, it loses 1d4 hit points from chill damage (no save, but magic such as resist cold halves damage) and must make a Constitution check or lose 1 point of Strength.\n\nThe fog travels at MV 9 over any and all terrain. It can follow simple instructions such as “pursue the dwarves on the hill, “ but it does so with no real intelligence (if the pursued party splits up, the member(s) followed is randomly determined) and it has no special detection abilities (it cannot follow invisible creatures, for example).\n\nFor every 10 points of damage inflicted by the mist, the priest regains 1 hit point (normal maximum cannot be exceeded). For every 5 points of Strength drained, the priest regains 1 hit point in the same way.\n\nFor every creature slain by the mist, whether by cumulative hit point loss or Strength reduced to zero, the priest gains a surge of energy; this can be used to cast cure light wounds on any creature touched, but this healing must be used within 3 rounds or the effect is lost. Any creature slain by the vampiric mist becomes a juju zombie under the control of the priest unless a save vs. death magic is successful.\n\nThe vampiric mist may be destroyed by a spell such as gust of wind, but it is allowed a saving throw vs. spell at the level of the priest casting the spell to avoid such destruction. It can be dispelled in the normal manner.\n\nThe mist cannot be struck with weapons or physically damaged with spells such as lightning bolt, although a suitable fire-based spell (fireball, etc.) may dissipate and destroy the mist unless it makes a successful saving throw vs. spell at the level of the priest who created it. Normal fires do not affect the mist, nor do they prevent the chilling and damaging effect of the spell on creatures within the area of effect.\n\nFinally, Strength points lost from exposure to a vampiric mist are regained at a rate of one per hour after escaping the mist.\n\nNotes: Granted by Iuz the Evil of the Greyhawk setting.",
     "setting": "Greyhawk"

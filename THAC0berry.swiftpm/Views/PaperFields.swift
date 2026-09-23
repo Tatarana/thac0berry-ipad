@@ -44,6 +44,16 @@ struct EditableNumber: View {
 
     var body: some View {
         Button {
+            // Larga o foco de qualquer outro campo de escrita ANTES de
+            // abrir o balão — sem isto, um campo que ainda esteja em foco
+            // em outro canto da ficha (ex.: Character Name) continua
+            // anunciando uma área de captura de Scribble maior que ele
+            // mesmo, e um traço feito aqui dentro do balão do Nível acaba
+            // sendo entregue a esse campo antigo em vez do novo. Mesma
+            // causa/mesma solução do `resignPencilFocus()` que já existia
+            // pros contadores de traço (ver comentário em
+            // `HandwritingField.swift`).
+            resignPencilFocus()
             draft = "\(value)"
             isEditing = true
         } label: {
@@ -89,7 +99,7 @@ private struct NumberPad: View {
         HStack(spacing: 12) {
             PadButton(symbol: "−") { onStep(-1) }
             HandwritingField(text: $draft, placeholder: "",
-                             allowsSoftwareKeyboard: true, onCommit: onDone)
+                             allowsSoftwareKeyboard: false, onCommit: onDone)
                 .frame(width: 84, height: 44)
                 .overlay(alignment: .bottom) { DottedRule() }
             PadButton(symbol: "+") { onStep(1) }
@@ -136,6 +146,9 @@ struct EditableText: View {
 
     var body: some View {
         Button {
+            // Mesmo motivo do `EditableNumber` acima — larga o foco de
+            // qualquer campo antigo antes de abrir o balão de edição.
+            resignPencilFocus()
             draft = value
             isEditing = true
         } label: {
@@ -160,7 +173,7 @@ struct EditableText: View {
         )) {
             HStack(spacing: 12) {
                 HandwritingField(text: $draft, placeholder: placeholder,
-                                 allowsSoftwareKeyboard: true) {
+                                 allowsSoftwareKeyboard: false) {
                     value = draft
                     isEditing = false
                     onCommit(draft)
@@ -199,7 +212,7 @@ struct InlineTextField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             HandwritingField(text: $value, placeholder: placeholder,
-                             allowsSoftwareKeyboard: true, fontSize: fontSize,
+                             allowsSoftwareKeyboard: false, fontSize: fontSize,
                              textColor: textColor)
                 .frame(height: fontSize + 16)
             if underline {

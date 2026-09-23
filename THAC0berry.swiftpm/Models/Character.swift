@@ -20,10 +20,59 @@ struct AbilityScores: Codable, Hashable {
     }
 }
 
+// MARK: - Esferas de acesso
+
+/// Nível de acesso do personagem a uma esfera de magia de clérigo —
+/// acesso MAIOR conjura até o círculo máximo que o nível permitir, acesso
+/// MENOR só até o 3º círculo daquela esfera (regra do PHB, capítulo 3).
+/// String bruta em vez de referência a `Spell.spheres` de propósito: são
+/// dados de fontes diferentes (a lista canônica de esferas é fixa; o
+/// texto de `spheres` em cada magia vem direto do corpus JSON), casam
+/// pelo NOME, não por identidade de tipo.
+enum SphereAccessLevel: String, Codable, Hashable, CaseIterable {
+    case major
+    case minor
+
+    var label: String {
+        switch self {
+        case .major: return "Major"
+        case .minor: return "Minor"
+        }
+    }
+}
+
+/// Sinal de esfera-de-acesso pra um candidato de magia na Folha de Magias
+/// (ver `PlayerCharacter.sphereSignal(for:)`) — SEMPRE só um aviso, nunca
+/// um filtro: a magia continua na lista, escolhível, do mesmo jeito.
+enum SphereSignal: Hashable {
+    /// Nenhuma das esferas da magia está marcada (nem maior, nem menor).
+    case outsideSpheres
+    /// Pelo menos uma esfera da magia está marcada, mas só como MENOR —
+    /// regra do PHB (capítulo 3): acesso menor trava no 3º círculo,
+    /// então uma magia de 4º círculo em diante nessa esfera fica fora do
+    /// alcance mecânico do personagem, mesmo "tendo" a esfera.
+    case minorCircleCap
+
+    var label: String {
+        switch self {
+        case .outsideSpheres: return "outside spheres"
+        case .minorCircleCap: return "minor — caps at 3rd circle"
+        }
+    }
+}
+
 // MARK: - Jogadas de proteção
 
 /// As cinco categorias de saving throw de AD&D 2e. São valores "role igual
-/// ou acima", então o app guarda o alvo do d20 direto da tabela da classe.
+/// ou acima" — quanto MENOR, melhor. O app guarda o alvo "Start" direto da
+/// tabela da classe/nível (o `ConsequenceEngine` escreve aqui sozinho numa
+/// subida de nível) e um "Mod" numérico por jogada que o jogador ajusta na
+/// mão (item de anel/poção temporário, penalidade de armadilha, bônus de
+/// magia — qualquer coisa que a tabela por si só não cobre). "Total" (Start
+/// − Mod, já que um bônus positivo FACILITA a jogada — reduz o número que
+/// precisa tirar no d20, regra do PHB cap. 9) é só exibido, nunca guardado:
+/// sempre recalculado a partir dos outros dois, nunca pode ficar
+/// dessincronizado.
 struct SavingThrows: Codable, Hashable {
     var paralyzationPoisonDeath: Int = 16
     var rodStaffWand: Int = 18
@@ -36,18 +85,30 @@ struct SavingThrows: Codable, Hashable {
     /// têm essa chave no JSON salvo.
     var spellResistance: String? = nil
 
-    /// Coluna "Mod" do PDF — um modificador de texto livre por jogada
-    /// (ex.: "+2 vs veneno"), guardado por `SaveEntry.id` porque cada
-    /// jogada não tinha campo próprio antes. Optional pelo mesmo motivo de
-    /// sempre: fichas antigas não têm essa chave no JSON salvo.
-    var modifiers: [String: String]? = nil
+    /// Coluna "Mod" do PDF — ajuste numérico por jogada (positivo = bônus,
+    /// facilita; negativo = penalidade), guardado por `SaveEntry.id`
+    /// porque cada jogada não tinha campo próprio antes. Optional pelo
+    /// mesmo motivo de sempre: fichas antigas não têm essa chave no JSON
+    /// salvo.
+    var modifiers: [String: Int]? = nil
 
-    func modifier(for id: String) -> String { modifiers?[id] ?? "" }
+    func modifier(for id: String) -> Int { modifiers?[id] ?? 0 }
 
-    mutating func setModifier(_ text: String, for id: String) {
+    mutating func setModifier(_ value: Int, for id: String) {
         var dict = modifiers ?? [:]
-        dict[id] = text
-        modifiers = dict
+        if value == 0 {
+            dict.removeValue(forKey: id)
+        } else {
+            dict[id] = value
+        }
+        modifiers = dict.isEmpty ? nil : dict
+    }
+
+    /// "Total" da coluna do PDF — Start menos o Mod aplicado (ver o
+    /// comentário da struct pro porquê de ser subtração). Nunca guardado;
+    /// sempre recalculado na hora de exibir.
+    func total(for entry: SaveEntry) -> Int {
+        self[keyPath: entry.keyPath] - modifier(for: entry.id)
     }
 
     struct SaveEntry: Identifiable {
@@ -336,6 +397,13 @@ struct WeaponEntry: Codable, Identifiable, Hashable {
     var hitAdj: String? = nil
     var dmgAdj: String? = nil
     var rangeSpecial: String? = nil
+
+    /// `Weapon.id` quando esta linha veio do `WeaponPickerSheet` (Weapon
+    /// Compendium) — mesmo padrão de `ProficiencyEntry.matchedProficiencyID`:
+    /// liga a linha à base pra abrir a descrição completa num toque, sem
+    /// depender do nome bater exatamente. `nil` numa linha digitada à mão
+    /// (fichas antigas, ou arma caseira fora da base de 69 armas do PHB).
+    var matchedWeaponID: String? = nil
 }
 
 /// Uma linha da tabela de Proficiências da ficha oficial (nome + espaços
@@ -343,7 +411,18 @@ struct WeaponEntry: Codable, Identifiable, Hashable {
 struct ProficiencyEntry: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var name: String = ""
-    var slots: String = ""
+    /// Quantos espaços de proficiência esta entrada consome. Era um campo
+    /// de TEXTO LIVRE — qualquer coisa podia ser digitada ali, inclusive
+    /// coisas que não fazem sentido nenhum nessa coluna (bug relatado pelo
+    /// usuário 2026-09-22: a ficha do Kelmon, gerada a partir dos dados de
+    /// exemplo antigos de `SampleCharacter.swift`, tinha "weapon" e "WIS
+    /// 17" no campo "Slots" — informação que devia estar em `target`, ou
+    /// nem existir). Virou número de verdade. `init(from:)` abaixo lê
+    /// fichas salvas ANTES dessa mudança (campo era String): tenta como
+    /// Int primeiro, senão extrai os dígitos de dentro do texto antigo
+    /// (ex.: "2 slots" → 2), senão cai pro padrão de 1 — nunca falha ao
+    /// abrir a ficha, só normaliza o valor.
+    var slots: Int = 1
     /// "checked" era um Bool (caixinha de visto) — na prática a coluna
     /// "Chk" da ficha oficial é o número-alvo pra rolar no dado (ex.: "14")
     /// pra ter sucesso na checagem, não um sim/não. `checked` fica sem uso
@@ -352,6 +431,46 @@ struct ProficiencyEntry: Codable, Identifiable, Hashable {
     /// o valor de verdade.
     var checked: Bool = false
     var target: String? = nil
+    /// `Proficiency.id` quando esta linha veio do `ProficiencyPickerSheet`
+    /// (TODO.md item 18) — mesmo padrão de `ItemSpellUse.matchedSpellID`:
+    /// liga a linha à base pra abrir a descrição completa num toque, sem
+    /// depender do nome bater exatamente. `nil` numa linha digitada à mão
+    /// (fichas antigas, ou proficiência caseira fora da base) — nesse caso
+    /// o nome ainda é comparado contra a base como último recurso (ver
+    /// `ProficiencyFormRow.matchedProficiency`), mas sem garantia nenhuma.
+    var matchedProficiencyID: String? = nil
+
+    init(id: UUID = UUID(), name: String = "", slots: Int = 1, checked: Bool = false,
+         target: String? = nil, matchedProficiencyID: String? = nil) {
+        self.id = id
+        self.name = name
+        self.slots = slots
+        self.checked = checked
+        self.target = target
+        self.matchedProficiencyID = matchedProficiencyID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, slots, checked, target, matchedProficiencyID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
+        target = try container.decodeIfPresent(String.self, forKey: .target)
+        matchedProficiencyID = try container.decodeIfPresent(String.self, forKey: .matchedProficiencyID)
+
+        if let intSlots = try? container.decodeIfPresent(Int.self, forKey: .slots) {
+            slots = intSlots
+        } else if let textSlots = try? container.decodeIfPresent(String.self, forKey: .slots) {
+            let digits = textSlots.filter(\.isNumber)
+            slots = Int(digits) ?? 1
+        } else {
+            slots = 1
+        }
+    }
 }
 
 /// Os detalhes de combate da ficha oficial que não têm campo próprio ainda
@@ -391,6 +510,14 @@ struct Page2EquipmentEntry: Codable, Identifiable, Hashable {
     /// só mexe nas linhas abaixo dela NA MESMA coluna, como uma lista
     /// normal. Optional pelo mesmo motivo de sempre; ausência vira coluna 0.
     var column: Int? = nil
+
+    /// `MundaneItem.id` quando esta linha veio do `MundaneItemPickerSheet`
+    /// (Equipment Compendium) — mesmo padrão de
+    /// `ProficiencyEntry.matchedProficiencyID`/`WeaponEntry.matchedWeaponID`:
+    /// liga a linha à base pra abrir a descrição completa (custo/peso) num
+    /// toque. `nil` numa linha digitada à mão (fichas antigas, ou item
+    /// caseiro fora do catálogo de 183 itens).
+    var matchedItemID: String? = nil
 }
 
 /// As taxas da tabela "Movement" da página 2.
@@ -445,6 +572,15 @@ struct QuantifiedItem: Codable, Identifiable, Hashable {
     /// motivo de sempre: linhas criadas antes desta versão não têm essa
     /// chave.
     var usedCount: Int? = nil
+
+    /// Liga esta linha a um item de `MagicItemDatabase` (mesmo padrão de
+    /// `Page2EquipmentEntry.matchedItemID`/`MundaneItemDatabase`) — só usado
+    /// pela lista "Magic Items" (não por "Treasure / Other Possessions",
+    /// que continua puramente texto livre). `nil` = linha digitada à mão
+    /// pelo jogador (item caseiro/criado por ele) ou ficha salva antes
+    /// desta versão existir; nesse caso cai pro fallback de nome exato,
+    /// igual ao equipamento mundano.
+    var matchedItemID: String? = nil
 }
 
 /// As moedas, como na caixa de tesouro da ficha.
@@ -527,6 +663,49 @@ enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
 
     /// Só o Clérigo tem folha de magias por enquanto.
     var hasSpellSheet: Bool { self == .cleric }
+
+    /// Quantas páginas fixas a aba "Sheet" da ficha de personagem tem pra
+    /// essa classe (`RecordSheetPagerView`/`RecordSheetBeadRow` em
+    /// `CharacterSheetView.swift`) — Ficha + Equipment/Movement/Experience
+    /// + Character Description pra todo mundo, mais uma 4ª página de
+    /// tabelas de referência do Clérigo só pra quem tem ficha de magia.
+    /// Centralizado aqui (2026-09-20) porque as duas views antes tinham
+    /// cada uma sua própria conta solta — divergiram (`RecordSheetBeadRow`
+    /// ficou um a menos que `RecordSheetPagerView`), e a página extra do
+    /// Clérigo nunca ganhava bolinha própria por causa disso.
+    var recordSheetPageCount: Int { hasSpellSheet ? 4 : 3 }
+
+    /// O grupo (Warrior/Wizard/Priest/Rogue) que esta classe pertence —
+    /// mesmo rótulo de `Proficiency.primaryGroup` (2026-09-22, pedido do
+    /// usuário: destacar no seletor de Proficiências o grupo "da classe do
+    /// personagem"). "General" fica de fora — toda classe pode aprender
+    /// proficiências gerais, então não é o grupo de NINGUÉM em particular.
+    var proficiencyGroup: String {
+        switch self {
+        case .fighter, .paladin, .ranger: return "Warrior"
+        case .mage: return "Wizard"
+        case .cleric, .druid: return "Priest"
+        case .thief, .bard: return "Rogue"
+        }
+    }
+
+    /// O dado de Hit Dice de cada classe — coluna "Hit Dice" das tabelas
+    /// de progressão de experiência do PHB, já conferidas em
+    /// `ExperienceProgressionTable` (Table 14: Warrior Experience Levels →
+    /// "Hit Dice (d10)"; Table 20: Wizard → "d4"; Table 23: Priest →
+    /// "d8"; Table 25: Rogue → "d6"). Usado por
+    /// `PlayerCharacter.refreshHitDiceType()` pra preencher o campo "Hit
+    /// Dice" sozinho quando o jogador escolhe a classe (pedido do usuário,
+    /// 2026-09-22: "deve entrar naquele motor", o mesmo de XP needed for
+    /// the next level).
+    var hitDieType: String {
+        switch self {
+        case .fighter, .paladin, .ranger: return "d10"
+        case .mage: return "d4"
+        case .cleric, .druid: return "d8"
+        case .thief, .bard: return "d6"
+        }
+    }
 
     /// Fichas salvas antes da tradução da UI pra inglês guardavam o nome
     /// da classe em português (era o `rawValue` da época) — sem isso elas
@@ -626,8 +805,41 @@ struct Campaign: Codable, Identifiable, Hashable {
     /// essa campanha, não mais um caderno por personagem.
     var notebookEntries: [NotebookEntry] = []
 
+    /// Cenários de campanha ligados (ver `CampaignSettingCatalog`) — `nil`
+    /// é o padrão (campanha nova, ou nunca mexeu nisso) e significa "sem
+    /// filtro, mostra tudo", igual toda outra feature de sinalização deste
+    /// app (esferas de acesso, etc.): nunca quebra campanha existente, só
+    /// SOMA um filtro quando o jogador liga pelo menos um cenário. Um
+    /// conjunto vazio (todos os cenários desligados na mão) tem o mesmo
+    /// efeito de `nil` — só o conteúdo genérico/core apareceria, o que não
+    /// faz sentido pra nenhuma mesa de verdade, então é tratado como "sem
+    /// filtro" também (ver `allowsSetting`).
+    var enabledSettings: Set<String>? = nil
+
     var displayTitle: String {
         name.isEmpty ? "Unnamed Campaign" : name
+    }
+
+    /// Verdadeiro quando `setting` deveria aparecer nas listas desta
+    /// campanha — conteúdo genérico/core sempre aparece; o resto só
+    /// aparece se a campanha não tiver filtro configurado, ou se tiver
+    /// ligado esse cenário especificamente.
+    func allowsSetting(_ setting: String?) -> Bool {
+        if CampaignSettingCatalog.isGeneric(setting) { return true }
+        guard let enabledSettings, !enabledSettings.isEmpty else { return true }
+        guard let setting else { return true }
+        return enabledSettings.contains(setting)
+    }
+
+    /// Mesma regra que `allowsSetting`, mas pra proficiências — que podem
+    /// pertencer a mais de um cenário (`Proficiency.campaignSettings`):
+    /// aparece se QUALQUER um dos cenários dela bater (união, não
+    /// interseção — mesmo raciocínio do filtro por esfera do Grimório).
+    func allowsAnySetting(_ settings: [String]) -> Bool {
+        guard let enabledSettings, !enabledSettings.isEmpty else { return true }
+        if settings.isEmpty { return true }
+        if settings.contains(where: { CampaignSettingCatalog.isGeneric($0) }) { return true }
+        return !Set(settings).isDisjoint(with: enabledSettings)
     }
 
     /// A sessão "ativa": a mais recente que não está arquivada. Se não
@@ -729,6 +941,53 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     var page2Movement: MovementRates? = nil
     var page2EncumbranceTable: EncumbranceTable? = nil
     var xpNeededNextLevel: String? = nil
+
+    /// Recalcula `xpNeededNextLevel` a partir de `ExperienceProgressionTable`
+    /// (nível/classe atuais) e marca `recentAutoChange` pro `ChangeFlash`
+    /// piscar da próxima vez que o campo aparecer. Método no MODELO (não só
+    /// dentro de `ExperienceForm`) porque a página 2 da ficha vive dentro
+    /// de um `UIPageViewController` (`RecordSheetPagerView`) que só
+    /// atualiza a página VISÍVEL — mudar de nível/classe enquanto a página
+    /// 1 está na tela não disparava o `onChange` de `ExperienceForm`
+    /// (página 2, fora de vista, congelada) — bug relatado pelo usuário
+    /// (2026-09-22): "ao subir ou descer de nível este campo não é
+    /// atualizado". Chamado agora direto de onde nível/classe são editados
+    /// (página 1), não só de dentro de `ExperienceForm`.
+    mutating func refreshXPNeededNextLevel() {
+        guard let text = ExperienceProgressionTable.xpNeededForNextLevel(
+            currentLevel: level, class: characterClass
+        ) else { return }
+        guard xpNeededNextLevel != text else { return }
+        xpNeededNextLevel = text
+        markRecentAutoChange("xpNeededNextLevel")
+    }
+
+    /// Preenche `combat.hitDiceType` ("Hit Dice: __d__" na página 1, perto
+    /// do THAC0) a partir de `CharacterClass.hitDieType` — mesmo "motor"
+    /// de `refreshXPNeededNextLevel()`, pedido do usuário (2026-09-22).
+    ///
+    /// `force: true` (chamado de `ClassPicker.select`, na troca de
+    /// classe): sempre resincroniza com a classe atual, igual o XP faz —
+    /// bug relatado pelo usuário na v1.38 ("não tá refletindo ao trocar
+    /// de classe"): a versão anterior só preenchia quando o campo estava
+    /// vazio, então depois do primeiro preenchimento a troca de classe
+    /// parava de atualizar o valor.
+    ///
+    /// `force: false` (padrão — chamado de `CombatForm.onAppear`, toda
+    /// vez que a página aparece): só preenche quando o campo está VAZIO,
+    /// nunca sobrescreve uma anotação que o jogador tenha escrito à mão —
+    /// senão o safety net rodaria de novo a cada vez que a página
+    /// aparecesse e apagaria qualquer texto customizado.
+    mutating func refreshHitDiceType(force: Bool = false) {
+        let expected = characterClass.hitDieType
+        guard force || (combat?.hitDiceType ?? "").isEmpty else { return }
+        guard combat?.hitDiceType != expected else { return }
+        var updated = combat ?? CombatDetails()
+        updated.hitDiceType = expected
+        combat = updated
+        markRecentAutoChange("hitDiceType")
+    }
+
     var xpKitModifier: String? = nil
     var xpAbilityBonus: String? = nil
     var xpSubraceModifier: String? = nil
@@ -744,8 +1003,6 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     var movement: Int = 12
     var equipment: [EquipmentItem] = []
     var weapons: [WeaponEntry] = []
-    var weaponProficiencies: [String] = []
-    var skills: [EquipmentItem] = []      // perícia + atributo/base
     var languages: [String] = []
     var magicItems: [String] = []
     var allies: [String] = []
@@ -799,6 +1056,167 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// funcionar.
     var clonedFromCharacterID: UUID? = nil
 
+    // MARK: - Motor de Consequências (2026-09-19)
+    //
+    // Retrato de nível/atributos na última vez que o jogador revisou (ou
+    // dispensou) a janela de consequências — não é "o que a ficha tinha
+    // quando foi criada", é "o que já foi visto". Comparado contra
+    // `level`/`abilities` atuais pra decidir se o sinal "•" aparece perto
+    // do nível (ver `RecordHeaderForm`/`ConsequenceEngine`). Optional pelo
+    // mesmo motivo de sempre: uma ficha salva antes desta versão não tem
+    // essas chaves — `ensureConsequenceSnapshotInitialized()` preenche
+    // com o valor atual na primeira vez que a ficha abre, silenciosamente,
+    // pra não fazer todo personagem já existente aparecer com o sinal
+    // aceso do nada.
+    var lastAppliedLevel: Int? = nil
+    var lastAppliedAbilities: AbilityScores? = nil
+
+    /// Qual campo foi editado por último, entre os que o motor de
+    /// consequências acompanha ("level", "strength", "dexterity",
+    /// "constitution", "intelligence", "wisdom", "charisma") — decide ONDE
+    /// mostrar o sinal (ver `effectiveChangedField`). Setado pelas views
+    /// (`RecordHeaderForm`/`AbilityScoresForm`, via `.onChange`) a cada
+    /// edição de verdade, e zerado em `markConsequencesReviewed()`.
+    ///
+    /// Existe porque o usuário testou a versão anterior (um sinal por
+    /// campo mudado, todos ao mesmo tempo) e achou pior: "o ícone fica
+    /// replicando a cada ajuste". Pediu pra deixar só UM sinal ativo — o
+    /// do último campo mexido — mas que ao tocar continue mostrando a
+    /// SOMA de todos os ajustes pendentes (por isso `ConsequencePreviewSheet`
+    /// continua comparando `lastAppliedRuleContext` inteiro contra
+    /// `currentRuleContext`, sem filtrar por este campo).
+    var lastChangedField: String? = nil
+
+    // MARK: - Sinal de "mudou sozinho" (2026-09-22)
+    //
+    // Pedido do usuário ao ver o seletor de Raça aplicando ajustes de
+    // atributo/resistência mágica sozinho na ficha: "dá pra deixar o novo
+    // valor numa outra cor por alguns segundos? Assim fica claro pro
+    // player o que mudou". Chaves aqui são o MESMO vocabulário de
+    // `lastChangedField` ("strength", "dexterity" etc.) mais campos que
+    // esse outro sinal não cobre ("spellResistance", "racialAbilities") —
+    // guarda só "isso foi tocado por uma ação automática e ainda não foi
+    // mostrado piscando"; `ChangeFlash` (`Views/ChangeFlash.swift`) lê e
+    // consome (remove a chave) na primeira vez que aquele campo aparece
+    // na tela, então cada mudança pisca uma única vez, mesmo que o campo
+    // fique fora da aba visível por um tempo antes do jogador chegar lá.
+    /// Não existe pra tudo que muda (edição manual do jogador não entra
+    /// aqui) — só pra mudanças que o APP fez sozinho, feitas fora da
+    /// visão do jogador naquele instante (ex.: escolher raça mexe em
+    /// Força/Constituição na aba Sheet enquanto ele está na aba
+    /// Description). Optional pelo mesmo motivo de sempre.
+    var recentAutoChanges: Set<String>? = nil
+
+    /// Marca `key` pra piscar na próxima vez que aparecer na tela.
+    mutating func markRecentAutoChange(_ key: String) {
+        recentAutoChanges = (recentAutoChanges ?? []).union([key])
+    }
+
+    /// `true` enquanto `key` ainda não piscou — consultado a cada render
+    /// do campo (não é um evento único), então quem chama decide quando
+    /// "consumir" com `clearRecentAutoChange`.
+    func hasRecentAutoChange(_ key: String) -> Bool {
+        recentAutoChanges?.contains(key) ?? false
+    }
+
+    /// Consome a marca — chamado pelo `ChangeFlash` depois de agendar a
+    /// animação, pra não piscar de novo a cada re-render enquanto o
+    /// campo continua visível.
+    mutating func clearRecentAutoChange(_ key: String) {
+        recentAutoChanges?.remove(key)
+    }
+
+    /// `true` quando nível ou atributos mudaram desde a última revisão —
+    /// liga o sinal "•" no cabeçalho da ficha.
+    var hasPendingConsequences: Bool {
+        guard let lastAppliedLevel, let lastAppliedAbilities else { return false }
+        return lastAppliedLevel != level || lastAppliedAbilities != abilities
+    }
+
+    /// `true` só quando o NÍVEL mudou desde a última revisão.
+    var hasPendingLevelChange: Bool {
+        guard let lastAppliedLevel else { return false }
+        return lastAppliedLevel != level
+    }
+
+    /// Mesma ideia de `hasPendingLevelChange`, mas por ATRIBUTO.
+    func hasPendingAbilityChange(_ keyPath: KeyPath<AbilityScores, Int>) -> Bool {
+        guard let lastAppliedAbilities else { return false }
+        return lastAppliedAbilities[keyPath: keyPath] != abilities[keyPath: keyPath]
+    }
+
+    /// Qual campo deve mostrar o sinal de consequência agora — só UM de
+    /// cada vez, nunca vários simultâneos (ver `lastChangedField` acima).
+    /// Usa `lastChangedField` quando ele bate com alguma mudança ainda
+    /// pendente; se não houver (ficha salva antes deste campo existir, com
+    /// uma mudança pendente "órfã" — sem edição rastreada desde então),
+    /// cai num fallback previsível (nível primeiro, depois cada atributo
+    /// em ordem) em vez de simplesmente não mostrar sinal nenhum.
+    var effectiveChangedField: String? {
+        guard hasPendingConsequences else { return nil }
+        if let lastChangedField, isPendingChange(forField: lastChangedField) {
+            return lastChangedField
+        }
+        if hasPendingLevelChange { return "level" }
+        if hasPendingAbilityChange(\.strength) { return "strength" }
+        if hasPendingAbilityChange(\.dexterity) { return "dexterity" }
+        if hasPendingAbilityChange(\.constitution) { return "constitution" }
+        if hasPendingAbilityChange(\.intelligence) { return "intelligence" }
+        if hasPendingAbilityChange(\.wisdom) { return "wisdom" }
+        if hasPendingAbilityChange(\.charisma) { return "charisma" }
+        return nil
+    }
+
+    /// Auxiliar de `effectiveChangedField`: o campo nomeado ainda tem uma
+    /// mudança pendente de verdade? (evita apontar pro último campo
+    /// editado se essa mudança específica já foi revisada por algum outro
+    /// caminho, mas outras continuam pendentes.)
+    private func isPendingChange(forField field: String) -> Bool {
+        switch field {
+        case "level": return hasPendingLevelChange
+        case "strength": return hasPendingAbilityChange(\.strength)
+        case "dexterity": return hasPendingAbilityChange(\.dexterity)
+        case "constitution": return hasPendingAbilityChange(\.constitution)
+        case "intelligence": return hasPendingAbilityChange(\.intelligence)
+        case "wisdom": return hasPendingAbilityChange(\.wisdom)
+        case "charisma": return hasPendingAbilityChange(\.charisma)
+        default: return false
+        }
+    }
+
+    /// Retrato "antes" pro `ConsequenceEngine.diff` — `nil` só na primeira
+    /// abertura de uma ficha antiga, antes do snapshot inicial rodar.
+    var lastAppliedRuleContext: RuleContext? {
+        guard let lastAppliedLevel, let lastAppliedAbilities else { return nil }
+        return RuleContext(level: lastAppliedLevel, characterClass: characterClass, abilities: lastAppliedAbilities)
+    }
+
+    /// Retrato "agora" pro `ConsequenceEngine.diff`.
+    var currentRuleContext: RuleContext {
+        RuleContext(level: level, characterClass: characterClass, abilities: abilities)
+    }
+
+    /// Chamado ao abrir a ficha (`.onAppear`). Só preenche o snapshot
+    /// quando ainda não existe (ficha nova, ou salva antes desta versão) —
+    /// sem marcar consequência nenhuma pra trás: só a partir daqui uma
+    /// mudança de nível/atributo liga o sinal. Chamar de novo depois que
+    /// já existe não faz nada (por isso é seguro repetir a cada
+    /// `.onAppear`, sem apagar uma consequência pendente de verdade).
+    mutating func ensureConsequenceSnapshotInitialized() {
+        guard lastAppliedLevel == nil, lastAppliedAbilities == nil else { return }
+        markConsequencesReviewed()
+    }
+
+    /// "Zera" o sinal: o snapshot passa a valer o nível/atributos atuais.
+    /// Chamado depois que o jogador revisou a janela de consequências
+    /// (aplicou as automáticas, ou fechou tendo visto) — ao contrário de
+    /// `ensureConsequenceSnapshotInitialized()`, sempre sobrescreve.
+    mutating func markConsequencesReviewed() {
+        lastAppliedLevel = level
+        lastAppliedAbilities = abilities
+        lastChangedField = nil
+    }
+
     /// LEGADO (2026-09-19): favoritar deixou de ser por personagem e virou
     /// preferência global do jogador — ver `CharacterLibrary.favoriteSpellIDs`.
     /// Este campo continua aqui só pra migrar fichas salvas ANTES da troca
@@ -829,6 +1247,85 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
             board.setCount(allotment.count, level: allotment.level, caster: allotment.caster)
         }
         return board
+    }
+
+    /// Esferas de acesso (TODO.md item 16) — `nil`/vazio até o jogador
+    /// preencher pela primeira vez (nenhuma ficha antiga tem essa chave).
+    /// Guardado como dicionário esfera→nível em vez de dois `Set`s
+    /// separados porque uma esfera só pode ter UM nível por personagem —
+    /// o dicionário já impede o estado inválido "maior E menor ao mesmo
+    /// tempo" que dois conjuntos permitiriam sem checagem extra.
+    var sphereAccess: [String: SphereAccessLevel]? = nil
+
+    /// `nil` quando a esfera não está marcada (nem maior nem menor) — o
+    /// mesmo "sem preferência" de antes de o jogador mexer em nada.
+    func sphereAccessLevel(for sphere: String) -> SphereAccessLevel? {
+        sphereAccess?[sphere]
+    }
+
+    /// Só pra decidir se vale ordenar/sinalizar a lista de candidatos por
+    /// esfera (`SlotEditorSheet`/`MemorizedRow` em `SpellSheetView.swift`)
+    /// — personagem que nunca abriu o editor de esferas não deve ter a
+    /// lista reordenada "sem querer" a partir de um mapa vazio.
+    var hasConfiguredSphereAccess: Bool {
+        !(sphereAccess?.isEmpty ?? true)
+    }
+
+    /// `true` quando QUALQUER esfera da magia está marcada (maior ou
+    /// menor) — usado só pra ordenar/sinalizar, nunca pra esconder uma
+    /// magia (decisão do usuário: o filtro de esferas não bloqueia).
+    func hasSphereAccess(to spheres: [String]) -> Bool {
+        guard let sphereAccess, !sphereAccess.isEmpty else { return false }
+        return spheres.contains { sphereAccess[$0] != nil }
+    }
+
+    /// `true` quando ALGUMA esfera da magia está marcada como MAIOR —
+    /// critério de ordenação mais forte que `hasSphereAccess(to:)` (TODO.md
+    /// item 16, pedido do usuário 2026-09-20): acesso maior conjura em
+    /// qualquer círculo, então é a aposta mais segura pra pôr no topo da
+    /// lista, antes até de uma esfera marcada só como Menor (que trava no
+    /// 3º círculo — ver `sphereSignal(for:)`). Só ordena, nunca esconde.
+    func hasMajorSphereAccess(to spheres: [String]) -> Bool {
+        spheres.contains { sphereAccessLevel(for: $0) == .major }
+    }
+
+    /// Aviso pra um candidato de magia na Folha de Magias (TODO.md item
+    /// 16) — sempre só um SINAL, nunca um filtro. Centralizado aqui (em
+    /// vez de duas versões quase iguais em `MemorizedRow`/`SlotEditorSheet`
+    /// de `SpellSheetView.swift`) pra não arriscar as duas divergirem.
+    func sphereSignal(for spell: Spell) -> SphereSignal? {
+        guard hasConfiguredSphereAccess, !spell.spheres.isEmpty else { return nil }
+        let matchedLevels = spell.spheres.compactMap { sphereAccessLevel(for: $0) }
+        guard !matchedLevels.isEmpty else { return .outsideSpheres }
+        // Tem a esfera, mas só como MENOR (regra do PHB: acesso menor
+        // trava no 3º círculo) — se NENHUMA das esferas batidas for MAIOR
+        // e a magia passa do 3º círculo, ela está fora do alcance mecânico
+        // do personagem mesmo "tendo" a esfera.
+        if spell.level > 3, !matchedLevels.contains(.major) {
+            return .minorCircleCap
+        }
+        return nil
+    }
+
+    /// Prioridade de ordenação por esfera (TODO.md item 16, retocado
+    /// 2026-09-20 — print do usuário mostrou o bug): antes o critério de
+    /// ORDENAR (`hasMajorSphereAccess`) e o de AVISAR (`sphereSignal`) eram
+    /// dois critérios DIFERENTES — uma magia com esfera Menor mas dentro do
+    /// 3º círculo não mostrava aviso nenhum (`sphereSignal == nil`), mas
+    /// também não contava como "esfera maior" pra ordenação, então ficava
+    /// no mesmo grupo (sem prioridade) que uma magia de fato fora de
+    /// qualquer esfera — resultado: magias SEM aviso apareciam espalhadas
+    /// no meio de magias COM aviso, em vez de todas agrupadas no topo.
+    /// Agora os dois usam a MESMA régua: 0 = esfera maior batida (aposta
+    /// mais segura, vai pro topo), 1 = sem aviso nenhum (esfera menor
+    /// dentro do alcance, ou magia sem `spheres` pra comparar — nem favor
+    /// nem contra), 2 = com aviso (`sphereSignal` não é `nil`) — essas
+    /// afundam TODAS juntas pro fim da lista. Devolve `1` (neutro, sem
+    /// reordenar nada) quando o personagem não configurou esferas.
+    func sphereSortRank(for spell: Spell) -> Int {
+        guard hasConfiguredSphereAccess else { return 1 }
+        if hasMajorSphereAccess(to: spell.spheres) { return 0 }
+        return sphereSignal(for: spell) == nil ? 1 : 2
     }
 
     /// Folhas em ordem, da mais recente para a mais antiga.

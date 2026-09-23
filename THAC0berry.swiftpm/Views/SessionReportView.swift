@@ -66,7 +66,7 @@ struct SessionReportView: View {
             }
             Spacer()
             Button("close") { dismiss() }
-                .font(Paper.printed(13))
+                .font(Paper.printed(16))
                 .foregroundStyle(Paper.inkSoft)
         }
     }

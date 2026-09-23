@@ -34,6 +34,134 @@ struct CompendiumHubView: View {
                     }
                     .buttonStyle(.plain)
 
+                    NavigationLink {
+                        KitCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_priest_kits",
+                            systemImage: "shield.lefthalf.filled",
+                            badgeImage: "star.fill",
+                            badgeColor: Ember.brass,
+                            title: "Priest Kits",
+                            subtitle: "91 kits · origins & specialty priests",
+                            accent: Ember.brass,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        DeityCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_deities",
+                            systemImage: "crown.fill",
+                            badgeImage: "sparkle",
+                            badgeColor: Ember.brass,
+                            title: "Deities",
+                            subtitle: "79 deities · Faiths & Avatars, Powers & Pantheons",
+                            accent: Ember.glow,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        RulesCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_rules_reference",
+                            systemImage: "text.book.closed.fill",
+                            badgeImage: "questionmark",
+                            badgeColor: Ember.teal,
+                            title: "Rules Reference",
+                            subtitle: "385 rules · PHB, DMG & CPrH",
+                            accent: Ember.teal,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        ProficiencyCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_proficiencies",
+                            systemImage: "checklist",
+                            badgeImage: "checkmark.seal.fill",
+                            badgeColor: Ember.crimson,
+                            title: "Proficiencies",
+                            subtitle: "372 proficiencies · general, class & racial",
+                            accent: Ember.brass,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        WeaponCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_weapons",
+                            systemImage: "shield.righthalf.filled",
+                            badgeImage: "target",
+                            badgeColor: Ember.wine,
+                            title: "Weapons",
+                            subtitle: "75 weapons · PHB & CPrH",
+                            accent: Ember.wine,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        ArmorCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_armor",
+                            systemImage: "shield.checkerboard",
+                            badgeImage: "checkmark.shield.fill",
+                            badgeColor: Ember.amberAccent,
+                            title: "Armor",
+                            subtitle: "20 items · armor, helmets & shields",
+                            accent: Ember.amberAccent,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        MundaneItemCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_equipment",
+                            systemImage: "bag.fill",
+                            badgeImage: "shippingbox.fill",
+                            badgeColor: Ember.teal,
+                            title: "Equipment",
+                            subtitle: "183 items · gear, clothing, food & more",
+                            accent: Ember.teal,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        MagicItemCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_magic_items",
+                            systemImage: "wand.and.stars",
+                            badgeImage: "sparkles",
+                            badgeColor: Ember.wine,
+                            title: "Magic Items",
+                            subtitle: "5,669 items · full corpus, filter by source",
+                            accent: Ember.wine,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     CompendiumTile(
                         imageName: "icon_mage_grimoire",
                         systemImage: "wand.and.stars",
@@ -165,6 +293,175 @@ private struct SpellbookScreen: View {
                 }, accessibilityLabel: "Compendium")
 
                 SpellbookView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Kits — mesmo tratamento do `SpellbookScreen`
+/// acima (conteúdo em tinta sobre pergaminho, só a volta com o selo
+/// escuro da estante).
+private struct KitCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                KitCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura da Referência de Regras — mesmo tratamento dos dois acima.
+private struct DeityCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                DeityCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+private struct RulesCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                RulesCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Proficiências (TODO.md item 18) — mesmo
+/// tratamento dos três acima. Aqui é só consulta/referência, por isso
+/// SEM filtro de campaign setting (ver comentário em
+/// `ProficiencyCompendiumView`) — o filtro só entra no seletor aberto a
+/// partir da ficha de personagem.
+private struct ProficiencyCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                ProficiencyCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Armas ("Manda bala!" — ver TODO.md item 25) —
+/// mesmo tratamento dos quatro acima.
+private struct WeaponCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                WeaponCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Armaduras/Elmos/Escudos (TODO.md item 26) —
+/// mesmo tratamento dos cinco acima.
+private struct ArmorCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                ArmorCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Equipamento geral (TODO.md item 26) — mesmo
+/// tratamento dos seis acima.
+private struct MundaneItemCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                MundaneItemCompendiumView()
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Itens Mágicos (TODO.md item 30 — escopo full,
+/// 5.669 itens) — mesmo tratamento dos sete acima.
+private struct MagicItemCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                MagicItemCompendiumView()
             }
             .padding(18)
         }

@@ -56,7 +56,7 @@ struct CharacterSheetView: View {
                         // arrastar quando a página não é a de ao lado.
                         VStack(spacing: 0) {
                             RecordSheetBeadRow(currentIndex: $recordSheetPageIndex,
-                                               maxPageIndex: character.characterClass.hasSpellSheet ? 2 : 1)
+                                               maxPageIndex: character.characterClass.recordSheetPageCount - 1)
                             RecordSheetPagerView(character: $character,
                                                  campaignBinding: campaignBinding,
                                                  currentIndex: $recordSheetPageIndex)
@@ -609,7 +609,7 @@ private struct SpellSheetBeadRow: View {
     let currentSheetID: UUID
 
     var body: some View {
-        if let session {
+        if session != nil {
             DayThreadRow(
                 sheets: daySheets,
                 currentID: currentSheetID,
@@ -767,7 +767,7 @@ struct OfficialRecordSheet: View {
             Thac0TargetForm(character: $character)
             CombatModifiersForm(character: $character)
             WeaponCombatForm(character: $character)
-            ProficienciesForm(character: $character)
+            ProficienciesForm(character: $character, campaignBinding: campaignBinding)
         }
         .padding(16)
         .background(Color.white.opacity(0.4))
@@ -823,9 +823,11 @@ struct RecordSheetPagerView: UIViewControllerRepresentable {
     /// A 3ª página (Character Description) existe pra todo mundo. A 4ª
     /// (tabelas de referência do Clérigo) só existe pra quem tem ficha de
     /// magia — as outras classes ficam com as 3 páginas fixas (Ficha +
-    /// Equipment/Movement/Experience + Character Description).
+    /// Equipment/Movement/Experience + Character Description). Ver
+    /// `CharacterClass.recordSheetPageCount` — mesma conta que
+    /// `RecordSheetBeadRow` usa, pra não voltar a divergir.
     fileprivate var maxPageIndex: Int {
-        character.characterClass.hasSpellSheet ? 3 : 2
+        character.characterClass.recordSheetPageCount - 1
     }
 
     fileprivate func pageContent(for index: Int) -> AnyView {
@@ -929,7 +931,8 @@ private struct RecordSheetPageTwo: View {
                 .frame(maxWidth: .infinity)
             }
 
-            QuantityListBlock(title: "Magic Items", items: $character.page2MagicItems.orInit([]))
+            QuantityListBlock(title: "Magic Items", items: $character.page2MagicItems.orInit([]),
+                               usesMagicItemDatabase: true)
             QuantityListBlock(title: "Treasure / Other Possessions",
                               items: $character.page2TreasureItems.orInit([]))
 
@@ -979,25 +982,7 @@ private struct QuantifiedItemRow: View {
             EditableText(value: $entry.name, placeholder: "…", size: 18, underline: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 6) {
-                TallyBoard(
-                    count: usedCount.wrappedValue,
-                    isExhausted: isExhausted,
-                    onAdd: { usedCount.wrappedValue += 1 },
-                    onRemove: {
-                        guard usedCount.wrappedValue > 0 else { return }
-                        usedCount.wrappedValue -= 1
-                    }
-                )
-                Text("\(usedCount.wrappedValue)")
-                    .font(Paper.hand(15))
-                    .foregroundStyle(isExhausted ? Paper.redInk : Paper.penInk)
-                Text("of")
-                    .font(Paper.printedItalic(10))
-                    .foregroundStyle(Paper.inkSoft)
-                EditableNumber(value: $entry.quantity, size: 13, lower: 0, upper: 9999)
-            }
-
+            QuantityControls(quantity: $entry.quantity, usedCount: usedCount, isExhausted: isExhausted)
             RemoveRowButton(action: onDelete)
         }
         .padding(.vertical, 3)
@@ -1005,21 +990,130 @@ private struct QuantifiedItemRow: View {
     }
 }
 
+/// Pauzinhos + "usado de quantos" — compartilhado por `QuantifiedItemRow`
+/// (Treasure/Other, texto livre) e `MagicItemQuantifiedRow` (Magic Items,
+/// nome vira botão pro buscador) pra não duplicar esse pedaço.
+private struct QuantityControls: View {
+    @Binding var quantity: Int
+    var usedCount: Binding<Int>
+    var isExhausted: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            TallyBoard(
+                count: usedCount.wrappedValue,
+                isExhausted: isExhausted,
+                onAdd: { usedCount.wrappedValue += 1 },
+                onRemove: {
+                    guard usedCount.wrappedValue > 0 else { return }
+                    usedCount.wrappedValue -= 1
+                }
+            )
+            Text("\(usedCount.wrappedValue)")
+                .font(Paper.hand(15))
+                .foregroundStyle(isExhausted ? Paper.redInk : Paper.penInk)
+            Text("of")
+                .font(Paper.printedItalic(11))
+                .foregroundStyle(Paper.inkSoft)
+            EditableNumber(value: $quantity, size: 13, lower: 0, upper: 9999)
+        }
+    }
+}
+
+/// Mesma linha de `QuantifiedItemRow` (pauzinhos + "usado de quantos"), mas
+/// só pra "Magic Items": o nome vira um botão, igual `Page2EquipmentRow`
+/// faz pro Equipment mundano — linha já ligada a um item da base
+/// (`matchedItemID`, ou nome batendo exato como fallback pra fichas
+/// antigas) abre a descrição num toque, com "change" lá dentro pra trocar;
+/// linha vazia ou não-ligada abre o buscador direto, onde também dá pra
+/// digitar um nome à mão e usar "as-is" (item caseiro/criado pelo
+/// jogador) — pedido do usuário: "buscar os itens da nossa lista recém
+/// adicionada, ok? Mas mantendo a opção do jogador imputar o próprio
+/// item". Só usada no bloco "Magic Items" — "Treasure / Other Possessions"
+/// continua com `QuantifiedItemRow`/texto livre, sem nenhuma mudança.
+private struct MagicItemQuantifiedRow: View {
+    @Binding var entry: QuantifiedItem
+    var onDelete: () -> Void
+
+    @EnvironmentObject private var magicItemDatabase: MagicItemDatabase
+    @State private var showDetail = false
+    @State private var showPicker = false
+
+    private var usedCount: Binding<Int> { $entry.usedCount.orDefault(0) }
+    private var isExhausted: Bool { entry.quantity > 0 && usedCount.wrappedValue >= entry.quantity }
+
+    private var matchedItem: CompendiumMagicItem? {
+        if let id = entry.matchedItemID, let match = magicItemDatabase.item(id: id) {
+            return match
+        }
+        guard !entry.name.isEmpty else { return nil }
+        return magicItemDatabase.items.first { $0.name == entry.name }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                if matchedItem != nil {
+                    showDetail = true
+                } else {
+                    showPicker = true
+                }
+            } label: {
+                Text(entry.name.isEmpty ? "…" : entry.name)
+                    .font(Paper.hand(18))
+                    .foregroundStyle(entry.name.isEmpty ? Paper.inkSoft : Paper.penInk)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            QuantityControls(quantity: $entry.quantity, usedCount: usedCount, isExhausted: isExhausted)
+            RemoveRowButton(action: onDelete)
+        }
+        .padding(.vertical, 3)
+        .overlay(alignment: .bottom) { DottedRule() }
+        .sheet(isPresented: $showDetail) {
+            if let matchedItem {
+                MagicItemDetailSheet(item: matchedItem, onChangeItem: {
+                    showDetail = false
+                    DispatchQueue.main.async { showPicker = true }
+                })
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            MagicItemPickerSheet(entry: $entry)
+        }
+    }
+}
+
 /// Igual ao `ListBlock` já usado na aba Equipment, mas com um contador de
 /// quantidade por linha e botão de remover — pra "10 poções de cura" caber
 /// numa linha só em vez de dez. Fica separado do `ListBlock` (que a aba
 /// Equipment também usa) pra não mudar o comportamento dela.
+///
+/// `usesMagicItemDatabase` troca a linha por `MagicItemQuantifiedRow`
+/// (nome vira botão, busca em `MagicItemDatabase`) — só ligado no bloco
+/// "Magic Items"; "Treasure / Other Possessions" continua com
+/// `QuantifiedItemRow`/texto livre, sem nenhuma mudança de comportamento.
 private struct QuantityListBlock: View {
     let title: String
     @Binding var items: [QuantifiedItem]
+    var usesMagicItemDatabase: Bool = false
 
     var body: some View {
         SheetBlock(title: title, trailing: "\(items.count)") {
             VStack(spacing: 0) {
                 ForEach(items.indices, id: \.self) { index in
-                    QuantifiedItemRow(entry: $items[index], onDelete: {
-                        items.remove(at: index)
-                    })
+                    if usesMagicItemDatabase {
+                        MagicItemQuantifiedRow(entry: $items[index], onDelete: {
+                            items.remove(at: index)
+                        })
+                    } else {
+                        QuantifiedItemRow(entry: $items[index], onDelete: {
+                            items.remove(at: index)
+                        })
+                    }
                 }
                 AddLineButton(title: "add") {
                     items.append(QuantifiedItem())
@@ -1033,10 +1127,40 @@ private struct Page2EquipmentRow: View {
     @Binding var entry: Page2EquipmentEntry
     var onDelete: () -> Void
 
+    // Mesmo padrão de "tocar no nome" de `ProficiencyFormRow`/
+    // `WeaponFormRow`: linha já ligada a um item da base (`matchedItemID`,
+    // ou nome batendo exato como último recurso pra fichas salvas antes
+    // disso existir) abre a descrição (custo/peso) num toque, com "change"
+    // lá dentro pra trocar; linha vazia ou não-ligada (item caseiro, texto
+    // digitado à mão) abre o seletor direto.
+    @EnvironmentObject private var itemDatabase: MundaneItemDatabase
+    @State private var showDetail = false
+    @State private var showPicker = false
+
+    private var matchedItem: MundaneItem? {
+        if let id = entry.matchedItemID, let match = itemDatabase.item(id: id) {
+            return match
+        }
+        guard !entry.item.isEmpty else { return nil }
+        return itemDatabase.items.first { $0.name == entry.item }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            InlineTextField(value: $entry.item, placeholder: "…", fontSize: 13)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                if matchedItem != nil {
+                    showDetail = true
+                } else {
+                    showPicker = true
+                }
+            } label: {
+                Text(entry.item.isEmpty ? "…" : entry.item)
+                    .font(Paper.printed(13))
+                    .foregroundStyle(entry.item.isEmpty ? Paper.inkSoft : Paper.ink)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
             EditableText(value: $entry.location, placeholder: "—", size: 12, underline: false)
                 .frame(width: 56)
             EditableText(value: $entry.weight, placeholder: "—", size: 12, underline: false)
@@ -1046,6 +1170,17 @@ private struct Page2EquipmentRow: View {
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
         .overlay(alignment: .bottom) { DottedRule() }
+        .sheet(isPresented: $showDetail) {
+            if let matchedItem {
+                MundaneItemDetailSheet(item: matchedItem, onChangeItem: {
+                    showDetail = false
+                    DispatchQueue.main.async { showPicker = true }
+                })
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            MundaneItemPickerSheet(entry: $entry)
+        }
     }
 }
 
@@ -1067,7 +1202,9 @@ private struct Page2EquipmentColumn: View {
                 Text("Wt").frame(width: 40)
                 Text("").frame(width: 24)
             }
-            .font(Paper.printed(10))
+            .font(Paper.printed(11))
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .foregroundStyle(Paper.ink)
             .padding(4)
             .overlay(alignment: .bottom) { Rectangle().fill(Paper.ink).frame(height: 1) }
@@ -1194,10 +1331,10 @@ private struct EncumbranceRowView: View {
     var body: some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(Paper.printed(10))
+                .font(Paper.printed(11))
                 .foregroundStyle(Paper.ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
                 .frame(width: 62, alignment: .leading)
             FormCell(value: $row.weightCarried, size: 12)
             FormCell(value: $row.moveRate, size: 12)
@@ -1216,15 +1353,17 @@ private struct EncumbranceForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            FormSectionTitle(text: "Encumbrance")
+            FormSectionTitle(text: "Encumbrance", ruleID: "phb_ch06_encumbrance")
 
             HStack(spacing: 4) {
                 Text("").frame(width: 62)
-                Text("Wt").font(Paper.printed(8.5)).frame(maxWidth: .infinity)
-                Text("Move").font(Paper.printed(8.5)).frame(maxWidth: .infinity)
-                Text("Atk").font(Paper.printed(8.5)).frame(maxWidth: .infinity)
-                Text("AC").font(Paper.printed(8.5)).frame(maxWidth: .infinity)
+                Text("Wt").font(Paper.printed(11)).frame(maxWidth: .infinity)
+                Text("Move").font(Paper.printed(11)).frame(maxWidth: .infinity)
+                Text("Atk").font(Paper.printed(11)).frame(maxWidth: .infinity)
+                Text("AC").font(Paper.printed(11)).frame(maxWidth: .infinity)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .foregroundStyle(Paper.inkSoft)
 
             EncumbranceRowView(title: "Light", row: table.light)
@@ -1266,7 +1405,7 @@ private struct ExperienceHeaderCell: View {
     var body: some View {
         VStack(spacing: 3) {
             Text(label.uppercased())
-                .font(Paper.printed(9))
+                .font(Paper.printed(10))
                 .tracking(0.6)
                 .foregroundStyle(Paper.inkSoft)
                 .multilineTextAlignment(.center)
@@ -1294,6 +1433,7 @@ private struct ExperienceForm: View {
                 ExperienceHeaderCell(label: "Total XPs", value: totalXPsBinding)
                 ExperienceHeaderCell(label: "XPs Needed for Next Level",
                                      value: $character.xpNeededNextLevel.orDefault(""))
+                    .changeFlash(character: $character, key: "xpNeededNextLevel")
             }
             .padding(.bottom, 2)
 
@@ -1304,6 +1444,25 @@ private struct ExperienceForm: View {
         }
         .padding(10)
         .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.2))
+        // Preenche sozinho a partir da tabela de progressão por classe
+        // (`ExperienceProgressionTable`, cópia fiel das Tables 14/20/23/25
+        // já no corpus de regras) — pedido do usuário: "em XP needed for
+        // the next level, podemos preencher automaticamente, dado que
+        // sabemos esta tabela por classe, certo?". Continua um campo de
+        // texto normal (não travado): o jogador pode sobrescrever à mão se
+        // a mesa usar uma variante de regra diferente.
+        //
+        // A conta de verdade agora mora em `PlayerCharacter.
+        // refreshXPNeededNextLevel()` e é chamada direto de onde nível/
+        // classe são editados de verdade (`RecordHeaderForm`, página 1) —
+        // esta página (`ExperienceForm`, página 2) só recalcula de novo no
+        // `onAppear` como uma segunda garantia (ex.: ficha antiga sem o
+        // campo preenchido ainda), porque a página 2 vive dentro de um
+        // `UIPageViewController` que só atualiza a página VISÍVEL — um
+        // `onChange` aqui não disparava enquanto o jogador estava vendo a
+        // página 1 (bug relatado pelo usuário: "ao subir ou descer de
+        // nível este campo não é atualizado").
+        .onAppear { character.refreshXPNeededNextLevel() }
     }
 
     /// A ficha já guarda o total de XP em `character.experience` (também
@@ -1324,10 +1483,10 @@ private struct LevelChangeRowView: View {
     var body: some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(Paper.printed(10))
+                .font(Paper.printed(11))
                 .foregroundStyle(Paper.ink)
                 .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
                 .frame(width: 108, alignment: .leading)
             EditableText(value: $row.by, placeholder: "—", size: 13, underline: false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1354,8 +1513,8 @@ private struct LevelChangesForm: View {
 
             HStack(spacing: 4) {
                 Text("").frame(width: 108)
-                Text("By").font(Paper.printed(9)).frame(maxWidth: .infinity)
-                Text("At Levels").font(Paper.printed(9)).frame(maxWidth: .infinity)
+                Text("By").font(Paper.printed(10)).frame(maxWidth: .infinity)
+                Text("At Levels").font(Paper.printed(10)).frame(maxWidth: .infinity)
             }
             .foregroundStyle(Paper.inkSoft)
 
@@ -1410,6 +1569,12 @@ struct WidthReader: View {
 /// Título de seção como no PDF — texto simples centralizado, sem tarja.
 private struct FormSectionTitle: View {
     let text: String
+    /// Quando presente, mostra o atalho "?" (`RuleLinkButton`) colado na
+    /// borda direita do título — a regra correspondente da base embutida
+    /// (ver `RulesDatabase`/`Store/EmbeddedRules_*.swift`). `nil` mantém o
+    /// título como sempre foi, sem o botão (a maioria das seções não tem
+    /// uma regra específica pra apontar).
+    var ruleID: String? = nil
 
     var body: some View {
         Text(text.uppercased())
@@ -1418,6 +1583,11 @@ private struct FormSectionTitle: View {
             .foregroundStyle(Paper.ink)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 3)
+            .overlay(alignment: .trailing) {
+                if let ruleID {
+                    RuleLinkButton(ruleID: ruleID)
+                }
+            }
     }
 }
 
@@ -1432,11 +1602,11 @@ private struct FormCell: View {
         VStack(spacing: 1) {
             if let label {
                 Text(label)
-                    .font(.system(size: 7.5, design: .serif))
+                    .font(.system(size: 9, design: .serif))
                     .foregroundStyle(Paper.inkSoft)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
             // Sem frame aqui o botão só respondia ao toque bem em cima do
@@ -1488,7 +1658,7 @@ private struct ArmorClassShield: View {
 
     var body: some View {
         VStack(spacing: 3) {
-            Text("ARMOR").font(Paper.printed(10)).tracking(1.5)
+            Text("ARMOR").font(Paper.printed(11)).tracking(1.5)
             ZStack {
                 ShieldShape().stroke(Paper.ink, lineWidth: 1.6)
                 EditableNumber(value: $armorClass, size: 28, lower: -10, upper: 10)
@@ -1497,7 +1667,7 @@ private struct ArmorClassShield: View {
                     .contentShape(Rectangle())
             }
             .frame(width: 76, height: 84)
-            Text("CLASS").font(Paper.printed(10)).tracking(1.5)
+            Text("CLASS").font(Paper.printed(11)).tracking(1.5)
         }
         .foregroundStyle(Paper.ink)
     }
@@ -1508,10 +1678,23 @@ private struct ArmorClassShield: View {
 private struct RecordHeaderForm: View {
     @Binding var character: PlayerCharacter
     var campaignBinding: Binding<Campaign>? = nil
+    /// Pro atalho "?" ao lado do campo "Patron Deity / Religion" — abre
+    /// `DeityDetailSheet` quando o nome digitado bate (match exato, após
+    /// `Fuzzy.normalize`) com uma das 79 divindades embutidas (ver
+    /// `Store/EmbeddedDeities_Part*.swift`). Some sozinho quando não bate
+    /// com nada — nunca mostra um link quebrado.
+    @EnvironmentObject private var deityDatabase: DeityDatabase
     /// Fase 6 do plano: subir de nível ganha uma rajada de brasa em cima do
     /// campo — só quando o número SOBE (editar pra baixo, corrigindo um
     /// erro de digitação, não é level up).
     @State private var isLevelingUp = false
+    /// Abre `SphereAccessEditorSheet` — TODO.md item 16. Vive aqui (não na
+    /// Folha de Magias) de propósito: esfera de acesso é um traço do
+    /// PERSONAGEM, do mesmo jeito que Kit/Classe/Raça, não algo que faz
+    /// sentido só existir enquanto o dia de jogo dura. `sphereAccess`
+    /// mora em `PlayerCharacter` desde o início — só o botão pra editar
+    /// estava no lugar errado.
+    @State private var isSphereAccessPresented = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
@@ -1525,34 +1708,96 @@ private struct RecordHeaderForm: View {
                         HStack(spacing: 6) {
                             ClassPicker(character: $character, campaignBinding: campaignBinding)
                             Text("/").foregroundStyle(Paper.inkSoft)
-                            EditableText(value: $character.kit.orDefault(""), placeholder: "",
-                                         size: 17, underline: false)
+                            KitField(kit: $character.kit, className: character.characterClass.rawValue)
                         }
                     }
                     .frame(maxWidth: .infinity)
+
+                    if character.characterClass.hasSpellSheet {
+                        HeaderLine(label: "Spheres") {
+                            Button {
+                                isSphereAccessPresented = true
+                            } label: {
+                                Text("edit")
+                                    .font(Paper.printedItalic(15))
+                                    .foregroundStyle(Paper.penInk)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .fixedSize()
+                    }
 
                     HeaderLine(label: "Level") {
                         EditableNumber(value: $character.level, size: 17, lower: 0, upper: 30)
                     }
                     .frame(width: 80)
                     .emberBurst(trigger: isLevelingUp, particleCount: 18)
+                    .overlay(alignment: .topTrailing) {
+                        // Só UM sinal por vez em toda a ficha, no campo
+                        // que foi editado por último (`effectiveChangedField`,
+                        // ver `Models/Character.swift`) — não mais um por
+                        // campo mudado simultaneamente (usuário achou
+                        // "replicando a cada ajuste" pior que útil).
+                        // Diâmetro igual ao das linhas de Ability Scores
+                        // agora (68pt) — antes só o do Level tinha esse
+                        // tamanho e os outros ficavam pequenos ao lado.
+                        ConsequenceSignalBadge(character: $character, isActive: character.effectiveChangedField == "level", diameter: 68)
+                            .offset(x: 22, y: -22)
+                    }
                 }
+                // Nenhum controle nesta linha é campo de escrita (Classe é
+                // Menu, Kit abre uma sheet de escolha, Nível abre um
+                // balão numérico) — mas os três ficam logo abaixo do
+                // Character Name, que É um `HandwritingField` de verdade,
+                // e o Scribble mira o campo de escrita mais próximo
+                // INDEPENDENTE de quem está em foco (mesmo raciocínio do
+                // `StrikeInteraction` em `SpellSheetView.swift`) — por
+                // isso só `resignPencilFocus()` não bastava. `ScribbleGuard`
+                // avisa o sistema pra não tentar escrita nesta área
+                // nenhuma; o `simultaneousGesture` continua de reforço
+                // pro caso de algum campo já estar em foco.
+                .background(ScribbleGuard())
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0).onChanged { _ in resignPencilFocus() }
+                )
 
                 HStack(alignment: .bottom, spacing: 16) {
                     HeaderLine(label: "Race") {
-                        EditableText(value: $character.race, placeholder: "", size: 17, underline: false)
+                        // Era `EditableText` livre — este era o campo que
+                        // o jogador via primeiro e realmente tocava; o
+                        // seletor (TODO.md item 35) tinha sido ligado só
+                        // no espelho da aba "Character Description" por
+                        // engano. Corrigido no item 36/37 — ver
+                        // `Views/RacePickerSheet.swift` → `RaceField`.
+                        RaceField(character: $character, size: 17)
                     }
                     .frame(maxWidth: .infinity)
 
                     HeaderLine(label: "Alignment") {
-                        EditableText(value: $character.alignment, placeholder: "", size: 17, underline: false)
+                        // Era `EditableText` livre — pedido do usuário
+                        // (2026-09-20): tem que ser uma das 9 combinações
+                        // do PHB, mesmo escrevendo com a caneta. Ver
+                        // `Views/AlignmentPicker.swift`.
+                        AlignmentField(alignment: $character.alignment, size: 17)
                     }
                     .frame(maxWidth: .infinity)
                 }
+                // Mesmo motivo da linha Classe/Kit/Nível acima: Raça e
+                // Alinhamento também abrem balão (`EditableText`) e ficam
+                // perto o bastante do Character Name pra sofrer o mesmo
+                // problema — o Scribble mirando o campo mais próximo em
+                // vez de abrir o balão certo.
+                .background(ScribbleGuard())
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0).onChanged { _ in resignPencilFocus() }
+                )
 
                 HStack(alignment: .bottom, spacing: 16) {
                     HeaderLine(label: "Patron Deity / Religion") {
-                        InlineTextField(value: $character.deity, placeholder: "", fontSize: 15)
+                        HStack(spacing: 4) {
+                            InlineTextField(value: $character.deity, placeholder: "", fontSize: 15)
+                            DeityLinkButton(deityName: character.deity)
+                        }
                     }
                     .frame(maxWidth: .infinity)
 
@@ -1606,11 +1851,31 @@ private struct RecordHeaderForm: View {
             .frame(width: 170, alignment: .trailing)
         }
         .onChange(of: character.level) { oldLevel, newLevel in
+            guard oldLevel != newLevel else { return }
+            // Marca o Level como o campo editado por último — decide onde
+            // o único sinal de consequência da ficha aparece (ver
+            // `effectiveChangedField`). Mesmo quando o nível desce (não é
+            // "level up"), ainda foi ele que mudou por último.
+            character.lastChangedField = "level"
+            // Recalcula "XP needed for next level" AQUI (não só dentro de
+            // `ExperienceForm`, página 2) — ver o comentário de
+            // `PlayerCharacter.refreshXPNeededNextLevel()` pro porquê.
+            character.refreshXPNeededNextLevel()
             guard newLevel > oldLevel else { return }
             isLevelingUp = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                 isLevelingUp = false
             }
+        }
+        .onAppear {
+            // Só preenche o snapshot de consequências na primeira vez —
+            // ver `PlayerCharacter.ensureConsequenceSnapshotInitialized()`.
+            // Seguro chamar toda vez que a ficha aparece: depois da
+            // primeira vez, não faz nada.
+            character.ensureConsequenceSnapshotInitialized()
+        }
+        .sheet(isPresented: $isSphereAccessPresented) {
+            SphereAccessEditorSheet(character: $character)
         }
     }
 
@@ -1664,6 +1929,13 @@ private struct ClassPicker: View {
     /// primeira folha — fica pendente até ele ser associado a uma.
     private func select(_ option: CharacterClass) {
         character.characterClass = option
+        // Cada classe usa uma coluna diferente da tabela de progressão —
+        // ver `PlayerCharacter.refreshXPNeededNextLevel()`.
+        character.refreshXPNeededNextLevel()
+        // Preenche "Hit Dice" sozinho, sempre resincronizando com a
+        // classe atual (força mesmo se já tiver algo escrito) — ver
+        // `PlayerCharacter.refreshHitDiceType()`.
+        character.refreshHitDiceType(force: true)
         guard option.hasSpellSheet, character.spellSheets.isEmpty, let campaignBinding else { return }
         let session = campaignBinding.wrappedValue.activeSession()
         var sheet = SpellSheet()
@@ -1675,12 +1947,61 @@ private struct ClassPicker: View {
     }
 }
 
+/// Campo "Kit" do cabeçalho — era `EditableText` livre, virou botão que
+/// abre `KitPickerSheet` (ver TODO.md item 9 e `Views/KitCompendiumView.swift`).
+/// `character.kit` continua sendo o mesmo `String?` de sempre: escolher um
+/// kit na base só grava `kit.name` ali, sem mudar o modelo nem quebrar
+/// fichas antigas que já tinham texto livre digitado nesse campo (esse
+/// texto continua aparecendo aqui normalmente, só não bate com nenhuma
+/// linha destacada — ★ — no seletor).
+private struct KitField: View {
+    @Binding var kit: String?
+    /// `character.characterClass.rawValue` — repassado pro `KitPickerSheet`
+    /// pra só listar kits elegíveis pra essa classe (ver
+    /// `KitDatabase.kits(allowedFor:)`). Antes esse filtro nunca era
+    /// aplicado aqui e o seletor sempre mostrava os 97 kits inteiros,
+    /// não importa a classe escolhida na ficha.
+    let className: String
+    @State private var isPickerPresented = false
+
+    // Usuário relatou que este campo é difícil de abrir — sendo um valor
+    // fixo (não dá pra escrever/digitar direto nele, ao contrário de um
+    // campo de texto normal), o toque precisa de um alvo maior do que só o
+    // texto do kit escolhido. Primeira tentativa acrescentou um ícone de
+    // seta do lado do valor — usuário achou feio visualmente e sugeriu
+    // algo mais simples: mostrar "None" (em vez de "—") quando não há kit
+    // escolhido, deixando claro que é um campo esperando preenchimento, e
+    // tirar o ícone. O `contentShape`/padding continuam alargando a área
+    // tocável por baixo dos panos, sem nenhum elemento visual extra.
+    var body: some View {
+        Button {
+            isPickerPresented = true
+        } label: {
+            HandValue(text: kit?.isEmpty == false ? kit! : "None", size: 17)
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $isPickerPresented) {
+            KitPickerSheet(selection: $kit, className: className)
+        }
+    }
+}
+
 // MARK: - Atributos
 
 private struct AbilityRowForm: View {
     let name: String
+    @Binding var character: PlayerCharacter
     @Binding var score: Int
     let cells: [(String, Binding<String>)]
+    var isPendingChange: Bool = false
+    /// Chave em `PlayerCharacter.recentAutoChanges` pra este atributo
+    /// ("strength", "dexterity", ...) — usada pelo `ChangeFlash` quando o
+    /// seletor de Raça (ou outra automação futura) muda este valor
+    /// sozinho. `nil` em qualquer chamador antigo que não passe isso
+    /// simplesmente nunca pisca, sem quebrar nada.
+    var flashKey: String? = nil
 
     var body: some View {
         HStack(spacing: 0) {
@@ -1692,6 +2013,18 @@ private struct AbilityRowForm: View {
                 .padding(.leading, 2)
             FormNumberCell(value: $score, lower: 1, upper: 25)
                 .frame(width: 52)
+                .modifier(OptionalChangeFlash(character: $character, key: flashKey))
+                // Mesmo diâmetro do sinal do Level (68pt) — usuário
+                // reclamou que ficava "maior só perto do nível" e
+                // "pequeno" do lado dos atributos; agora só UM sinal
+                // aparece de cada vez em toda a ficha (`isPendingChange`
+                // já vem calculado como "sou eu o `effectiveChangedField`
+                // agora?"), então não tem mais risco de vários círculos
+                // grandes empilhados na tabela ao mesmo tempo.
+                .overlay(alignment: .topTrailing) {
+                    ConsequenceSignalBadge(character: $character, isActive: isPendingChange, diameter: 68)
+                        .offset(x: 20, y: -20)
+                }
             ForEach(cells.indices, id: \.self) { index in
                 FormCell(label: cells[index].0, value: cells[index].1)
             }
@@ -1706,68 +2039,104 @@ private struct AbilityScoresForm: View {
         VStack(alignment: .leading, spacing: 0) {
             FormSectionTitle(text: "Ability Scores")
             VStack(spacing: 0) {
-                AbilityRowForm(name: "STR", score: $character.abilities.strength, cells: [
+                AbilityRowForm(name: "STR", character: $character, score: $character.abilities.strength, cells: [
                     ("Hit\nAdj", $character.details.strengthHit),
                     ("Dmg\nAdj", $character.details.strengthDamage),
                     ("Weight\nAllow", $character.details.strengthWeight),
                     ("Max\nPress", $character.details.strengthMaxPress),
                     ("Open\nDoors", $character.details.strengthDoors),
                     ("Bend\nBars", $character.details.strengthBars)
-                ])
-                AbilityRowForm(name: "DEX", score: $character.abilities.dexterity, cells: [
+                ], isPendingChange: character.effectiveChangedField == "strength", flashKey: "strength")
+                AbilityRowForm(name: "DEX", character: $character, score: $character.abilities.dexterity, cells: [
                     ("Surprise\nAdjustment", $character.details.dexterityReaction),
                     ("Missile Att\nAdjustment", $character.details.dexterityMissile),
                     ("Defensive\nAdjustment", $character.details.dexterityDefense)
-                ])
-                AbilityRowForm(name: "CON", score: $character.abilities.constitution, cells: [
+                ], isPendingChange: character.effectiveChangedField == "dexterity", flashKey: "dexterity")
+                AbilityRowForm(name: "CON", character: $character, score: $character.abilities.constitution, cells: [
                     ("HP\nAdj", $character.details.constitutionHP),
                     ("System\nShock", $character.details.constitutionShock),
                     ("Resurrect\nSurvival", $character.details.constitutionResurrection),
                     ("Poison\nSave", $character.details.constitutionPoison),
                     ("Regen", $character.details.constitutionRegen.orDefault(""))
-                ])
-                AbilityRowForm(name: "INT", score: $character.abilities.intelligence, cells: [
+                ], isPendingChange: character.effectiveChangedField == "constitution", flashKey: "constitution")
+                AbilityRowForm(name: "INT", character: $character, score: $character.abilities.intelligence, cells: [
                     ("Languages", $character.details.intelligenceLanguages),
                     ("Spell\nLevel", $character.details.intelligenceMaxLevel),
                     ("Learn\nSpell", $character.details.intelligenceLearn),
                     ("Max/\nLevel", $character.details.intelligenceMaxPerLevel),
                     ("Spell\nImmun", $character.details.intelligenceSpellImmunity.orDefault(""))
-                ])
-                AbilityRowForm(name: "WIS", score: $character.abilities.wisdom, cells: [
+                ], isPendingChange: character.effectiveChangedField == "intelligence", flashKey: "intelligence")
+                AbilityRowForm(name: "WIS", character: $character, score: $character.abilities.wisdom, cells: [
                     ("Magical\nDef Adj", $character.details.wisdomDefense),
                     ("Bonus\nSpells", $character.details.wisdomBonusSpells),
                     ("Spell\nFailure", $character.details.wisdomFailure),
                     ("Spell\nImmun", $character.details.wisdomSpellImmunity.orDefault(""))
-                ])
-                AbilityRowForm(name: "CHA", score: $character.abilities.charisma, cells: [
+                ], isPendingChange: character.effectiveChangedField == "wisdom", flashKey: "wisdom")
+                AbilityRowForm(name: "CHA", character: $character, score: $character.abilities.charisma, cells: [
                     ("Max # of\nHenchmen", $character.details.charismaHenchmen),
                     ("Loyalty\nBase", $character.details.charismaLoyalty),
                     ("Reaction\nAdjustment", $character.details.charismaReaction)
-                ])
+                ], isPendingChange: character.effectiveChangedField == "charisma", flashKey: "charisma")
             }
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
+        }
+        // Marca qual atributo foi editado por último — decide onde o
+        // único sinal de consequência da ficha aparece (ver
+        // `effectiveChangedField` em `Models/Character.swift`; mesmo
+        // esquema do `.onChange(of: character.level)` em
+        // `RecordHeaderForm`). Confere um por um porque `AbilityScores`
+        // muda inteira de uma vez só (é um struct) — o `EditableNumber`
+        // de cada linha só mexe em UM campo por edição, então no máximo
+        // uma dessas comparações bate a cada chamada.
+        .onChange(of: character.abilities) { old, new in
+            if old.strength != new.strength { character.lastChangedField = "strength" }
+            else if old.dexterity != new.dexterity { character.lastChangedField = "dexterity" }
+            else if old.constitution != new.constitution { character.lastChangedField = "constitution" }
+            else if old.intelligence != new.intelligence { character.lastChangedField = "intelligence" }
+            else if old.wisdom != new.wisdom { character.lastChangedField = "wisdom" }
+            else if old.charisma != new.charisma { character.lastChangedField = "charisma" }
         }
     }
 }
 
 // MARK: - Jogadas de proteção
 //
-// Simplificação assumida: o PDF real tem colunas Start/Mod/Total pra cada
-// jogada; o app guarda só um número (o alvo do d20, direto da tabela da
-// classe) — mantido assim pra não abrir uma frente nova de mudança de
-// modelo. A tabela aqui vira Jogada/Alvo/Modificador.
+// Três colunas, como no PDF real (TODO.md item 4, retomado a pedido do
+// usuário — "é muito importante ter o MOD, pois podemos aplicar
+// manualmente um ajuste temporário"): "Start" é o alvo da tabela de
+// classe/nível (o `ConsequenceEngine` escreve sozinho numa subida de
+// nível, mas continua editável na mão), "Mod" é um ajuste numérico
+// temporário que o jogador liga/desliga (anel, poção, armadilha, bônus de
+// magia — qualquer coisa que a tabela sozinha não cobre) e "Total" é só
+// exibido, nunca editável nem guardado — sempre Start − Mod na hora de
+// desenhar a tela (ver `SavingThrows.total(for:)`), então nunca fica
+// dessincronizado dos outros dois.
 private struct SavingThrowsForm: View {
     @Binding var character: PlayerCharacter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            FormSectionTitle(text: "Saving Throws")
+            // Pedido do usuário (2026-09-22, TODO.md item 38): Saving
+            // Throws muda por nível/classe, mas o sinal de "algo mudou,
+            // vem conferir" só aparecia perto do campo Level/atributo em
+            // si, nunca aqui — onde o jogador de fato precisa ir conferir
+            // a tabela e atualizar os números. Era um `ConsequenceSignalBadge`
+            // (ícone circular) — trocado (TODO.md item 41, usuário: "os
+            // campos alterados [deveriam ficar] em verde... o ícone
+            // pequeno... tá errado") por `PendingConsequenceHighlight`,
+            // que tinge o próprio título de verde em vez de um ícone do
+            // lado.
+            FormSectionTitle(text: "Saving Throws", ruleID: "phb_ch09_the_saving_throw")
+                .pendingConsequenceHighlight(isActive: character.hasPendingConsequences)
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     Text("").frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Target").font(.system(size: 7.5, design: .serif)).frame(width: 40)
-                    Text("Mod").font(.system(size: 7.5, design: .serif)).frame(width: 46)
+                    Text("Start").font(.system(size: 9, design: .serif)).frame(width: 34)
+                    Text("Mod").font(.system(size: 9, design: .serif)).frame(width: 34)
+                    Text("Total").font(.system(size: 9, design: .serif)).frame(width: 34)
                 }
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .foregroundStyle(Paper.inkSoft)
                 .padding(.vertical, 3)
                 .padding(.horizontal, 4)
@@ -1775,7 +2144,7 @@ private struct SavingThrowsForm: View {
                 ForEach(SavingThrows.labels) { entry in
                     SaveLineForm(saves: $character.saves, entry: entry)
                 }
-                SaveResistanceLine(saves: $character.saves)
+                SaveResistanceLine(character: $character, saves: $character.saves)
             }
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
         }
@@ -1798,25 +2167,34 @@ private struct SaveLineForm: View {
                     get: { saves[keyPath: entry.keyPath] },
                     set: { saves[keyPath: entry.keyPath] = $0 }
                 ),
-                size: 17, lower: 1, upper: 20
+                size: 15, lower: 1, upper: 20
             )
-            .frame(width: 40, height: 32)
+            .frame(width: 34, height: 32)
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
-            EditableText(
+            EditableNumber(
                 value: Binding(
                     get: { saves.modifier(for: entry.id) },
                     set: { saves.setModifier($0, for: entry.id) }
                 ),
-                placeholder: "—", size: 13, underline: false
+                size: 15, lower: -20, upper: 20
             )
-            .frame(width: 46, height: 32)
+            .frame(width: 34, height: 32)
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+            // Total nunca é editável nem guardado — só exibe Start − Mod
+            // (ver comentário da `SavingThrowsForm`). Destaque em negrito
+            // pra deixar claro que é o número que vale na mesa.
+            Text("\(saves.total(for: entry))")
+                .font(Paper.printed(15).bold())
+                .foregroundStyle(Paper.ink)
+                .frame(width: 34, height: 32)
+                .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
         }
         .frame(minHeight: 32)
     }
 }
 
 private struct SaveResistanceLine: View {
+    @Binding var character: PlayerCharacter
     @Binding var saves: SavingThrows
 
     var body: some View {
@@ -1830,6 +2208,10 @@ private struct SaveResistanceLine: View {
                          size: 13, underline: false)
                 .frame(width: 86, height: 32)
                 .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+                // Preenchido sozinho pelo seletor de Raça (Elf/Half-elf
+                // ganham "X% vs sleep/charm" automático) — mesmo sinal
+                // de "mudou sozinho" dos atributos.
+                .changeFlash(character: $character, key: "spellResistance")
         }
         .frame(minHeight: 32)
     }
@@ -1934,7 +2316,7 @@ private struct CombatForm: View {
                             }
 
                             HStack(spacing: 3) {
-                                Text("Hit Dice:").font(Paper.printed(10))
+                                Text("Hit Dice:").font(Paper.printed(11))
                                 EditableText(value: combat.hitDiceType.orDefault(""), placeholder: "d",
                                              size: 13, underline: false)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1975,6 +2357,12 @@ private struct CombatForm: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 8)
         .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
+        // Rede de segurança pra fichas que já existiam com uma classe
+        // escolhida e o campo "Hit Dice" vazio — `ClassPicker.select`
+        // cobre a troca de classe, isso aqui cobre abrir uma ficha antiga
+        // (ver `PlayerCharacter.refreshHitDiceType()`, só preenche se
+        // estiver vazio, nunca sobrescreve).
+        .onAppear { character.refreshHitDiceType() }
     }
 }
 
@@ -2039,7 +2427,7 @@ private struct WoundsBlock: View {
                     .popover(isPresented: $isAdding) {
                         HStack(spacing: 12) {
                             HandwritingField(text: $draft, placeholder: "dmg",
-                                             allowsSoftwareKeyboard: true, onCommit: commit, fontSize: 20)
+                                             allowsSoftwareKeyboard: false, onCommit: commit, fontSize: 20)
                                 .frame(width: 100, height: 44)
                                 .overlay(alignment: .bottom) { DottedRule() }
                             Button(action: commit) {
@@ -2100,12 +2488,21 @@ private struct Thac0TargetForm: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("THAC0").font(Paper.printed(12)).tracking(1).foregroundStyle(Paper.ink)
+                // Mesmo motivo do `Saving Throws` acima (TODO.md item 38):
+                // THAC0 também muda por nível/classe. Era um
+                // `ConsequenceSignalBadge` (ícone do lado) — trocado
+                // (TODO.md item 41, usuário: "os campos alterados
+                // [deveriam ficar] em verde") por um realce direto no
+                // próprio campo do THAC0 base.
                 EditableNumber(value: $character.thac0, size: 17, lower: -10, upper: 25)
                     .frame(width: 40, height: 30)
                     .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+                    .pendingConsequenceHighlight(isActive: character.hasPendingConsequences)
                 Text("(base — the table below fills itself in)")
-                    .font(Paper.printedItalic(10))
+                    .font(Paper.printedItalic(13))
                     .foregroundStyle(Paper.inkSoft)
+                Spacer(minLength: 4)
+                RuleLinkButton(ruleID: "phb_ch09_calculating_thac0")
             }
 
             ScrollView(.horizontal, showsIndicators: true) {
@@ -2283,10 +2680,39 @@ private struct WeaponFormRow: View {
     @Binding var weapon: WeaponEntry
     var onDelete: () -> Void
 
+    // Mesmo padrão de "tocar no nome" de `ProficiencyFormRow`: linha já
+    // ligada a uma arma da base (`matchedWeaponID`, ou nome batendo exato
+    // como último recurso pra fichas salvas antes disso existir) abre a
+    // descrição num toque, com "change" lá dentro pra trocar; linha vazia
+    // ou não-ligada (homebrew, texto digitado à mão) abre o seletor direto.
+    @EnvironmentObject private var weaponDatabase: WeaponDatabase
+    @State private var showDetail = false
+    @State private var showPicker = false
+
+    private var matchedWeapon: Weapon? {
+        if let id = weapon.matchedWeaponID, let match = weaponDatabase.weapon(id: id) {
+            return match
+        }
+        guard !weapon.name.isEmpty else { return nil }
+        return weaponDatabase.weapons.first { $0.name == weapon.name }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            InlineTextField(value: $weapon.name, placeholder: "…", fontSize: 15)
-                .frame(width: 220, alignment: .leading)
+            Button {
+                if matchedWeapon != nil {
+                    showDetail = true
+                } else {
+                    showPicker = true
+                }
+            } label: {
+                Text(weapon.name.isEmpty ? "…" : weapon.name)
+                    .font(Paper.printed(15))
+                    .foregroundStyle(weapon.name.isEmpty ? Paper.inkSoft : Paper.ink)
+                    .lineLimit(1)
+                    .frame(width: 220, alignment: .leading)
+            }
+            .buttonStyle(.plain)
             EditableText(value: $weapon.attacks, placeholder: "1", size: 14, underline: false)
                 .frame(width: 40)
             EditableText(value: $weapon.size.orDefault(""), placeholder: "—", size: 14, underline: false)
@@ -2314,6 +2740,17 @@ private struct WeaponFormRow: View {
         .padding(.vertical, 5)
         .padding(.horizontal, 4)
         .overlay(alignment: .bottom) { DottedRule() }
+        .sheet(isPresented: $showDetail) {
+            if let matchedWeapon {
+                WeaponDetailSheet(weapon: matchedWeapon, onChangeWeapon: {
+                    showDetail = false
+                    DispatchQueue.main.async { showPicker = true }
+                })
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            WeaponPickerSheet(weapon: $weapon)
+        }
     }
 }
 
@@ -2327,6 +2764,26 @@ private struct WeaponCombatForm: View {
     // a seção quando há espaço, e continua rolando na horizontal quando
     // não há (retrato no iPad).
     @State private var availableWidth: CGFloat = 0
+
+    /// Soma das larguras fixas das colunas (220+40+48+54+48+88+88+24) mais
+    /// os 100pt mínimos de "Range/Special" — abaixo disso a tabela some
+    /// conteúdo e PRECISA rolar; a partir daqui ela já coube inteira sem
+    /// cortar nada.
+    private static let minTableWidth: CGFloat = 710
+
+    // Pedido do usuário (2026-09-20): "a caixa Weapon Combat se move junto
+    // com meu dedo quando me apoio nela pra trocar de página". Causa: esta
+    // tabela mora dentro do `UIPageViewController` de `RecordSheetPagerView`
+    // (folhear as páginas da aba Sheet é um gesto horizontal), e um
+    // `ScrollView(.horizontal)` aqui dentro instala seu PRÓPRIO gesto de
+    // arraste horizontal — os dois competem sempre que o toque começa
+    // sobre esta tabela, e o `ScrollView` interno costuma ganhar, "roubando"
+    // o folhear de página. Na tela cheia do iPad (paisagem) a tabela cabe
+    // inteira e a rolagem nem faz falta — só existe pra retrato, quando as
+    // colunas realmente não cabem. `.scrollDisabled` tira o gesto do meio
+    // exatamente quando ele não tem função nenhuma (retrato continua
+    // rolando normalmente, porque aí a rolagem é o comportamento certo).
+    private var needsHorizontalScroll: Bool { availableWidth < Self.minTableWidth }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -2344,7 +2801,9 @@ private struct WeaponCombatForm: View {
                         Text("Range/Special").frame(minWidth: 100, maxWidth: .infinity, alignment: .center)
                         Text("").frame(width: 24)
                     }
-                    .font(Paper.printed(10.5))
+                    .font(Paper.printed(11))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .foregroundStyle(Paper.ink)
                     .padding(.vertical, 5)
                     .padding(.horizontal, 4)
@@ -2359,6 +2818,7 @@ private struct WeaponCombatForm: View {
                 .frame(minWidth: availableWidth, alignment: .leading)
                 .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
             }
+            .scrollDisabled(!needsHorizontalScroll)
             .background(WidthReader(width: $availableWidth))
 
             AddLineButton(title: "add weapon") {
@@ -2373,13 +2833,55 @@ private struct WeaponCombatForm: View {
 
 private struct ProficiencyFormRow: View {
     @Binding var entry: ProficiencyEntry
+    /// Repassado pro `ProficiencyPickerSheet` — sugere o alvo de "Chk" a
+    /// partir do atributo relevante da proficiência escolhida.
+    var abilities: AbilityScores
+    /// Campanha vinculada ao personagem (via `character.campaignID`), se
+    /// houver — filtra o seletor por `campaignSettings` quando a campanha
+    /// tiver `enabledSettings` configurado (ver `Campaign.
+    /// allowsAnySetting`). `nil` = sem filtro (personagem avulso).
+    var campaign: Campaign?
+    /// Repassado só pro `ProficiencyPickerSheet` destacar o grupo da
+    /// classe do personagem (item 2 do lote 2026-09-22) — a linha em si
+    /// não usa isso em mais nada.
+    var characterClass: CharacterClass
     var onDelete: () -> Void
+
+    // Mesmo padrão de toque no nome de `ItemSpellRow` (Magic Item Spells,
+    // `SpellSheetView.swift`): tocar o nome abre a DESCRIÇÃO (quando a
+    // linha já está ligada a uma proficiência da base), com "change" lá
+    // dentro pra trocar; linha vazia ou não-ligada (texto digitado à mão,
+    // fichas antigas) abre o seletor direto — não tem descrição nenhuma
+    // pra mostrar ainda.
+    @EnvironmentObject private var proficiencyDatabase: ProficiencyDatabase
+    @State private var showDetail = false
+    @State private var showPicker = false
+
+    private var matchedProficiency: Proficiency? {
+        if let id = entry.matchedProficiencyID, let match = proficiencyDatabase.proficiency(id: id) {
+            return match
+        }
+        guard !entry.name.isEmpty else { return nil }
+        return proficiencyDatabase.proficiencies.first { $0.name == entry.name }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            InlineTextField(value: $entry.name, placeholder: "…", fontSize: 13)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            EditableText(value: $entry.slots, placeholder: "—", size: 12, underline: false)
+            Button {
+                if matchedProficiency != nil {
+                    showDetail = true
+                } else {
+                    showPicker = true
+                }
+            } label: {
+                Text(entry.name.isEmpty ? "…" : entry.name)
+                    .font(Paper.printed(13))
+                    .foregroundStyle(entry.name.isEmpty ? Paper.inkSoft : Paper.ink)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            EditableNumber(value: $entry.slots, size: 13, lower: 0, upper: 9)
                 .frame(width: 40)
             // "Chk" não é uma caixinha de visto — é o número-alvo pra rolar
             // no dado e ter sucesso na checagem da proficiência.
@@ -2393,6 +2895,18 @@ private struct ProficiencyFormRow: View {
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
         .overlay(alignment: .bottom) { DottedRule() }
+        .sheet(isPresented: $showDetail) {
+            if let matchedProficiency {
+                ProficiencyDetailSheet(proficiency: matchedProficiency, onChangeProficiency: {
+                    showDetail = false
+                    DispatchQueue.main.async { showPicker = true }
+                })
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            ProficiencyPickerSheet(entry: $entry, abilities: abilities, campaign: campaign,
+                                    characterClass: characterClass)
+        }
     }
 }
 
@@ -2402,6 +2916,9 @@ private struct ProficiencyFormRow: View {
 private struct ProficiencyColumn: View {
     let items: Binding<[ProficiencyEntry]>
     let column: Int
+    var abilities: AbilityScores
+    var campaign: Campaign?
+    var characterClass: CharacterClass
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2411,13 +2928,16 @@ private struct ProficiencyColumn: View {
                 Text("Chk").frame(width: 28)
                 Text("").frame(width: 24)
             }
-            .font(Paper.printed(10))
+            .font(Paper.printed(11))
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
             .foregroundStyle(Paper.ink)
             .padding(4)
             .overlay(alignment: .bottom) { Rectangle().fill(Paper.ink).frame(height: 1) }
 
             ForEach(indices, id: \.self) { index in
-                ProficiencyFormRow(entry: items[index], onDelete: {
+                ProficiencyFormRow(entry: items[index], abilities: abilities, campaign: campaign,
+                                    characterClass: characterClass, onDelete: {
                     items.wrappedValue.remove(at: index)
                 })
             }
@@ -2433,35 +2953,38 @@ private struct ProficiencyColumn: View {
 
 private struct ProficienciesForm: View {
     @Binding var character: PlayerCharacter
+    /// Mesmo `campaignBinding` que já percorre `OfficialRecordSheet` inteira
+    /// (sessões, notebook etc.) — repassado aqui só pra ler `enabledSettings`
+    /// e filtrar o seletor de proficiência por campaign setting. `nil`
+    /// quando o personagem está avulso (sem campanha vinculada).
+    var campaignBinding: Binding<Campaign>? = nil
 
     private var items: Binding<[ProficiencyEntry]> { $character.proficiencies.orInit([]) }
+    private var campaign: Campaign? { campaignBinding?.wrappedValue }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            FormSectionTitle(text: "Proficiencies")
+            FormSectionTitle(text: "Proficiencies", ruleID: "phb_ch05_proficiencies")
             HStack(alignment: .top, spacing: 10) {
-                ProficiencyColumn(items: items, column: 0)
-                ProficiencyColumn(items: items, column: 1)
-                ProficiencyColumn(items: items, column: 2)
+                ProficiencyColumn(items: items, column: 0, abilities: character.abilities, campaign: campaign,
+                                   characterClass: character.characterClass)
+                ProficiencyColumn(items: items, column: 1, abilities: character.abilities, campaign: campaign,
+                                   characterClass: character.characterClass)
+                ProficiencyColumn(items: items, column: 2, abilities: character.abilities, campaign: campaign,
+                                   characterClass: character.characterClass)
             }
             AddLineButton(title: "add proficiency") {
                 items.wrappedValue.append(ProficiencyEntry())
             }
             .padding(.horizontal, 4)
         }
-        // Se a ficha já tinha proficiências de arma/perícias da extinta aba
-        // Equipment, herda delas em vez de nascer em branco — só na
-        // primeira vez (checa se a lista nova ainda está vazia). Sem
-        // nenhuma das duas, começa com 6 linhas em branco (2 por coluna, no
-        // rodízio de 3 colunas), gravadas de verdade, mesmo motivo do
-        // CombatModifiersForm acima.
+        // Começa com 6 linhas em branco (2 por coluna, no rodízio de 3
+        // colunas), gravadas de verdade, mesmo motivo do
+        // CombatModifiersForm acima — só na primeira vez (checa se a lista
+        // ainda está vazia).
         .onAppear {
             guard character.proficiencies?.isEmpty ?? true else { return }
-            let inherited = character.weaponProficiencies.map { ProficiencyEntry(name: $0, slots: "weapon") }
-                + character.skills.map { ProficiencyEntry(name: $0.name, slots: $0.note) }
-            character.proficiencies = inherited.isEmpty
-                ? (0..<6).map { _ in ProficiencyEntry() }
-                : inherited
+            character.proficiencies = (0..<6).map { _ in ProficiencyEntry() }
         }
     }
 }
@@ -2471,11 +2994,17 @@ private struct ProficienciesForm: View {
 private struct ArmorBlock: View {
     @Binding var character: PlayerCharacter
 
+    // Só o campo "Armor" abre o seletor (ver `ArmorPickerSheet` — só lista
+    // `kind == .armor`, porque elmo/escudo não têm AC isolado na tabela do
+    // PHB pra sugerir aqui, ver `ArmorPiece`). "Shield" continua texto
+    // livre como sempre foi, sem dado da base pra sugerir ainda.
+    @State private var showArmorPicker = false
+
     var body: some View {
         SheetBlock(title: "Armor", trailing: "base AC 10") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 12)],
                       alignment: .leading, spacing: 2) {
-                ArmorField(label: "Armor", value: $character.armorRating)
+                ArmorField(label: "Armor", value: $character.armorRating, onPick: { showArmorPicker = true })
                 ArmorField(label: "Shield", value: $character.shieldRating)
                 ArmorField(label: "Dexterity", value: $character.details.dexterityDefense)
                 HStack(spacing: 4) {
@@ -2486,16 +3015,35 @@ private struct ArmorBlock: View {
                 .overlay(alignment: .bottom) { DottedRule() }
             }
         }
+        .sheet(isPresented: $showArmorPicker) {
+            ArmorPickerSheet(armorRating: $character.armorRating)
+        }
     }
 }
 
 private struct ArmorField: View {
     let label: String
     @Binding var value: String
+    /// Presente só no campo "Armor" — toca no rótulo (não no número, que
+    /// continua editável na hora) pra abrir o Armor Compendium e sugerir o
+    /// `baseAC` da armadura escolhida.
+    var onPick: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 4) {
-            FieldLabel(text: label)
+            if let onPick {
+                Button(action: onPick) {
+                    HStack(spacing: 3) {
+                        FieldLabel(text: label)
+                        Text("ⓘ")
+                            .font(Paper.printed(10))
+                            .foregroundStyle(Paper.inkSoft)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                FieldLabel(text: label)
+            }
             Spacer(minLength: 2)
             EditableText(value: $value, placeholder: "—", size: 17, underline: false)
                 .fixedSize()

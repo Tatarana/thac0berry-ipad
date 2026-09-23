@@ -103,32 +103,34 @@ struct SpellbookView: View {
     }
 
     private var searchField: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            FieldLabel(text: "Search")
-            HandwritingField(text: $query, placeholder: "spell name",
-                             allowsSoftwareKeyboard: true, onCommit: {})
-                .frame(height: 44)
-            DottedRule()
-        }
+        SearchField(text: $query, placeholder: "spell name")
     }
 
+    /// Cenário virou selinho de ícone (`SettingFilterRow` abaixo) — mesmo
+    /// padrão pedido pelo usuário pro Compendium de Proficiências ("sem
+    /// combos feios de formulário. Use ícones."), agora replicado aqui pra
+    /// manter as duas telas consistentes. Esfera continua como `Menu`: não
+    /// tem cenário fixo nem ícone natural por esfera, e a lista de opções é
+    /// grande demais (dúzias) pra caber numa fileira de selinhos.
     private var filtersRow: some View {
-        HStack(spacing: 10) {
-            filterMenu(title: "Sphere", selection: $sphereFilter, options: availableSpheres,
-                      allLabel: "All Spheres")
-            filterMenu(title: "Setting", selection: $settingFilter, options: availableSettings,
-                      allLabel: "All Settings", icon: settingIcon)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                filterMenu(title: "Sphere", selection: $sphereFilter, options: availableSpheres,
+                          allLabel: "All Spheres")
 
-            if !sphereFilter.isEmpty || !settingFilter.isEmpty {
-                Button("clear filters") {
-                    sphereFilter = []
-                    settingFilter = []
+                Spacer()
+
+                if !sphereFilter.isEmpty || !settingFilter.isEmpty {
+                    Button("clear filters") {
+                        sphereFilter = []
+                        settingFilter = []
+                    }
+                    .font(Paper.printedItalic(11))
+                    .foregroundStyle(Paper.inkSoft)
                 }
-                .font(Paper.printedItalic(11))
-                .foregroundStyle(Paper.inkSoft)
             }
 
-            Spacer()
+            SettingFilterRow(selected: $settingFilter, options: availableSettings)
         }
     }
 
@@ -145,7 +147,7 @@ struct SpellbookView: View {
     /// o menu e obrigaria reabrir pra marcar a próxima — inviável pra
     /// escolha múltipla.
     private func filterMenu(title: String, selection: Binding<Set<String>>, options: [String],
-                            allLabel: String, icon: ((String) -> String)? = nil) -> some View {
+                            allLabel: String) -> some View {
         Menu {
             Button {
                 selection.wrappedValue.removeAll()
@@ -166,11 +168,7 @@ struct SpellbookView: View {
                     }
                 } label: {
                     let checked = selection.wrappedValue.contains(option)
-                    if let icon {
-                        Label(checked ? "✓ \(option)" : option, systemImage: icon(option))
-                    } else {
-                        Text(checked ? "✓ \(option)" : option)
-                    }
+                    Text(checked ? "✓ \(option)" : option)
                 }
                 .menuActionDismissBehavior(.disabled)
             }
@@ -190,22 +188,6 @@ struct SpellbookView: View {
         case 0: return allLabel
         case 1: return selection.first!
         default: return "\(selection.count) selected"
-        }
-    }
-
-    /// Não são os logos oficiais de cada cenário (arte licenciada da
-    /// TSR/WotC) — só símbolos do sistema (SF Symbols) escolhidos pra
-    /// lembrar a identidade visual de cada um sem reproduzir marca
-    /// registrada de ninguém.
-    private func settingIcon(_ setting: String) -> String {
-        switch setting {
-        case "Forgotten Realms": return "globe.americas.fill"
-        case "Dark Sun": return "sun.max.fill"
-        case "Greyhawk": return "shield.fill"
-        case "Ravenloft": return "moon.stars.fill"
-        case "Planescape": return "infinity"
-        case "Generic": return "book.closed.fill"
-        default: return "questionmark.circle"
         }
     }
 
@@ -229,6 +211,20 @@ struct SpellbookView: View {
         Set(allDivineSpells.compactMap(\.setting)).sorted()
     }
 
+    /// "Generic" (ver `CampaignSettingCatalog.isGeneric`) nunca some da
+    /// lista, esteja o filtro de ícones ligado ou não — mesma regra
+    /// adotada no filtro por ícone do Compendium de Proficiências
+    /// (`ProficiencyCompendiumView.matchesSelectedSettings`); antes o
+    /// `Menu` de "Setting" escondia até as magias genéricas se algum
+    /// cenário específico estivesse marcado, o que não fazia muito
+    /// sentido (conteúdo básico do PHB deveria continuar disponível não
+    /// importa o cenário escolhido).
+    private func matchesSettingFilter(_ spell: Spell) -> Bool {
+        if CampaignSettingCatalog.isGeneric(spell.setting) { return true }
+        guard let setting = spell.setting else { return false }
+        return settingFilter.contains(setting)
+    }
+
     private var filtered: [Spell] {
         var list = allDivineSpells
 
@@ -241,10 +237,7 @@ struct SpellbookView: View {
         }
 
         if !settingFilter.isEmpty {
-            list = list.filter { spell in
-                guard let setting = spell.setting else { return false }
-                return settingFilter.contains(setting)
-            }
+            list = list.filter(matchesSettingFilter)
         }
 
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -314,6 +307,111 @@ struct SpellbookView: View {
     }
 }
 
+// MARK: - Filtro por cenário (ícones, não Picker/Menu)
+
+/// Fileira de "selinhos" com ícone — mesmo padrão pedido pro Compendium de
+/// Proficiências (`ProficiencyCompendiumView.SettingFilterRow`), replicado
+/// aqui em vez de compartilhado: cada `struct` é `private` (visível só
+/// dentro do próprio arquivo), e as duas telas têm listas de cenário
+/// diferentes (`options` vem de `availableSettings`, calculado sobre a
+/// base de magias de Priest — "Al-Qadim"/"Council of Wyrms"/"Spelljammer",
+/// que só existem no corpus de proficiências, nunca apareceriam aqui de
+/// qualquer forma). "All" (sem nenhum marcado) mostra tudo; tocar um ou
+/// mais cenários restringe a lista a eles (mais o que é "Generic", que
+/// nunca some — ver `matchesSettingFilter`). Toque-e-segure mostra o nome
+/// completo do cenário (`actionTooltip`, mesmo tooltip do resto do app).
+private struct SettingFilterRow: View {
+    @Binding var selected: Set<String>
+    let options: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            FieldLabel(text: "Setting")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    SettingFilterChip(
+                        systemImage: "asterisk",
+                        label: "All",
+                        tooltip: "Show every setting",
+                        isSelected: selected.isEmpty,
+                        action: { selected.removeAll() }
+                    )
+                    ForEach(options, id: \.self) { setting in
+                        SettingFilterChip(
+                            systemImage: CampaignSettingCatalog.icon(for: setting),
+                            imageName: CampaignSettingCatalog.logoImageName(for: setting),
+                            label: CampaignSettingCatalog.shortLabel(for: setting),
+                            tooltip: setting,
+                            isSelected: selected.contains(setting),
+                            action: { toggle(setting) }
+                        )
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func toggle(_ setting: String) {
+        if selected.contains(setting) {
+            selected.remove(setting)
+        } else {
+            selected.insert(setting)
+        }
+    }
+}
+
+private struct SettingFilterChip: View {
+    let systemImage: String
+    /// Nome do PNG (sem extensão) do logo de verdade do cenário — `nil`
+    /// cai pro `systemImage` de sempre. Ver `CampaignSettingCatalog.
+    /// logoImageName(for:)` (2026-09-21, logos entregues pelo usuário).
+    var imageName: String? = nil
+    let label: String
+    let tooltip: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                settingIcon
+                Text(label)
+                    .font(Paper.printed(10))
+                    .tracking(0.3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(isSelected ? Paper.sheet : Paper.ink)
+            .frame(width: 56, height: 46)
+            .background(isSelected ? Paper.ink : Color.white.opacity(0.15))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Paper.ink.opacity(0.5), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .actionTooltip(tooltip)
+        .accessibilityLabel(tooltip)
+    }
+
+    /// Mesmo fallback de `ProficiencyCompendiumView.SettingFilterChip` —
+    /// cópia privada de propósito (mesmo padrão que o resto do filtro de
+    /// Setting já segue neste arquivo), ver o comentário lá pro porquê do
+    /// `.renderingMode(.template)`.
+    @ViewBuilder
+    private var settingIcon: some View {
+        if let imageName, let art = Image.bundled(imageName) {
+            art
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 17, height: 17)
+        } else {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .medium))
+        }
+    }
+}
+
 private struct LevelSection: View {
     let label: String
     let spells: [Spell]
@@ -335,59 +433,23 @@ private struct LevelSection: View {
             .buttonStyle(.plain)
 
             if isExpanded {
+                // `SpellPaperRow` em modo `.compact` (TODO.md item 3) — era
+                // um `SpellbookRow` próprio aqui, quase idêntico ao da
+                // Folha de Magias (mesma estrela de favorito, mesmo botão
+                // pra abrir o detalhe), só sem o resumo/horário de
+                // conjuração. Virou o mesmo componente com um parâmetro de
+                // densidade, em vez de duas implementações divergindo com
+                // o tempo.
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(spells) { spell in
-                        SpellbookRow(spell: spell,
-                                    favoritesEnabled: favoritesEnabled,
-                                    isFavorite: isFavorite(spell.id),
-                                    onToggleFavorite: { onToggleFavorite(spell.id) },
-                                    onSelect: { onSelect(spell) })
+                        SpellPaperRow(spell: spell, style: .compact,
+                                      isFavorite: favoritesEnabled ? isFavorite(spell.id) : nil,
+                                      onToggleFavorite: favoritesEnabled ? { onToggleFavorite(spell.id) } : nil) {
+                            onSelect(spell)
+                        }
                     }
                 }
             }
         }
-    }
-}
-
-private struct SpellbookRow: View {
-    let spell: Spell
-    let favoritesEnabled: Bool
-    let isFavorite: Bool
-    let onToggleFavorite: () -> Void
-    let onSelect: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if favoritesEnabled {
-                Button(action: onToggleFavorite) {
-                    Text(isFavorite ? "★" : "☆")
-                        .font(Paper.printed(16))
-                        .foregroundStyle(isFavorite ? Paper.redInk : Paper.inkSoft)
-                        .frame(width: 20)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button(action: onSelect) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(spell.name)
-                        .font(Paper.hand(19))
-                        .foregroundStyle(Paper.penInk)
-                        .lineLimit(1)
-                    if !spell.spheres.isEmpty {
-                        Text(spell.spheres.joined(separator: ", "))
-                            .font(Paper.printedItalic(10.5))
-                            .foregroundStyle(Paper.inkSoft)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 4)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.vertical, 3)
-        .overlay(alignment: .bottom) { DottedRule() }
     }
 }

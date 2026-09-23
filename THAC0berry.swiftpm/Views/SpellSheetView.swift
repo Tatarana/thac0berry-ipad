@@ -251,6 +251,7 @@ private struct CircleBlock: View {
                     MemorizedRow(slot: slot,
                                  spell: spellFor(slot),
                                  casterLevel: character.level,
+                                 character: character,
                                  onStrike: { toggle(slot) },
                                  onShowDetail: { onShowDetail(slot) },
                                  onAssign: { name, spell in assign(slot, name: name, spell: spell) })
@@ -325,6 +326,9 @@ private struct MemorizedRow: View {
     /// Nível do personagem — usado para calcular o dano/cura que escala
     /// por nível ("10d6" em vez de "1d6 per level (max 10d6)").
     let casterLevel: Int
+    /// Só pra sinalizar esfera-de-acesso nas sugestões escritas à mão (ver
+    /// TODO.md item 16) — não muda nada além disso.
+    let character: PlayerCharacter
     /// Riscar a magia com o dedo/caneta, de ponta a ponta — só isso marca o
     /// slot como gasto (e riscar de novo desfaz).
     let onStrike: () -> Void
@@ -440,9 +444,20 @@ private struct MemorizedRow: View {
     /// `matches` (não depois): senão as 5 vagas do `limit` podiam ser
     /// tomadas por magias de mesmo nome parecido em OUTRO círculo, deixando
     /// este slot sem nenhum candidato.
+    /// Mesmas magias por aproximação de sempre — só reordenadas (nunca
+    /// filtradas) por `sphereSortRank` (TODO.md item 16, ajustado
+    /// 2026-09-20 outra vez: agora é a MESMA régua de 3 níveis que decide
+    /// o aviso em `SpellPaperRow`/`SuggestionLine`, não mais um critério
+    /// solto — ver o comentário grande em `PlayerCharacter.sphereSortRank`).
+    /// `sorted` é estável, então dentro de cada grupo a ordem por score de
+    /// `matches` continua igual a antes da feature existir.
     private var candidates: [SpellMatch] {
         guard !handwritten.isEmpty else { return [] }
-        return spellbook.matches(for: handwritten, limit: 5, caster: slot.caster, level: slot.level)
+        let matches = spellbook.matches(for: handwritten, limit: 5, caster: slot.caster, level: slot.level)
+        guard character.hasConfiguredSphereAccess else { return matches }
+        return matches.sorted { lhs, rhs in
+            character.sphereSortRank(for: lhs.spell) < character.sphereSortRank(for: rhs.spell)
+        }
     }
 
     @ViewBuilder
@@ -460,7 +475,7 @@ private struct MemorizedRow: View {
                 .buttonStyle(.plain)
             } else {
                 ForEach(candidates) { match in
-                    SuggestionLine(match: match) {
+                    SuggestionLine(match: match, sphereSignal: character.sphereSignal(for: match.spell)) {
                         assign(name: match.spell.name, spell: match.spell)
                     }
                 }
@@ -812,7 +827,7 @@ private struct MagicItemCard: View {
 
                     Button { showDescription = true } label: {
                         Text("description")
-                            .font(Paper.printedItalic(10))
+                            .font(Paper.printedItalic(11))
                             .foregroundStyle(Paper.inkSoft)
                     }
                     .buttonStyle(.plain)
@@ -889,7 +904,7 @@ private struct ItemSpellRow: View {
                         .font(Paper.hand(15))
                         .foregroundStyle(isExhausted ? Paper.redInk : Paper.penInk)
                     Text("of")
-                        .font(Paper.printedItalic(10))
+                        .font(Paper.printedItalic(11))
                         .foregroundStyle(Paper.inkSoft)
                     EditableNumber(value: $item.maxUses, size: 13, lower: 1, upper: 99)
                 }
@@ -949,7 +964,7 @@ private struct ItemDescriptionSheet: View {
                     }
                     Spacer()
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -1175,7 +1190,7 @@ private struct SpellWritingSheet: View {
                         .foregroundStyle(Paper.ink)
                     Spacer()
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -1370,6 +1385,9 @@ private struct AdditionalSpellsBlock: View {
 /// casamento é confiável e um "log" pra registrar.
 private struct SuggestionLine: View {
     let match: SpellMatch
+    /// Ver `SphereBadge` — mesmo sinal (TODO.md item 16), mesma regra de
+    /// nunca esconder nada, só sinalizar.
+    var sphereSignal: SphereSignal? = nil
     let onAdd: () -> Void
 
     var body: some View {
@@ -1383,6 +1401,9 @@ private struct SuggestionLine: View {
                 Text(caption)
                     .font(Paper.printedItalic(11))
                     .foregroundStyle(Paper.inkSoft)
+                if let sphereSignal {
+                    SphereBadge(signal: sphereSignal)
+                }
                 Spacer(minLength: 0)
                 Text("log")
                     .font(Paper.printed(11))
@@ -1503,7 +1524,7 @@ private struct SlotEditorSheet: View {
                         .foregroundStyle(Paper.ink)
                     Spacer()
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -1527,14 +1548,20 @@ private struct SlotEditorSheet: View {
                         }
 
                         ForEach(candidates) { match in
-                            SpellPaperRow(spell: match.spell, hint: match.confidenceLabel) {
+                            SpellPaperRow(spell: match.spell, hint: match.confidenceLabel,
+                                          sphereSignal: character.sphereSignal(for: match.spell),
+                                          isFavorite: library.isFavorite(match.spell.id),
+                                          onToggleFavorite: { library.toggleFavorite(match.spell.id) }) {
                                 assign(name: match.spell.name, id: match.spell.id)
                             }
                         }
 
                         if handwritten.isEmpty {
                             ForEach(levelList) { spell in
-                                SpellPaperRow(spell: spell, hint: nil) {
+                                SpellPaperRow(spell: spell, hint: nil,
+                                              sphereSignal: character.sphereSignal(for: spell),
+                                              isFavorite: library.isFavorite(spell.id),
+                                              onToggleFavorite: { library.toggleFavorite(spell.id) }) {
                                     assign(name: spell.name, id: spell.id)
                                 }
                             }
@@ -1583,10 +1610,15 @@ private struct SlotEditorSheet: View {
     }
 
     /// Favoritos do jogador primeiro (globais, não deste personagem —
-    /// 2026-09-19), depois os mais usados no histórico do personagem,
-    /// depois o resto em ordem alfabética — sem isso, achar uma magia
-    /// específica numa base de quase 1.800 entradas vira procurar agulha
-    /// no palheiro (ver TODO.md itens 2 e 3).
+    /// 2026-09-19), depois `sphereSortRank` do personagem (TODO.md item
+    /// 16, ajustado 2026-09-20 outra vez — print do usuário mostrou magia
+    /// SEM aviso espalhada no meio de magias COM aviso, porque o critério
+    /// de ordenar e o de avisar eram diferentes; agora são a mesma régua
+    /// de 3 níveis — ver `PlayerCharacter.sphereSortRank`), depois os mais
+    /// usados no histórico do personagem, depois o resto em ordem
+    /// alfabética — sem isso, achar uma magia específica numa base de
+    /// quase 1.800 entradas vira procurar agulha no palheiro (ver TODO.md
+    /// itens 2 e 3).
     private var levelList: [Spell] {
         let all = spellbook.spells(caster: slot.caster, level: slot.level)
         let favorites = library.favoriteSpellIDs
@@ -1595,6 +1627,9 @@ private struct SlotEditorSheet: View {
             let lhsFav = favorites.contains(lhs.id)
             let rhsFav = favorites.contains(rhs.id)
             if lhsFav != rhsFav { return lhsFav }
+            let lhsRank = character.sphereSortRank(for: lhs)
+            let rhsRank = character.sphereSortRank(for: rhs)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
             let lhsCount = counts[lhs.id] ?? 0
             let rhsCount = counts[rhs.id] ?? 0
             if lhsCount != rhsCount { return lhsCount > rhsCount }
@@ -1666,7 +1701,7 @@ struct SpellDetailSheet: View {
                             .foregroundStyle(Paper.inkSoft)
                     }
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -1753,36 +1788,125 @@ private struct DetailField: View {
     }
 }
 
+/// Duas "densidades" pro mesmo componente de linha de magia (TODO.md item
+/// 3): `.detailed` é o formato de sempre da Folha de Magias/seletor de slot
+/// (nome + horário de conjuração + resumo + aviso de esfera, várias
+/// linhas), `.compact` é o formato do Grimório (só nome + esferas, uma
+/// linha só) — antes eram dois `View`s praticamente iguais
+/// (`SpellPaperRow` aqui e `SpellbookRow` em `SpellbookView.swift`), agora
+/// um só com um parâmetro a mais.
+enum SpellRowStyle {
+    case detailed
+    case compact
+}
+
 struct SpellPaperRow: View {
     let spell: Spell
-    let hint: String?
+    var hint: String? = nil
+    var style: SpellRowStyle = .detailed
+    /// Sinal de esfera-de-acesso (TODO.md item 16) — `nil` quando o
+    /// personagem não configurou esferas (comportamento de sempre, sem
+    /// nenhum aviso), quando a magia bate com uma esfera de acesso MAIOR
+    /// dele, ou quando bate com uma MENOR mas ainda dentro do 3º círculo.
+    /// Nunca esconde a linha nem impede escolher a magia — só avisa, numa
+    /// linha própria (não mais espremido ao lado do nome) pra não passar
+    /// despercebido numa lista de quase 200 magias por círculo.
+    var sphereSignal: SphereSignal? = nil
+    /// Estrela de favorito (TODO.md item 1) — `nil` esconde a estrela por
+    /// completo (ex.: `SpellWritingSheet`, que escolhe magia de item
+    /// mágico e não tem noção de favorito nenhuma aqui). Quando presente,
+    /// é um botão PRÓPRIO — não dispara `action` — mesmo padrão que já
+    /// existia no Grimório.
+    var isFavorite: Bool? = nil
+    var onToggleFavorite: (() -> Void)? = nil
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Text(spell.name)
-                        .font(Paper.hand(23))
-                        .foregroundStyle(Paper.penInk)
-                    if let hint {
-                        Text(hint)
-                            .font(Paper.printedItalic(11))
-                            .foregroundStyle(Paper.inkSoft)
-                    }
-                    Spacer(minLength: 0)
-                    Text(spell.castingTime)
-                        .font(Paper.printed(12))
-                        .foregroundStyle(Paper.inkSoft)
+        HStack(spacing: 8) {
+            if let isFavorite, let onToggleFavorite {
+                Button(action: onToggleFavorite) {
+                    Text(isFavorite ? "★" : "☆")
+                        .font(Paper.printed(16))
+                        .foregroundStyle(isFavorite ? Paper.redInk : Paper.inkSoft)
+                        .frame(width: 20)
                 }
-                Text(spell.summary)
-                    .font(Paper.printed(12))
-                    .foregroundStyle(Paper.inkSoft)
-                    .multilineTextAlignment(.leading)
-                DottedRule()
+                .buttonStyle(.plain)
             }
+
+            Button(action: action) {
+                switch style {
+                case .detailed:
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Text(spell.name)
+                                .font(Paper.hand(23))
+                                .foregroundStyle(Paper.penInk)
+                            if let hint {
+                                Text(hint)
+                                    .font(Paper.printedItalic(11))
+                                    .foregroundStyle(Paper.inkSoft)
+                            }
+                            Spacer(minLength: 0)
+                            Text(spell.castingTime)
+                                .font(Paper.printed(12))
+                                .foregroundStyle(Paper.inkSoft)
+                        }
+                        if let sphereSignal {
+                            SphereBadge(signal: sphereSignal)
+                        }
+                        Text(spell.summary)
+                            .font(Paper.printed(12))
+                            .foregroundStyle(Paper.inkSoft)
+                            .multilineTextAlignment(.leading)
+                        DottedRule()
+                    }
+                case .compact:
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(spell.name)
+                                .font(Paper.hand(19))
+                                .foregroundStyle(Paper.penInk)
+                                .lineLimit(1)
+                            if !spell.spheres.isEmpty {
+                                Text(spell.spheres.joined(separator: ", "))
+                                    .font(Paper.printedItalic(11))
+                                    .foregroundStyle(Paper.inkSoft)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                        }
+                        if let sphereSignal {
+                            SphereBadge(signal: sphereSignal)
+                        }
+                        DottedRule()
+                    }
+                    .padding(.vertical, 1)
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
+    }
+}
+
+/// O "marcador" de esfera de verdade (TODO.md item 16) — antes era só um
+/// texto itálico pequeno espremido ao lado do nome da magia, fácil de não
+/// notar numa lista longa. Agora é uma pílula com fundo sólido, numa linha
+/// própria, do mesmo jeito que o resto do app já sinaliza coisas (ver o
+/// "log" de `SuggestionLine`) — continua só um AVISO, nunca escondendo ou
+/// bloqueando a magia.
+struct SphereBadge: View {
+    let signal: SphereSignal
+
+    var body: some View {
+        Text(signal.label.uppercased())
+            .font(Paper.printed(10))
+            .tracking(0.6)
+            .foregroundStyle(Paper.sheet)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Paper.redInk.opacity(0.82))
+            .clipShape(Capsule())
     }
 }
 

@@ -10,6 +10,7 @@ import UIKit
 struct CampaignListView: View {
     @EnvironmentObject private var library: CharacterLibrary
     @EnvironmentObject private var spellbook: SpellDatabase
+    @EnvironmentObject private var kits: KitDatabase
     @Environment(\.dismiss) private var dismiss
     @State private var showingArchivedSection = false
 
@@ -23,7 +24,7 @@ struct CampaignListView: View {
 
                 campaignsSection
 
-                if let error = spellbook.loadError ?? library.lastError {
+                if let error = spellbook.loadError ?? kits.loadError ?? library.lastError {
                     Text(error)
                         .font(Paper.printedItalic(12))
                         .foregroundStyle(Ember.glowBright)

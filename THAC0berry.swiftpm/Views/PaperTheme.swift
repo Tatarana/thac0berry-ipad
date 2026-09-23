@@ -229,15 +229,27 @@ struct SheetBlock<Content: View>: View {
     }
 }
 
-/// Rótulo impresso pequeno, em versalete espaçado.
+/// Rótulo impresso pequeno, em versalete espaçado. Componente compartilhado
+/// por praticamente todo o app (rótulos de campo nos Compêndios, cabeçalhos
+/// de tabela na Ficha de Magias, etc.) — a MAIORIA dos usos tem largura
+/// flexível (rótulo em cima, valor embaixo, numa `VStack` sem `frame`
+/// travado), mas alguns cabeçalhos de tabela estreitos (ex.: "Cast"/
+/// "Dmg/Heal" na Ficha de Magias, `frame(width: 42)`/`frame(width: 70)`)
+/// travam a largura de fora. 9.5→10.5pt (fase 2 de fonte, "confirmar Spell
+/// Sheet", 2026-09-22 — achei este componente abaixo do piso de 10pt
+/// estabelecido nas rodadas anteriores) + `lineLimit`/`minimumScaleFactor`
+/// de segurança pros casos de largura travada — mesmo padrão já usado no
+/// cabeçalho "Start/Mod/Total" de Saving Throws (TODO.md item 45).
 struct FieldLabel: View {
     let text: String
 
     var body: some View {
         Text(text.uppercased())
-            .font(Paper.printed(9.5))
+            .font(Paper.printed(10.5))
             .tracking(2)
             .foregroundStyle(Paper.inkSoft)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
     }
 }
 

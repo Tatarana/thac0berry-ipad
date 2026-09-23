@@ -4900,7 +4900,8 @@
     "summary": "The priest can summon 1d4 warriors from beneath the sand to fight for him or her. The warriors are completely loyal and cannot be controlled or stolen, although they can be banished by a successful dispel magic spell.",
     "damageDice": null,
     "spheres": [
-      "Elemental Earth or Silt"
+      "Elemental Earth",
+      "Silt"
     ],
     "fullDescription": "The priest can summon 1d4 warriors from beneath the sand to fight for him or her. The warriors are completely loyal and cannot be controlled or stolen, although they can be banished by a successful dispel magic spell. They have an Armor Class of 5,2 Hit Dice, and wield terrible swords of compressed, fine sand that cause 1d10 points of damage whenever they hit. THAC0 is 18, and movement is 150 feet. The sand warriors take double damage from water-based attacks.\n\nTo use this spell, a cup of water is poured onto the sand where the warriors are to rise.\n\nSand Warriors: AC 5; MV 15; HD 2; #AT 1; THAC0 18; Dmg 1d10; SW Take double damage from water-based attacks; SZ M.\n\nNotes: Uncommon for priests of Elemental Earth from the Dark Sun setting; otherwise, very",
     "setting": "Dark Sun"
@@ -5734,7 +5735,7 @@
     },
     "spheres": [
       "Elemental Earth",
-      "Fire"
+      "Elemental Fire"
     ],
     "fullDescription": "This spell allows the caster to ignite stone into roaring flames. The stone blackens, stretches to reveal holes, burns away from the edges of these holes in ever-widening cavities until large amounts of stone have actually been burnt away, and then smolders into quiescence again, creaking as it cools.\n\nThe stonefire gives off an acrid, billowing white smoke, an earthy, metallic stink, and flames that cause 2d6 points of fire and heat damage (per round) to creatures within 10 feet. Actual contact with stonefire causes 4d4 points of damage and forces a System Shock roll to avoid collapsing unconscious from the pain.\n\nCreatures especially susceptible to fire damage surfer double these effects. Creatures made of stone take 4d4 points of damage in the first round and a like amount each round until a successful saving throw vs. spell is made, checking each round. Creatures resistant to fire suffer 1d2 points of damage from contact with stonefire. (They suffer some damage due to the corrosive effects of the burning). Stone burned away by this spell is consumed, forever gone.\n\nIf key areas of stonework (such as pillars) or natural stone walls, ceilings, or supporting floors are burned away, collapses and cave-ins may occur. The effects of such cave-ins are detailed in the spell description for stone/all. Collapses entail the same damage, plus falling damage (and item saving throws) for beings and things that fall as a result of the spell. This spell cannot be precisely controlled, even with long practice; it is unsuitable for stone-carving or decorating uses. The caster can affect 1 cubic foot of stone per level; a man-sized statue is roughly 12 cubic feet.\n\nThe material components are a few grains of saltpeter and a piece of stone, which are rubbed together.\n\nNotes: Granted by the dwarven god Moradin.",
     "setting": "Generic"
@@ -6627,7 +6628,8 @@
     "summary": "This terrible spell turns earth or silt into a swirling sea of rock and earth. Anyone standing in the area must make a save vs.",
     "damageDice": null,
     "spheres": [
-      "Elemental Earth or Elemental Silt"
+      "Elemental Earth",
+      "Silt"
     ],
     "fullDescription": "This terrible spell turns earth or silt into a swirling sea of rock and earth. Anyone standing in the area must make a save vs. spell. Failure indicates that they have been sucked into the center of the whirlpool and must begin to make Swimming proficiency checks at a +3 penalty. Creatures that make three successful checks in a row are able to make their way to the edge of the pool and pull themselves free. Failing a proficiency check means the individual begins to drown.\n\nNotes: Uncommon for priests of the Dark Sun setting.",
     "setting": "Dark Sun"

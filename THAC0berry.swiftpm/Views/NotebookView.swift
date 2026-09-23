@@ -427,13 +427,18 @@ struct DrawingCanvas: UIViewRepresentable {
 
         // Liga o PKToolPicker assim que a view já está numa janela de
         // verdade — na primeira passada de makeUIView ela ainda não está.
-        if !context.coordinator.didAttachToolPicker, let window = uiView.window {
+        // `PKToolPicker.shared(for:)` (um picker por JANELA) foi
+        // depreciado no iOS 14 — a Apple pede uma instância própria por
+        // canvas agora (`PKToolPicker()`), guardada no Coordinator pra não
+        // recriar uma a cada `updateUIView` (senão o picker "esquece" a
+        // ferramenta escolhida a cada toque na tela).
+        if !context.coordinator.didAttachToolPicker, uiView.window != nil {
             context.coordinator.didAttachToolPicker = true
-            if let toolPicker = PKToolPicker.shared(for: window) {
-                toolPicker.setVisible(true, forFirstResponder: uiView)
-                toolPicker.addObserver(uiView)
-                uiView.becomeFirstResponder()
-            }
+            let toolPicker = PKToolPicker()
+            context.coordinator.toolPicker = toolPicker
+            toolPicker.setVisible(true, forFirstResponder: uiView)
+            toolPicker.addObserver(uiView)
+            uiView.becomeFirstResponder()
         }
 
         // Só recarrega o traço se o dado mudou por fora (folheou pra outra
@@ -452,6 +457,11 @@ struct DrawingCanvas: UIViewRepresentable {
     final class Coordinator: NSObject, PKCanvasViewDelegate {
         var parent: DrawingCanvas
         var didAttachToolPicker = false
+        /// Guardado aqui (não só passado adiante) pra manter viva a
+        /// instância própria do picker (ver `updateUIView`) — sem essa
+        /// referência forte, `PKToolPicker()` seria liberado assim que
+        /// `updateUIView` termina e o picker sumiria da tela.
+        var toolPicker: PKToolPicker?
 
         init(_ parent: DrawingCanvas) {
             self.parent = parent

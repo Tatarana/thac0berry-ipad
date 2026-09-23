@@ -19,16 +19,25 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.tatarana.thac0berry",
             teamIdentifier: "",
-            displayVersion: "0.80",
-            bundleVersion: "86",
+            displayVersion: "1.46",
+            bundleVersion: "153",
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad
             ],
+            // No iPad, o multitasking (Split View/Slide Over) fica ligado
+            // por padrão — e nesse modo a Apple exige suportar as QUATRO
+            // orientações, a não ser que o app abra mão de multitasking
+            // com `requiresFullScreen: true` (não é o caso aqui: o app não
+            // pede tela cheia obrigatória em lugar nenhum). Faltava
+            // `.portraitUpsideDown` — o aviso do Playground era exatamente
+            // sobre isso ("All interface orientations must be supported
+            // unless the app requires full screen").
             supportedInterfaceOrientations: [
                 .landscapeRight,
                 .landscapeLeft,
-                .portrait
+                .portrait,
+                .portraitUpsideDown
             ]
         )
     ],

@@ -66,6 +66,15 @@ struct CharacterDescriptionPage: View {
     /// alinhadas em todas as linhas, como uma tabela de verdade.
     /// Feedback do usuário (2026-09-19): com q1 em 1.2x "fez muito pouca
     /// diferença" — subiu pra 1.8x (quase o dobro das outras colunas).
+    // Altura mínima de cada linha da tabela — subiu de 42 pra 46 junto com
+    // a fonte das células (fase 2 de ajuste de tamanho de fonte, pedido do
+    // usuário: "Bora pra uma das outras 3 áreas citadas", 2026-09-22) pra
+    // dar espaço extra ao texto maior sem cortar nada. `DescCell` usa
+    // `minHeight`, não uma altura travada, então a linha ainda cresce se
+    // precisar — mas a `GeometryReader` da tabela toda (abaixo) tem altura
+    // FIXA de fora, então essa constante também entra na conta dela.
+    private let rowHeight: CGFloat = 46
+
     private var descriptionTable: some View {
         GeometryReader { geo in
             let q1Weight: CGFloat = 1.8
@@ -75,72 +84,123 @@ struct CharacterDescriptionPage: View {
             let q2 = unit
             let q3 = unit
             let q4 = unit
+            // Largura de cada uma das 5 colunas das duas linhas
+            // Birth Date/Birth Rank/Age/Sex/Deity e Height/Weight/
+            // Nationality/Hair/Eyes (TODO.md item 40) — divide a MESMA
+            // largura total (q1+q2+q3+q4) em 5 partes iguais, só usada
+            // por essas duas linhas.
+            let fifth = (q1 + q2 + q3 + q4) / 5
+            // Metade da largura total — só pra Character Name/Player Name
+            // (pedido do usuário, 2026-09-22: os dois campos da 1ª linha
+            // devem ter o MESMO tamanho). `q1+q2` puxava mais largura pro
+            // Character Name por causa do peso extra que `q1` carrega pra
+            // Racial Abilities (linha de baixo) — como essa linha já não
+            // precisa alinhar borda com nada (é a primeira da tabela), dá
+            // pra sair da grade `q1..q4` aqui, igual as linhas de 5
+            // colunas já fazem.
+            let half = (q1 + q2 + q3 + q4) / 2
 
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    DescCell(label: "Character Name", value: $character.name)
-                        .frame(width: q1 + q2)
-                    DescCell(label: "Player Name", value: $character.playerName)
-                        .frame(width: q3 + q4)
+                    DescCell(label: "Character Name", value: $character.name, minHeight: rowHeight)
+                        .frame(width: half)
+                    DescCell(label: "Player Name", value: $character.playerName, minHeight: rowHeight)
+                        .frame(width: half)
+                }
+                // Alignment e Race SAÍRAM de vez desta tabela (TODO.md item
+                // 39, pedido do usuário 2026-09-22: a versão só-leitura do
+                // item 37 ainda confundia — "vai tentar alterar por ali e
+                // não vai conseguir"). Editam-se só no cabeçalho da página 1
+                // (`RecordHeaderForm` → `AlignmentField`/`RaceField`). Os 8
+                // campos que sobraram (Birth Date/Birth Rank/Age/Sex +
+                // Deity/Height/Weight/Nationality/Hair/Eyes, 10 no total)
+                // foram redistribuídos em 2 linhas de 5 (TODO.md item 40,
+                // pedido do usuário: "divide 5 campos pra cada uma das duas
+                // linhas") em vez de 1 linha de 4 + 1 linha de 6 — melhor
+                // aproveitamento do espaço. Sai da grade `q1..q4`
+                // compartilhada com o resto da tabela só nestas duas linhas
+                // (as bordas delas não precisam bater com as de cima/baixo)
+                // porque 5 não divide os 4 quartos de forma limpa.
+                HStack(spacing: 0) {
+                    DescCell(label: "Birth Date", value: $character.birthDate.orDefault(""), minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Birth Rank", value: $character.birthRank.orDefault(""), minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Age", value: $character.age, minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Sex", value: $character.sex, minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Deity", value: $character.deity, minHeight: rowHeight)
+                        .frame(width: fifth)
                 }
                 HStack(spacing: 0) {
-                    DescCell(label: "Birth Date", value: $character.birthDate.orDefault(""))
-                        .frame(width: q1)
-                    DescCell(label: "Birth Rank", value: $character.birthRank.orDefault(""))
-                        .frame(width: q2)
-                    DescCell(label: "Age", value: $character.age)
-                        .frame(width: q3)
-                    DescCell(label: "Sex", value: $character.sex)
-                        .frame(width: q4)
-                }
-                HStack(spacing: 0) {
-                    DescCell(label: "Alignment", value: $character.alignment)
-                        .frame(width: q1)
-                    DescCell(label: "Deity", value: $character.deity)
-                        .frame(width: q2)
-                    DescCell(label: "Height", value: $character.height)
-                        .frame(width: q3)
-                    DescCell(label: "Weight", value: $character.weight)
-                        .frame(width: q4)
-                }
-                HStack(spacing: 0) {
-                    DescCell(label: "Race", value: $character.race)
-                        .frame(width: q1)
-                    DescCell(label: "Nationality", value: $character.nationality.orDefault(""))
-                        .frame(width: q2)
-                    DescCell(label: "Hair", value: $character.hair)
-                        .frame(width: q3)
-                    DescCell(label: "Eyes", value: $character.eyes)
-                        .frame(width: q4)
+                    DescCell(label: "Height", value: $character.height, minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Weight", value: $character.weight, minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Nationality", value: $character.nationality.orDefault(""), minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Hair", value: $character.hair, minHeight: rowHeight)
+                        .frame(width: fifth)
+                    DescCell(label: "Eyes", value: $character.eyes, minHeight: rowHeight)
+                        .frame(width: fifth)
                 }
                 HStack(alignment: .top, spacing: 0) {
-                    DescCell(label: "Racial Abilities", value: $character.racialAbilities.orDefault(""),
-                             minHeight: 126)
-                        .frame(width: q1 + q2)
+                    // Era `DescCell`/`InlineTextField` — que é um campo de
+                    // UMA linha só e não quebra texto. Enquanto o jogador
+                    // digitava frases curtas isso nunca dava problema, mas
+                    // o texto que `RaceOption.apply(to:)` preenche sozinho
+                    // é um parágrafo inteiro, que vazava pra fora da
+                    // célula por cima das colunas vizinhas (bug relatado
+                    // pelo usuário em 2026-09-22, print em anexo — TODO.md
+                    // item 37). `PaperTextEditor` (mesma usada em
+                    // Personality/Background logo abaixo) quebra linha de
+                    // verdade e fica contida na própria moldura.
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Racial Abilities")
+                            .font(.system(size: 11, design: .serif))
+                            .foregroundStyle(Paper.inkSoft)
+                        PaperTextEditor(text: $character.racialAbilities.orDefault(""), placeholder: "")
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 4)
+                    .frame(width: q1 + q2, height: rowHeight * 3, alignment: .topLeading)
+                    .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
+                        // Preenchido sozinho pelo seletor de Raça, só
+                        // quando o campo estava vazio (ver `RaceOption.
+                        // apply(to:)`) — mesmo sinal de "mudou sozinho".
+                        .changeFlash(character: $character, key: "racialAbilities")
                     VStack(spacing: 0) {
                         HStack(spacing: 0) {
-                            DescCell(label: "Skin", value: $character.skin.orDefault(""))
+                            DescCell(label: "Skin", value: $character.skin.orDefault(""), minHeight: rowHeight)
                                 .frame(width: q3)
-                            DescCell(label: "Vision", value: $character.vision.orDefault(""))
+                            DescCell(label: "Vision", value: $character.vision.orDefault(""), minHeight: rowHeight)
                                 .frame(width: q4)
                         }
                         HStack(spacing: 0) {
-                            DescCell(label: "Handedness", value: $character.handedness.orDefault(""))
+                            DescCell(label: "Handedness", value: $character.handedness.orDefault(""), minHeight: rowHeight)
                                 .frame(width: q3)
-                            DescCellStatic(label: "Class", value: character.characterClass.rawValue)
+                            DescCellStatic(label: "Class", value: character.characterClass.rawValue, minHeight: rowHeight)
                                 .frame(width: q4)
                         }
-                        DescCell(label: "Origin", value: $character.placeOfOrigin.orDefault(""))
+                        DescCell(label: "Origin", value: $character.placeOfOrigin.orDefault(""), minHeight: rowHeight)
                             .frame(width: q3 + q4)
                     }
                     .frame(width: q3 + q4)
                 }
             }
         }
-        // Altura = soma fixa das 5 linhas (4 × 42 + 126) — a
+        // Altura = soma fixa das 4 linhas (`rowHeight` × 3 pras linhas
+        // normais + `rowHeight` × 3 pro bloco "Racial Abilities", que por
+        // dentro empilha 3 sub-linhas da mesma altura) — caiu de 5 pra 4
+        // linhas quando Alignment e Race saíram e as duas linhas de 4
+        // colunas viraram 1 linha de 6 (TODO.md item 39). Fase 2 de fonte
+        // (TODO.md, 2026-09-22) subiu `rowHeight` de 42 pra 46 — como o
+        // "126" de antes já era só `42 × 3`, a conta abaixo sobe junto
+        // automaticamente, sem precisar recalcular um número solto. A
         // `GeometryReader` da tabela inteira precisa de uma altura
         // explícita de fora, senão tenta ocupar todo o `ScrollView`.
-        .frame(height: 42 * 4 + 126)
+        .frame(height: rowHeight * 3 + rowHeight * 3)
     }
 
     // MARK: - Personality
@@ -148,7 +208,7 @@ struct CharacterDescriptionPage: View {
     private var personalityBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Personality")
-                .font(.system(size: 10, design: .serif))
+                .font(.system(size: 11, design: .serif))
                 .foregroundStyle(Paper.inkSoft)
             PaperTextEditor(text: $character.personality.orDefault(""),
                             placeholder: "How they talk, what they want, what they're afraid of…")
@@ -195,7 +255,7 @@ struct CharacterDescriptionPage: View {
 private struct DescCell: View {
     let label: String
     @Binding var value: String
-    var minHeight: CGFloat = 42
+    var minHeight: CGFloat = 46
 
     // Escreve direto na página com `InlineTextField` (mesma UIKit
     // `HandwritingField` por baixo) — sem balão. A 1ª tentativa desta
@@ -209,11 +269,11 @@ private struct DescCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 8.5, design: .serif))
+                .font(.system(size: 11, design: .serif))
                 .foregroundStyle(Paper.inkSoft)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-            InlineTextField(value: $value, placeholder: "", fontSize: 13, underline: false)
+            InlineTextField(value: $value, placeholder: "", fontSize: 14, underline: false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(.horizontal, 5)
@@ -224,28 +284,30 @@ private struct DescCell: View {
 }
 
 /// A mesma célula, só que pra um valor que não é dessa página (a Classe já
-/// se edita na página 1, pelo `ClassPicker`) — mostrado aqui só pra
-/// completar a tabela como no PDF, sem abrir um segundo jeito de editar a
-/// mesma coisa.
+/// se edita na página 1, pelo `ClassPicker`; Alignment e Race também, pelo
+/// `AlignmentField`/`RaceField` do cabeçalho — TODO.md item 37) —
+/// mostrado aqui só pra completar a tabela como no PDF, sem abrir um
+/// segundo jeito de editar a mesma coisa.
 private struct DescCellStatic: View {
     let label: String
     let value: String
+    var minHeight: CGFloat = 46
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 8.5, design: .serif))
+                .font(.system(size: 11, design: .serif))
                 .foregroundStyle(Paper.inkSoft)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(value.isEmpty ? "—" : value)
-                .font(Paper.hand(17))
+                .font(Paper.hand(18))
                 .foregroundStyle(Paper.penInk)
                 .lineLimit(1)
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, minHeight: 42, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
         .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
     }
 }

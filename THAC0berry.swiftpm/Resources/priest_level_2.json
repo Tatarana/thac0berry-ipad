@@ -836,7 +836,7 @@
       "maxBonus": null
     },
     "spheres": [
-      "Earth"
+      "Elemental Earth"
     ],
     "fullDescription": "When the spell is cast, the priest's fingernails lengthen and become as hard as stone. For the duration of the spell, the caster can use these claws to burrow through earth, sand, clay, and gravel (but not solid rock), excavating with enough speed to provide a burrowing rate of 3, much like a badger or other burrowing mammal\n\nIn addition, the caster can use these claws as weapons. The priest can attack with both claws, each successful attack inflicting 1d4+1 points of damage, plus any Strength damage adjustment.\n\nThis spell ends early if subjected to a successful dispel magic, if the caster dies or by the caster's silent command.\n\nThe material components for this spell include the caster's holy symbol, a tuft of fur from a burrowing mammal, and a tiny replica of a shovel.\n\nNotes: Granted by the gnome gods Segojan Earthcaller and Urdlen.",
     "setting": "Generic"

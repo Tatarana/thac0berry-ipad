@@ -34,6 +34,41 @@ final class CharacterLibrary: ObservableObject {
         /// global (chave ainda não existia) sem falhar o decode — mesma
         /// convenção do resto do app pra campo novo em JSON antigo.
         var favoriteSpellIDs: Set<String>? = nil
+
+        init(campaigns: [Campaign] = [], characters: [PlayerCharacter] = [], favoriteSpellIDs: Set<String>? = nil) {
+            self.campaigns = campaigns
+            self.characters = characters
+            self.favoriteSpellIDs = favoriteSpellIDs
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case campaigns, characters, favoriteSpellIDs
+        }
+
+        /// Decode manual (2026-09-20) — em vez do sintetizado automático,
+        /// que faz `[Campaign]`/`[PlayerCharacter]` inteiros falharem se UM
+        /// item só vier com um campo ilegível (um enum com valor que este
+        /// build não reconhece mais, por exemplo). `LossyArray` (abaixo)
+        /// descarta só o item ruim, não a lista toda — antes, um personagem
+        /// corrompido levava todo mundo junto de arrasto.
+        ///
+        /// Isso é uma rede de segurança, não a causa do bug que o usuário
+        /// relatou (2026-09-20: "toda versão nova eu perco meus
+        /// personagens") — aquele era outra coisa: reimportar o .zip inteiro
+        /// no Swift Playgrounds cria uma cópia NOVA do projeto, com sua
+        /// própria pasta Documents vazia (mesmo bundle identifier, sandbox
+        /// diferente) — `library.json` simplesmente não existe aí, sem
+        /// decode nenhum envolvido, daí `load()` cair direto no branch de
+        /// "primeira execução" e semear o Kelmon de exemplo, sem erro na
+        /// tela. Mantém o app aberto pra recomeçar via Export/Import
+        /// (`SettingsView`) — mas o de verdade é não reimportar o projeto
+        /// inteiro a cada versão nova.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            campaigns = try container.decodeIfPresent(LossyArray<Campaign>.self, forKey: .campaigns)?.elements ?? []
+            characters = try container.decodeIfPresent(LossyArray<PlayerCharacter>.self, forKey: .characters)?.elements ?? []
+            favoriteSpellIDs = try container.decodeIfPresent(Set<String>.self, forKey: .favoriteSpellIDs)
+        }
     }
 
     private let fileName = "library.json"
@@ -291,5 +326,77 @@ final class CharacterLibrary: ObservableObject {
     func update(_ character: PlayerCharacter) {
         guard let index = index(of: character.id) else { return }
         characters[index] = character
+    }
+
+    // MARK: - Backup manual (Export/Import — 2026-09-20)
+
+    /// Cópia dos dados salvos, pronta pra compartilhar (AirDrop, Arquivos,
+    /// iCloud, e-mail pra si mesmo...). Existe porque reimportar o `.zip`
+    /// de uma versão nova no Swift Playgrounds cria um projeto NOVO com sua
+    /// própria pasta Documents vazia — `library.json` não atravessa esse
+    /// tipo de atualização sozinho. Com um backup exportado, dá pra
+    /// restaurar depois de qualquer reimportação, não importa a causa.
+    func exportSnapshot() -> Data? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try? encoder.encode(LibraryData(campaigns: campaigns, characters: characters,
+                                                favoriteSpellIDs: favoriteSpellIDs))
+    }
+
+    struct ImportPreview {
+        let campaignCount: Int
+        let characterCount: Int
+    }
+
+    /// Só olha o arquivo, sem aplicar nada ainda — pra `SettingsView` poder
+    /// mostrar "isso tem N campanhas e M personagens, substituir os M
+    /// atuais?" antes do jogador confirmar (importar é destrutivo: troca a
+    /// biblioteca inteira, não faz merge).
+    func previewImport(from data: Data) throws -> ImportPreview {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(LibraryData.self, from: data)
+        return ImportPreview(campaignCount: decoded.campaigns.count, characterCount: decoded.characters.count)
+    }
+
+    /// Aplica um backup exportado por `exportSnapshot()` — SUBSTITUI a
+    /// biblioteca atual inteira. Quem chama já deve ter confirmado com o
+    /// jogador (ver `previewImport(from:)`).
+    func importSnapshot(from data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(LibraryData.self, from: data)
+        campaigns = decoded.campaigns
+        characters = decoded.characters
+        favoriteSpellIDs = decoded.favoriteSpellIDs ?? Set(decoded.characters.flatMap(\.favoriteSpellIDs))
+        saveNow()
+    }
+}
+
+/// Decodifica um array elemento por elemento — se UM item vier corrompido
+/// (ou num formato que este build não reconhece mais), só ELE é
+/// descartado, em vez de `Array<Element>.init(from:)` padrão, que faz o
+/// array INTEIRO falhar assim que um item dá erro. `container.decode` só
+/// "consome" a posição atual do array quando tem sucesso — por isso o
+/// `try?` pra `AnyDecodableDiscard` no `else`: decodificar QUALQUER coisa
+/// (mesmo sem usar o valor) avança o cursor e evita um laço infinito no
+/// item ruim.
+private struct LossyArray<Element: Decodable>: Decodable {
+    private struct AnyDecodableDiscard: Decodable {}
+
+    let elements: [Element]
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var result: [Element] = []
+        while !container.isAtEnd {
+            if let value = try? container.decode(Element.self) {
+                result.append(value)
+            } else {
+                _ = try? container.decode(AnyDecodableDiscard.self)
+            }
+        }
+        elements = result
     }
 }

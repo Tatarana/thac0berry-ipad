@@ -15,6 +15,8 @@ struct CampaignDetailView: View {
     /// pra "morrer", não um toque só que já grava data de hoje/nota em
     /// branco sem perguntar nada.
     @State private var characterPendingDeath: PlayerCharacter?
+    /// TODO.md item 18 — abre `CampaignSettingsEditorSheet`.
+    @State private var isSettingsPresented = false
 
     var body: some View {
         ScrollView {
@@ -33,6 +35,9 @@ struct CampaignDetailView: View {
             MarkDeadSheet(character: person) { date, note in
                 library.markDead(person, on: date, note: note)
             }
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            CampaignSettingsEditorSheet(campaign: $campaign)
         }
     }
 
@@ -81,6 +86,17 @@ struct CampaignDetailView: View {
                 // próprio ícone (a caixa "fecha" com uma leve batida) — antes
                 // trocava de símbolo sem nenhum aviso de que algo aconteceu.
                 .symbolEffect(.bounce, value: campaign.isArchived)
+                // TODO.md item 18 — seletor de campaign settings (Dark Sun,
+                // Ravenloft etc.) pra filtrar o que aparece nos seletores da
+                // ficha (por enquanto só Proficiencies). Mesmo `.badge` dos
+                // outros botões redondos aqui.
+                RoundIconButton(
+                    systemImage: "slider.horizontal.3",
+                    style: .badge,
+                    action: { isSettingsPresented = true },
+                    accessibilityLabel: "Campaign settings",
+                    tooltip: "Campaign settings"
+                )
             }
         }
     }

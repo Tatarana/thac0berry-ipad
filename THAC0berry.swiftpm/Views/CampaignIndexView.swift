@@ -265,7 +265,7 @@ private struct SessionRow: View {
                     .popover(isPresented: $isRenaming) {
                         HStack(spacing: 12) {
                             HandwritingField(text: $renameDraft, placeholder: "unnamed session",
-                                             allowsSoftwareKeyboard: true) {
+                                             allowsSoftwareKeyboard: false) {
                                 titleBinding.wrappedValue = renameDraft
                                 isRenaming = false
                             }
@@ -343,7 +343,7 @@ private struct NewSessionSheet: View {
                         .foregroundStyle(Paper.penInk)
                     Spacer()
                     Button("close") { dismiss() }
-                        .font(Paper.printed(13))
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                 }
 
@@ -358,7 +358,7 @@ private struct NewSessionSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     FieldLabel(text: "Title (optional)")
                     HandwritingField(text: $title, placeholder: "e.g. The Tower of Elturel",
-                                     allowsSoftwareKeyboard: true, onCommit: {})
+                                     allowsSoftwareKeyboard: false, onCommit: {})
                         .frame(height: 54)
                         .overlay(alignment: .bottom) { DottedRule() }
                 }

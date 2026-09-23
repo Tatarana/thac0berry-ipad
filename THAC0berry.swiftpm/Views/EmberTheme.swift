@@ -35,6 +35,14 @@ enum Ember {
     static let crimson = Color(red: 0.80, green: 0.22, blue: 0.16)          // personagem / HP
     static let amberAccent = Color(red: 0.86, green: 0.62, blue: 0.20)      // campanha / contagem
     static let teal = Color(red: 0.18, green: 0.55, blue: 0.48)             // caderno / páginas
+
+    /// Verde-claro pro fundo do `ConsequenceSignalBadge` — pedido do
+    /// usuário pra combinar com `icon_consequence_signal.png` (o
+    /// escudo com chama turquesa/esverdeada), trocando o gradiente
+    /// laranja/vermelho que tinha antes (herdado de quando o ícone era só
+    /// o símbolo genérico "wand.and.stars", sem cor nenhuma pra combinar).
+    static let mintGlow = Color(red: 0.58, green: 0.88, blue: 0.64)         // #94E0A3 — verde-claro
+    static let mintDeep = Color(red: 0.20, green: 0.58, blue: 0.42)         // #33946B — verde mais fechado
 }
 
 /// Fundo de couro e brasa pras telas de navegação — a primeira versão

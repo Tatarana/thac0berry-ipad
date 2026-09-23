@@ -519,8 +519,8 @@
     "summary": "This spell causes an ordinary wooden staff or club to sprout thick, extremely hard spikes on one end. Just like a staff made from bramblewood.",
     "damageDice": null,
     "spheres": [
-      "Earth",
-      "Water"
+      "Elemental Earth",
+      "Elemental Water"
     ],
     "fullDescription": "This spell causes an ordinary wooden staff or club to sprout thick, extremely hard spikes on one end. Just like a staff made from bramblewood. The staff adds +2 to the caster's attack roll and inflicts double damage for the duration of the spell. A bramblestaff can affect any creature harmed only by magical weapons.\n\nNotes: Uncommon for druids from the Dark Sun setting.",
     "setting": "Dark Sun"
@@ -896,8 +896,7 @@
     "damageDice": null,
     "spheres": [
       "Elemental Water",
-      "Elemental Water",
-      "Weather - PSC"
+      "Weather"
     ],
     "fullDescription": "This spell precipitates a rush of water out of the air, instantly drenching everything in the area of effect. Normal fires are extinguished. Permanent magical fires go out, but relight in 1d2 rounds. (Weapons relight in one round.) Fire-based spells of 1st or 2nd level are negated immediately.\n\nFire-based spells of 3rd level or higher are also negated, but create a steam cloud with a 120-foot diameter. Those within the steam cloud are scalded for Id3 points of damage per round. Cold-based creatures take double this damage. The steam cloud lasts Id4+1 rounds, half that in a breeze, and but one round in a strong wind.\n\nThe cloudburst spell has doubled effect in humid climates, causes a heavy dampness in arid climates, produces slush and sleet at temperatures near freezing, and creates up to 10 inches of snow if the temperature is below freezing.\n\n:Errata delete sphere “Elemental Air.”\n\nThe material component for this spell is the priest's holy symbol.\n\nNotes: Uncommon for druids (originally published in Unearthed Arcana). Granted by Istishia the Water Lord of the Forgotten Realms setting.",
     "setting": "Forgotten Realms"
@@ -3123,7 +3122,7 @@
     "damageDice": null,
     "spheres": [
       "Elemental Lightning",
-      "Water"
+      "Elemental Water"
     ],
     "fullDescription": "This spell is used by dwarven priests in the process of enchanting magical items, and thus is seldom encountered. By means of this spell, a dwarven priest causes a quantity of water to become infused with the magical spirit of the lightning. The water is then used in the forging or creation of certain items to improve the quality of the goods. The lightning water removes imperfections, strengthens metal, and generally makes treated items superior in quality.\n\nMetal jewelry crafted with lightning water becomes one category more valuable (see the jewelry table in the DMG). All metal items, weapons, and armor crafted with lightning water have a +1 bonus to their item saving throws.\n\nTo prepare the water, a special trough or container made of fine wood inlaid with silver decorations must be constructed. The container must be made from materials worth no less than 5,000 gp. The container is then blessed by a dwarven priest. Thereafter, the container can be used any number of times to collect lightning water.\n\nThe water-filled container is first placed outdoors. The lightning water spell is then cast over the water, which is left out overnight to capture the spirit of the lightning from a nighttime thunder storm (either natural or summoned). If no storm occurs, the spell is wasted. Once the lightning spirit is captured within the water, the water itself is not electrified, nor is it dangerous to touch; instead, the water is simply infused with the magical potential and spiritual strength of the lightning.\n\nWhen the water is retrieved the next morning, it holds its lightning-spirit charge for 12 hours or until the water is used up in the smithy. The lightning water is used in the forging of weapons, armor, or metal goods, either to improve the quality of the items or to prepare them for magical enchantment. To treat items, 2 cubic feet of water is necessary for each piece of metal jewelry or other small item crafted, 6 cubic feet of water for each weapon, and 12 cubic feet of water for each suit of armor.\n\nThe material components for this spell are a miniature silver lightning rod worth at least 500 gp and a vial of holy water sprinkled into the trough of water to be ensorcelled.\n\nNotes: Very rare spell, restricted to dwarves. (Updated from Dragon Magazine.)",
     "setting": "Generic"
@@ -4476,7 +4475,8 @@
     "summary": "This malicious evocation causes small glassy particles of sand or silt to spray into an opponent's eyes. The spell does not create the tiny shards, so the caster must use existing sand or silt to create the effect.",
     "damageDice": null,
     "spheres": [
-      "Elemental Earth or Silt"
+      "Elemental Earth",
+      "Silt"
     ],
     "fullDescription": "This malicious evocation causes small glassy particles of sand or silt to spray into an opponent's eyes. The spell does not create the tiny shards, so the caster must use existing sand or silt to create the effect.\n\nCreatures sprayed by the slivers must make a saving throw vs. breath weapons. Failure indicates that they are blinded for 1d6 rounds, and lose 1d10 hit points. Creatures vulnerable only to magical weapons take no damage, but may be blinded.\n\nNotes: Uncommon for priests of Elemental Earth from the Dark Sun setting; otherwise, very rare.",
     "setting": "Dark Sun"
@@ -5627,7 +5627,7 @@
     "damageDice": null,
     "spheres": [
       "Protection",
-      "Necromancy"
+      "Necromantic"
     ],
     "fullDescription": "This spell protects undead creatures in the service of, or being commanded by, the priest from turning attempts. The spell has two forms.\n\nThe shorter duration, more protective version lasts 1 round per caster level. It confers total immunity to turning attempts upon chosen undead creatures within the area of effect. Only undead creatures with Hit Dice equal to half the caster's level or less can be so protected. Such undead moving farther than 30 feet from the caster lose this protection; they can be turned normally if another attempt is made. Note that the turnbane does not negate a successful turning in the event that turned undead creatures move back to within 30 feet of the caster.\n\nThe longer duration version lasts 3 rounds per level and allows the caster to protect undead with Hit Dice equal to or less than the his or her experience level. An opposing priest, cleric or paladin attempting to turn such creatures must first roll a number on 1d20 less than the caster's basic, unadjusted saving throw vs. spell. Failure to do so means the undead cannot be turned while they remain within 30 feet of the caster. This failure does not prevent others from trying to rum the same undead creatures; each separate turning attempt by another different priest requires a separate 1d20 roll. A successful roll on the 1d20 means the turning attempt is resolved normally.\n\nA successful dispel magic will remove the effects of a turnbane, as will a dispel evil cast into the area of effect of the turnbane. A holy word dispels a turnbane also.\n\nNotes: Granted by Iuz the Evil of the Greyhawk. setting.",
     "setting": "Greyhawk"

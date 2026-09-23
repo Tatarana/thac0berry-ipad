@@ -4,6 +4,15 @@ import SwiftUI
 struct THAC0berryApp: App {
     @StateObject private var library = CharacterLibrary()
     @StateObject private var spellbook = SpellDatabase()
+    @StateObject private var kits = KitDatabase()
+    @StateObject private var proficiencies = ProficiencyDatabase()
+    @StateObject private var weapons = WeaponDatabase()
+    @StateObject private var armor = ArmorDatabase()
+    @StateObject private var mundaneItems = MundaneItemDatabase()
+    @StateObject private var magicItems = MagicItemDatabase()
+    @StateObject private var rules = RulesDatabase()
+    @StateObject private var deities = DeityDatabase()
+    @StateObject private var ruleset = RulesetRegistry()
 
     var body: some Scene {
         WindowGroup {
@@ -11,6 +20,15 @@ struct THAC0berryApp: App {
                 HomeView()
                     .environmentObject(library)
                     .environmentObject(spellbook)
+                    .environmentObject(kits)
+                    .environmentObject(proficiencies)
+                    .environmentObject(weapons)
+                    .environmentObject(armor)
+                    .environmentObject(mundaneItems)
+                    .environmentObject(magicItems)
+                    .environmentObject(rules)
+                    .environmentObject(deities)
+                    .environmentObject(ruleset)
 
                 // Por cima de qualquer tela do app (lista, ficha, folha de
                 // magia) — não faz parte de nenhuma delas, então continua
