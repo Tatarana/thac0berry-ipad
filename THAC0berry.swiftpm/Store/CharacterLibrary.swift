@@ -25,6 +25,15 @@ final class CharacterLibrary: ObservableObject {
     @Published var favoriteSpellIDs: Set<String> = [] {
         didSet { scheduleSave() }
     }
+    /// Item 3 do pedido do usuário (2026-09-24): "nas configurações gerais,
+    /// deixar o jogador definir o tipo de folha padrão: liso, pautado ou
+    /// quadriculado" — preferência global (não por campanha/personagem),
+    /// lida por `Campaign.addNotebookPage(kind:paperStyle:)` toda vez que
+    /// uma folha NOVA nasce. Trocar aqui não muda folha já existente — só
+    /// o padrão de folhas futuras (ver `NotebookPaperStyle`).
+    @Published var defaultNotebookPaperStyle: NotebookPaperStyle = .plain {
+        didSet { scheduleSave() }
+    }
     @Published private(set) var lastError: String? = nil
 
     private struct LibraryData: Codable {
@@ -34,15 +43,21 @@ final class CharacterLibrary: ObservableObject {
         /// global (chave ainda não existia) sem falhar o decode — mesma
         /// convenção do resto do app pra campo novo em JSON antigo.
         var favoriteSpellIDs: Set<String>? = nil
+        /// Mesma convenção — biblioteca salva antes deste pedido
+        /// (2026-09-24) não tem essa chave; ausência vira `.plain`, que já
+        /// era o único estilo de folha que existia.
+        var defaultNotebookPaperStyle: NotebookPaperStyle? = nil
 
-        init(campaigns: [Campaign] = [], characters: [PlayerCharacter] = [], favoriteSpellIDs: Set<String>? = nil) {
+        init(campaigns: [Campaign] = [], characters: [PlayerCharacter] = [], favoriteSpellIDs: Set<String>? = nil,
+             defaultNotebookPaperStyle: NotebookPaperStyle? = nil) {
             self.campaigns = campaigns
             self.characters = characters
             self.favoriteSpellIDs = favoriteSpellIDs
+            self.defaultNotebookPaperStyle = defaultNotebookPaperStyle
         }
 
         enum CodingKeys: String, CodingKey {
-            case campaigns, characters, favoriteSpellIDs
+            case campaigns, characters, favoriteSpellIDs, defaultNotebookPaperStyle
         }
 
         /// Decode manual (2026-09-20) — em vez do sintetizado automático,
@@ -68,6 +83,7 @@ final class CharacterLibrary: ObservableObject {
             campaigns = try container.decodeIfPresent(LossyArray<Campaign>.self, forKey: .campaigns)?.elements ?? []
             characters = try container.decodeIfPresent(LossyArray<PlayerCharacter>.self, forKey: .characters)?.elements ?? []
             favoriteSpellIDs = try container.decodeIfPresent(Set<String>.self, forKey: .favoriteSpellIDs)
+            defaultNotebookPaperStyle = try container.decodeIfPresent(NotebookPaperStyle.self, forKey: .defaultNotebookPaperStyle)
         }
     }
 
@@ -88,10 +104,10 @@ final class CharacterLibrary: ObservableObject {
 
     private func load() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            // Primeira execução: a pasta abre com uma campanha e uma ficha
-            // já preenchidas, para dar pra ver como o app fica em uso de
-            // verdade.
-            seedSample()
+            // Primeira execução: pedido do usuário (2026-09-24) — nada de
+            // campanha/personagem de exemplo (o Kelmon) semeado sozinho.
+            // A pasta abre vazia mesmo; `campaigns`/`characters` já nascem
+            // `[]` pelos inicializadores das propriedades acima.
             return
         }
         do {
@@ -110,19 +126,15 @@ final class CharacterLibrary: ObservableObject {
                 // conjunto só, pra ninguém perder favorito nenhum na troca.
                 favoriteSpellIDs = Set(decoded.characters.flatMap(\.favoriteSpellIDs))
             }
+            defaultNotebookPaperStyle = decoded.defaultNotebookPaperStyle ?? .plain
         } catch {
             // JSON gravado por uma versão anterior (sem campanha, sem os
-            // campos novos) não decodifica. Melhor abrir com o exemplo do
-            // que com a pasta vazia e sem saída.
+            // campos novos) não decodifica. Pedido do usuário (2026-09-24):
+            // sem semear o Kelmon de exemplo automaticamente aqui também —
+            // só avisa do erro e deixa a pasta vazia mesmo, pronta pra um
+            // Import de backup (`SettingsView`) se o jogador tiver um.
             lastError = "Couldn't read the saved library: \(error.localizedDescription)"
-            if characters.isEmpty && campaigns.isEmpty { seedSample() }
         }
-    }
-
-    private func seedSample() {
-        let (campaign, character) = PlayerCharacter.kelmonWithCampaign()
-        campaigns = [campaign]
-        characters = [character]
     }
 
     /// Salva com um pequeno atraso, para não escrever no disco a cada toque
@@ -142,7 +154,8 @@ final class CharacterLibrary: ObservableObject {
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(LibraryData(campaigns: campaigns, characters: characters,
-                                                       favoriteSpellIDs: favoriteSpellIDs))
+                                                       favoriteSpellIDs: favoriteSpellIDs,
+                                                       defaultNotebookPaperStyle: defaultNotebookPaperStyle))
             try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUnlessOpen])
             lastError = nil
         } catch {
@@ -341,7 +354,8 @@ final class CharacterLibrary: ObservableObject {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try? encoder.encode(LibraryData(campaigns: campaigns, characters: characters,
-                                                favoriteSpellIDs: favoriteSpellIDs))
+                                                favoriteSpellIDs: favoriteSpellIDs,
+                                                defaultNotebookPaperStyle: defaultNotebookPaperStyle))
     }
 
     struct ImportPreview {
@@ -370,6 +384,7 @@ final class CharacterLibrary: ObservableObject {
         campaigns = decoded.campaigns
         characters = decoded.characters
         favoriteSpellIDs = decoded.favoriteSpellIDs ?? Set(decoded.characters.flatMap(\.favoriteSpellIDs))
+        defaultNotebookPaperStyle = decoded.defaultNotebookPaperStyle ?? .plain
         saveNow()
     }
 }

@@ -229,7 +229,10 @@ struct ArmorDetailSheet: View {
                             onChoose()
                             dismiss()
                         }
-                        .font(Paper.printed(13))
+                        // Item 4 do pedido do usuário (2026-09-24):
+                        // "choose" numa fonte bem menor que "close" —
+                        // padronizado nos 16pt do "close" ao lado.
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                     }
                     Button("close") { dismiss() }
@@ -284,19 +287,33 @@ private struct ArmorDetailField: View {
 
 // MARK: - Seletor de Armor (usado no campo "Armor" do bloco de Armadura)
 
-/// Sheet aberta a partir do campo "Armor" (`ArmorBlock`, `CharacterSheetView.
-/// swift`) — escolher aqui preenche `character.armorRating` com o `baseAC`
-/// sugerido. Só lista peças `kind == .armor` (elmo/escudo não têm AC pra
-/// sugerir aqui — ver `ArmorPiece`); quem quiser consultá-los usa o
-/// Compendium direto. Mesmo padrão de `WeaponPickerSheet`/`KitPickerSheet`,
-/// incluindo a saída "use as typed" pra armadura caseira fora da base.
+/// Sheet aberta a partir dos campos "Armor" e, a partir do item 7 do
+/// pedido do usuário (2026-09-24: "Armor mostra só '1' no campo, AC base
+/// não muda; estender pra Shield"), também "Shield" (`ArmorBlock`,
+/// `CharacterSheetView.swift`) — `kind` escolhe qual seção da base
+/// (`ArmorDatabase.pieces(kind:)`) listar, e `rating` é o campo de texto
+/// (`armorRating` ou `shieldRating`) que recebe o valor escolhido. Mesmo
+/// padrão de `WeaponPickerSheet`/`KitPickerSheet`, incluindo a saída "use
+/// as typed" pra armadura/escudo caseiro fora da base.
+///
+/// Peça de armadura tem `baseAC` de verdade (AC final, ex. Plate Mail = 3)
+/// — grava direto. Escudo NUNCA tem `baseAC` na base (a tabela de preços
+/// do PHB não atribui um valor de AC isolado a eles, ver `ArmorPiece`) —
+/// pra esses, `choose(_:)` grava o "-1" fixo que a regra central de 2e dá
+/// a qualquer escudo, já com o sinal certo pra somar em
+/// `ConsequenceEngine.recalculateArmorClass`.
 struct ArmorPickerSheet: View {
-    @Binding var armorRating: String
+    @Binding var rating: String
+    var kind: ArmorPieceKind = .armor
     @EnvironmentObject private var armorDatabase: ArmorDatabase
     @Environment(\.dismiss) private var dismiss
 
     @State private var query: String = ""
     @State private var detailPiece: ArmorPiece? = nil
+
+    private var title: String {
+        kind == .shield ? "Choose a Shield" : "Choose an Armor"
+    }
 
     var body: some View {
         ZStack {
@@ -304,7 +321,7 @@ struct ArmorPickerSheet: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
-                    Text("Choose an Armor")
+                    Text(title)
                         .font(Paper.hand(28))
                         .foregroundStyle(Paper.penInk)
                     Spacer()
@@ -315,12 +332,12 @@ struct ArmorPickerSheet: View {
 
                 searchField
 
-                if !armorRating.isEmpty {
+                if !rating.isEmpty {
                     Button {
-                        armorRating = ""
+                        rating = ""
                         dismiss()
                     } label: {
-                        Text("Clear current value (\(armorRating))")
+                        Text("Clear current value (\(rating))")
                             .font(Paper.printedItalic(13))
                             .foregroundStyle(Paper.redInk)
                     }
@@ -332,7 +349,7 @@ struct ArmorPickerSheet: View {
                         .font(Paper.printedItalic(12))
                         .foregroundStyle(Paper.redInk)
                 } else if filtered.isEmpty {
-                    Text("No armor matches — try a different search.")
+                    Text("No \(kind == .shield ? "shields" : "armor") match — try a different search.")
                         .font(Paper.printedItalic(13))
                         .foregroundStyle(Paper.inkSoft)
                 }
@@ -357,11 +374,11 @@ struct ArmorPickerSheet: View {
     }
 
     private var searchField: some View {
-        SearchField(text: $query, placeholder: "armor name")
+        SearchField(text: $query, placeholder: kind == .shield ? "shield name" : "armor name")
     }
 
     private var filtered: [ArmorPiece] {
-        let all = armorDatabase.pieces(kind: .armor)
+        let all = armorDatabase.pieces(kind: kind)
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return all }
 
@@ -373,7 +390,14 @@ struct ArmorPickerSheet: View {
 
     private func choose(_ piece: ArmorPiece) {
         if let baseAC = piece.baseAC {
-            armorRating = "\(baseAC)"
+            rating = "\(baseAC)"
+        } else if piece.kind == .shield {
+            // Regra central de 2e: qualquer escudo dá -1 fixo de AC — sem
+            // `baseAC` por item na tabela de preços do PHB (ver
+            // `ArmorPiece`), então o valor não vem do dado, é a regra.
+            rating = "-1"
+        } else {
+            return
         }
         dismiss()
     }

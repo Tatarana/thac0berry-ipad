@@ -757,6 +757,26 @@ enum NotebookPageKind: String, Codable {
     case freeform
 }
 
+/// O papel de fundo de uma folha do caderno — pedido do usuário
+/// (2026-09-24): "crie mais dois estilos de folha: pautada e quadriculada,
+/// com a opção de trocar qual tipo de folha". `.plain` é o único que
+/// existia até então (folha lisa, sem nada desenhado por trás do texto/
+/// traço). O desenho de cada estilo mora em `NotebookPaperTexture`
+/// (`Views/NotebookView.swift`) — este enum só guarda a ESCOLHA.
+enum NotebookPaperStyle: String, Codable, CaseIterable {
+    case plain
+    case lined
+    case grid
+
+    var label: String {
+        switch self {
+        case .plain: return "Plain"
+        case .lined: return "Lined"
+        case .grid: return "Grid"
+        }
+    }
+}
+
 /// Uma folha livre do caderno de campanha — encontro com NPC, pista,
 /// decisão do grupo. Sem seções fixas: só um título opcional, uma data e o
 /// conteúdo, que é texto ou tinta dependendo do tipo da folha.
@@ -774,6 +794,15 @@ struct NotebookEntry: Codable, Identifiable, Hashable {
     /// Traço de tinta serializado (PKDrawing.dataRepresentation()) — só
     /// usado quando kind == .freeform.
     var drawingData: Data? = nil
+
+    /// Optional pelo mesmo motivo de sempre — folha criada antes desta
+    /// versão não tem essa chave; ausência é tratada como `.plain` na hora
+    /// de exibir (ver `NotebookPageView.style`), igual a como toda folha
+    /// já era antes deste pedido existir. Cada folha guarda a PRÓPRIA
+    /// escolha (pode trocar depois de criada, ver `NotebookBeadRow`'s
+    /// picker no cabeçalho); só a folha NOVA nasce com o padrão configurado
+    /// em Settings (`CharacterLibrary.defaultNotebookPaperStyle`, item 3).
+    var paperStyle: NotebookPaperStyle? = nil
 }
 
 /// Uma campanha de mesa: dura meses ou anos, agrupa as sessões jogadas e o
@@ -856,11 +885,15 @@ struct Campaign: Codable, Identifiable, Hashable {
     }
 
     /// Cria uma folha nova no fim do caderno (mais recente) e devolve o id
-    /// dela, pronto pra virar o `currentID` do pager.
+    /// dela, pronto pra virar o `currentID` do pager. `paperStyle` nasce da
+    /// preferência padrão configurada em Settings (item 3 do pedido de
+    /// 2026-09-24) — parâmetro com default `.plain` só pra não quebrar
+    /// nenhuma chamada antiga que não passe esse argumento.
     @discardableResult
-    mutating func addNotebookPage(kind: NotebookPageKind) -> UUID {
+    mutating func addNotebookPage(kind: NotebookPageKind, paperStyle: NotebookPaperStyle = .plain) -> UUID {
         var entry = NotebookEntry()
         entry.kind = kind
+        entry.paperStyle = paperStyle
         notebookEntries.append(entry)
         return entry.id
     }
@@ -1143,6 +1176,26 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     func hasPendingAbilityChange(_ keyPath: KeyPath<AbilityScores, Int>) -> Bool {
         guard let lastAppliedAbilities else { return false }
         return lastAppliedAbilities[keyPath: keyPath] != abilities[keyPath: keyPath]
+    }
+
+    /// Versão ESCOPADA de `hasPendingConsequences`, pros realces que ficam
+    /// em cima de uma seção específica (`PendingConsequenceHighlight` em
+    /// "Saving Throws" e "THAC0" — item 1 do pedido do usuário, 2026-09-24:
+    /// mudar WIS não deveria acender o realce do THAC0, já que WIS não
+    /// afeta o THAC0). `hasPendingConsequences` (acima) continua global de
+    /// propósito — é o que liga o sinal único do cabeçalho
+    /// (`ConsequenceSignalBadge`), que precisa acender pra QUALQUER
+    /// mudança pendente, não só pras rastreadas por chave.
+    ///
+    /// Só reaproveita `ConsequenceEngine.diff` (a mesma conta que
+    /// `ConsequencePreviewSheet` já faz) e filtra pelas `keys` da regra —
+    /// ex. `["thac0"]` pro campo de THAC0, `["savingThrows"]` pra Saving
+    /// Throws. `false` sem `lastAppliedRuleContext` (ficha ainda sem
+    /// snapshot inicial), igual ao comportamento de `hasPendingConsequences`.
+    func hasPendingConsequence(forKeys keys: Set<String>, registry: RulesetRegistry) -> Bool {
+        guard let old = lastAppliedRuleContext else { return false }
+        let items = ConsequenceEngine.diff(old: old, new: currentRuleContext, registry: registry)
+        return items.contains { keys.contains($0.id) }
     }
 
     /// Qual campo deve mostrar o sinal de consequência agora — só UM de

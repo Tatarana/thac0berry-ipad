@@ -33,6 +33,19 @@ final class KitDatabase: ObservableObject {
         kits.first { $0.id == id }
     }
 
+    /// Acha o kit pelo NOME — `character.kit` só guarda `kit.name` (texto
+    /// livre, ver `KitField`/`KitPickerSheet`), sem `id` nenhum salvo na
+    /// ficha. Usado por `addBonusProficiencies(forKit:)` (item 5 do
+    /// pedido do usuário, 2026-09-24) pra achar `mechanics.proficiencies.bonus`
+    /// a partir do texto do campo "Kit" do cabeçalho. `nil` pra texto
+    /// digitado à mão que não bate com kit nenhum da base — nesse caso
+    /// não tem proficiência bônus pra adicionar mesmo.
+    func kit(named name: String) -> Kit? {
+        let normalized = Fuzzy.normalize(name)
+        guard !normalized.isEmpty else { return nil }
+        return kits.first { Fuzzy.normalize($0.name) == normalized }
+    }
+
     /// Kits elegíveis pra uma classe (como o valor aparece em
     /// `classEligibility.allowedClasses` — "Cleric", "Druid" etc.),
     /// alfabético. Sem filtro (`nil`/vazio) devolve a base inteira.

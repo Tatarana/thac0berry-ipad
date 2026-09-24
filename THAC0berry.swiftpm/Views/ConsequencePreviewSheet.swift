@@ -1,38 +1,36 @@
 import SwiftUI
 
-/// Sinal perto do campo de Nível/Atributo — acende quando
+/// Sinal de consequência pendente — acende quando
 /// `character.hasPendingConsequences` é `true` (nível ou atributo mudou
 /// desde a última revisão, ver `PlayerCharacter.markConsequencesReviewed`).
 /// Tocar abre `ConsequencePreviewSheet`; não abre sozinho, de propósito —
 /// o jogador pode mudar Força e Constituição em sequência antes de querer
 /// ver a consequência de cada uma.
 ///
-/// Trocado de um "•" de 22pt (o usuário relatou ser difícil de acertar)
-/// por um ícone flutuante de verdade: `icon_consequence_signal.png`
-/// (escudo com flecha flamejante, arte ilustrada entregue pela LLM de
-/// imagem — mesmo padrão de `Docs/icon-button-spec.md` dos outros ícones
-/// do app) dentro do mesmo círculo com gradiente/sombra de antes; sem a
-/// arte no bundle (por algum motivo), cai pro símbolo antigo
-/// ("wand.and.stars") em vez de não mostrar nada. O gradiente trocou de
-/// laranja/vermelho (herdado de quando o ícone era só o símbolo genérico)
-/// pro `Ember.mintGlow`/`.mintDeep` — verde-claro, pra combinar com a
-/// chama turquesa do escudo em vez de brigar com ela. Entrada com bounce
-/// pra chamar a atenção só no instante em que aparece — sem repetir a
+/// Ícone flutuante de verdade: `icon_consequence_signal.png` (escudo com
+/// flecha flamejante, arte ilustrada entregue pela LLM de imagem — mesmo
+/// padrão de `Docs/icon-button-spec.md` dos outros ícones do app) dentro
+/// de um círculo com gradiente/sombra; sem a arte no bundle (por algum
+/// motivo), cai pro símbolo antigo ("wand.and.stars") em vez de não
+/// mostrar nada. Gradiente `Ember.mintGlow`/`.mintDeep` — verde-claro,
+/// pra combinar com a chama turquesa do escudo. Entrada com bounce pra
+/// chamar a atenção só no instante em que aparece — sem repetir a
 /// animação enquanto o sinal continuar aceso.
 ///
-/// Antes este badge só existia uma vez (grudado no campo Level) e lia
-/// `character.hasPendingConsequences` (nível OU atributo mudou) direto.
-/// Usuário pediu duas coisas — dobrar de novo o tamanho (34→68pt o
-/// círculo, 26→52pt o ícone: "aumente mais o ícone, dobre o tamanho")
-/// e fazer o sinal aparecer "sempre ao lado de onde houve a mudança:
-/// nível, atributo etc." — ou seja, um badge por campo, aceso só quando
-/// AQUELE campo específico mudou. Por isso virou parametrizado: quem
-/// chama decide `isActive` (lendo `hasPendingLevelChange` ou
-/// `hasPendingAbilityChange(_:)`, ver `Models/Character.swift`) e o
-/// `diameter` (68pt no Level, que tem espaço de sobra no cabeçalho; menor
-/// nas linhas de atributo, que são compactas — `AbilityRowForm` empilha
-/// sem espaçamento entre linhas). O ícone interno escala com o círculo
-/// (proporção ~0.76, igual à versão fixa 26/34 de antes) e a área de
+/// Histórico de posição/tamanho (por ordem): começou como um "•" de 22pt
+/// grudado no campo Level (difícil de acertar o toque); virou este ícone
+/// de 34pt; depois virou parametrizado — um badge por campo (`isActive`
+/// lendo `hasPendingLevelChange`/`hasPendingAbilityChange(_:)`), 68pt,
+/// pipocando ao lado do Level OU de uma das seis linhas de Ability
+/// Scores, dependendo de qual campo mudou por último. Usuário achou esse
+/// vai-e-vem ruim ("tá aparecendo em pontos diversos") e pediu um lugar
+/// FIXO: agora só existe uma chamada deste componente na ficha inteira,
+/// em `RecordHeaderForm.body` — substitui o dragão (`record_badge.png`)
+/// no mesmo lugar e tamanho (92pt) quando `hasPendingConsequences` é
+/// `true`, volta a mostrar o dragão quando `false`. `isActive`/`diameter`
+/// continuam parâmetros abertos (não hardcoded pro caso de precisar de
+/// outro tamanho/gatilho no futuro), só que hoje só um call site existe.
+/// O ícone interno escala com o círculo (proporção ~0.76) e a área de
 /// toque nunca fica menor que 44×44pt (mínimo recomendado pela Apple),
 /// mesmo em diâmetros pequenos.
 struct ConsequenceSignalBadge: View {

@@ -912,6 +912,11 @@ private final class RecordSheetPageController: UIHostingController<AnyView> {
 private struct RecordSheetPageTwo: View {
     @Binding var character: PlayerCharacter
 
+    // Item 10 do pedido do usuário (2026-09-24): "Magic Items (armadura
+    // mágica) não muda o AC" — precisa da base pra ler `defenseBonus.
+    // acBonus` de um item recém-ligado na lista "Magic Items" logo abaixo.
+    @EnvironmentObject private var magicItemDatabase: MagicItemDatabase
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ArmorBlock(character: $character)
@@ -952,7 +957,17 @@ private struct RecordSheetPageTwo: View {
         // itens e os "Magic Items" numa forma mais simples (só texto). Essa
         // migração roda uma vez só (checa se o destino novo ainda está
         // vazio) pra ninguém perder o que já tinha escrito lá.
-        .onAppear { migrateFromOldEquipmentTab() }
+        .onAppear {
+            migrateFromOldEquipmentTab()
+        }
+        // Item 10: um item de Magic Items sendo ligado/trocado/removido
+        // (matchedItemID mudando) pode mudar o `acBonus` que entra na
+        // conta do AC — ver `ConsequenceEngine.recalculateArmorClass`.
+        // Dispara em QUALQUER mudança na lista (inclusive quantidade), mas
+        // a função só escreve quando o total realmente muda.
+        .onChange(of: character.page2MagicItems) { _, _ in
+            ConsequenceEngine.recalculateArmorClass(for: &character, magicItemDatabase: magicItemDatabase)
+        }
     }
 
     private func migrateFromOldEquipmentTab() {
@@ -1305,6 +1320,13 @@ private struct MovementForm: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(spacing: 0) {
                     CombatLine(label: "Base", value: rates.base)
+                        // Item 8 do pedido do usuário (2026-09-24):
+                        // `RaceOption.apply(to:)` já preenche "Base"
+                        // sozinho ao escolher a raça e já marca
+                        // `markRecentAutoChange("page2MovementBase")` —
+                        // só faltava este `.changeFlash` do lado da view
+                        // pra consumir o aviso.
+                        .changeFlash(character: $character, key: "page2MovementBase")
                     CombatLine(label: "Jog (x2)", value: rates.jog)
                     CombatLine(label: "Run (x3)", value: rates.runX3)
                     CombatLine(label: "Run (x4)", value: rates.runX4)
@@ -1479,15 +1501,25 @@ private struct ExperienceForm: View {
 private struct LevelChangeRowView: View {
     let title: String
     @Binding var row: LevelChangeRow
+    /// Item 9 do pedido do usuário (2026-09-24): botão "?" pra consultar
+    /// a tabela cheia do livro (Table 53/60) sem sair da ficha — `nil`
+    /// nas linhas de Proficiências, que não têm regra embutida pra
+    /// apontar. Ver `ConsequenceEngine.levelChangeRuleIDs`.
+    var ruleID: String? = nil
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(title)
-                .font(Paper.printed(11))
-                .foregroundStyle(Paper.ink)
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
-                .frame(width: 108, alignment: .leading)
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(Paper.printed(11))
+                    .foregroundStyle(Paper.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                if let ruleID {
+                    RuleLinkButton(ruleID: ruleID)
+                }
+            }
+            .frame(width: 108, alignment: .leading)
             EditableText(value: $row.by, placeholder: "—", size: 13, underline: false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -1518,8 +1550,17 @@ private struct LevelChangesForm: View {
             }
             .foregroundStyle(Paper.inkSoft)
 
-            LevelChangeRowView(title: "THAC0", row: table.thac0)
-            LevelChangeRowView(title: "Saving Throws", row: table.savingThrows)
+            // Item 9 do pedido do usuário (2026-09-24): estas duas linhas
+            // são preenchidas sozinhas por `ConsequenceEngine.refreshLevelChanges`
+            // (Tables 53/60 do PHB) — o `.changeFlash` avisa quando isso
+            // acontece, e o "?" ao lado do título abre a tabela cheia do
+            // livro pra consulta. Proficiências continuam manuais (ver
+            // doc de `refreshLevelChanges` pro porquê), então não piscam
+            // nem têm "?".
+            LevelChangeRowView(title: "THAC0", row: table.thac0, ruleID: ConsequenceEngine.levelChangeRuleIDs["thac0"])
+                .changeFlash(character: $character, key: "levelChanges")
+            LevelChangeRowView(title: "Saving Throws", row: table.savingThrows, ruleID: ConsequenceEngine.levelChangeRuleIDs["savingThrows"])
+                .changeFlash(character: $character, key: "levelChanges")
             LevelChangeRowView(title: "Weapon Proficiencies", row: table.weaponProficiencies)
             LevelChangeRowView(title: "Non-weapon Proficiencies", row: table.nonWeaponProficiencies)
         }
@@ -1684,6 +1725,18 @@ private struct RecordHeaderForm: View {
     /// `Store/EmbeddedDeities_Part*.swift`). Some sozinho quando não bate
     /// com nada — nunca mostra um link quebrado.
     @EnvironmentObject private var deityDatabase: DeityDatabase
+    /// Item 9 do pedido do usuário (2026-09-24): "Level Changes ajustado
+    /// automaticamente por classe/raça" — precisa do `RulesetRegistry`
+    /// pra reaproveitar a mesma tabela (`ConsequenceEngine.refreshLevelChanges`)
+    /// que já calcula THAC0/Saving Throws de verdade, em vez de duplicar
+    /// os números.
+    @EnvironmentObject private var ruleset: RulesetRegistry
+    /// Item 5 do pedido do usuário (2026-09-24): "Kit que concede
+    /// Proficiência deveria adicioná-la automaticamente na ficha" — ver
+    /// `.onChange(of: character.kit)`/`addBonusProficiencies(forKit:)`
+    /// mais abaixo.
+    @EnvironmentObject private var kitDatabase: KitDatabase
+    @EnvironmentObject private var proficiencyDatabase: ProficiencyDatabase
     /// Fase 6 do plano: subir de nível ganha uma rajada de brasa em cima do
     /// campo — só quando o número SOBE (editar pra baixo, corrigindo um
     /// erro de digitação, não é level up).
@@ -1732,18 +1785,13 @@ private struct RecordHeaderForm: View {
                     }
                     .frame(width: 80)
                     .emberBurst(trigger: isLevelingUp, particleCount: 18)
-                    .overlay(alignment: .topTrailing) {
-                        // Só UM sinal por vez em toda a ficha, no campo
-                        // que foi editado por último (`effectiveChangedField`,
-                        // ver `Models/Character.swift`) — não mais um por
-                        // campo mudado simultaneamente (usuário achou
-                        // "replicando a cada ajuste" pior que útil).
-                        // Diâmetro igual ao das linhas de Ability Scores
-                        // agora (68pt) — antes só o do Level tinha esse
-                        // tamanho e os outros ficavam pequenos ao lado.
-                        ConsequenceSignalBadge(character: $character, isActive: character.effectiveChangedField == "level", diameter: 68)
-                            .offset(x: 22, y: -22)
-                    }
+                    // O sinal de consequência pendente não aparece mais
+                    // aqui — usuário achou ruim ele pipocar em pontos
+                    // diferentes da ficha (Level, ou uma das seis linhas
+                    // de Ability Scores lá embaixo, dependendo de qual
+                    // campo mudou por último). Agora é um lugar só: em
+                    // cima do dragão no canto superior direito, ver
+                    // `RecordHeaderForm.body` mais abaixo.
                 }
                 // Nenhum controle nesta linha é campo de escrita (Classe é
                 // Menu, Kit abre uma sheet de escolha, Nível abre um
@@ -1834,7 +1882,20 @@ private struct RecordHeaderForm: View {
                 // direita) e com saturação/contraste reduzidos — as cores
                 // originais eram vivas demais perto do pergaminho pastel do
                 // resto da ficha.
-                if let recordBadge {
+                //
+                // Quando há consequência pendente (nível ou algum atributo
+                // mudou desde a última revisão — `hasPendingConsequences`),
+                // o dragão dá lugar ao `ConsequenceSignalBadge`, no mesmo
+                // tamanho (92pt) e no mesmo lugar — era pra aparecer em
+                // pontos diferentes da ficha (perto do Level, ou de uma das
+                // seis linhas de Ability Scores), usuário achou ruim e
+                // pediu um ponto único, fixo, "como se substituindo" o
+                // dragão. Único sinal da ficha inteira agora.
+                if character.hasPendingConsequences {
+                    ConsequenceSignalBadge(character: $character, isActive: true, diameter: 92)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 8)
+                } else if let recordBadge {
                     recordBadge
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -1861,11 +1922,25 @@ private struct RecordHeaderForm: View {
             // `ExperienceForm`, página 2) — ver o comentário de
             // `PlayerCharacter.refreshXPNeededNextLevel()` pro porquê.
             character.refreshXPNeededNextLevel()
+            // Item 9 do pedido do usuário (2026-09-24): "Level Changes
+            // ajustado automaticamente por classe/raça" — só preenche
+            // linha vazia (ver doc de `refreshLevelChanges`), então é
+            // seguro chamar em toda edição de nível, sem risco de
+            // sobrescrever algo que o jogador tenha digitado à mão.
+            ConsequenceEngine.refreshLevelChanges(for: &character, registry: ruleset)
             guard newLevel > oldLevel else { return }
             isLevelingUp = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                 isLevelingUp = false
             }
+        }
+        .onChange(of: character.kit) { _, newKit in
+            // Item 5 do pedido do usuário (2026-09-24): "Kit que concede
+            // Proficiência deveria adicioná-la automaticamente na
+            // ficha" — dispara ao escolher/trocar o Kit no cabeçalho
+            // (`KitField`) ou ao digitar um nome que bata com um kit da
+            // base.
+            addBonusProficiencies(forKit: newKit)
         }
         .onAppear {
             // Só preenche o snapshot de consequências na primeira vez —
@@ -1873,10 +1948,81 @@ private struct RecordHeaderForm: View {
             // Seguro chamar toda vez que a ficha aparece: depois da
             // primeira vez, não faz nada.
             character.ensureConsequenceSnapshotInitialized()
+            // Rede de segurança pra fichas que já existiam com classe/
+            // nível escolhidos e "Level Changes" vazio — mesma ideia do
+            // `refreshHitDiceType()` acima: só preenche o que estiver
+            // vazio, nunca sobrescreve.
+            ConsequenceEngine.refreshLevelChanges(for: &character, registry: ruleset)
         }
         .sheet(isPresented: $isSphereAccessPresented) {
             SphereAccessEditorSheet(character: $character)
         }
+    }
+
+    /// Item 5 do pedido do usuário (2026-09-24): "Kit que concede
+    /// Proficiência deveria adicioná-la automaticamente na ficha" — só
+    /// cobre `kit.mechanics.proficiencies.bonus` (`KitProficiencyRules.bonus`,
+    /// `Models/Kit.swift`), a lista de proficiências não-de-arma que o
+    /// kit CONCEDE de graça — distinta de `recommended` (só sugestão, o
+    /// jogador ainda escolhe essas à mão no seletor). `kitName` vem de
+    /// `character.kit`, texto livre; `KitDatabase.kit(named:)` casa por
+    /// nome (`Fuzzy.normalize`) — kit não encontrado (texto digitado à
+    /// mão, ou vazio) simplesmente não adiciona nada. Nunca REMOVE
+    /// proficiência nenhuma ao trocar de kit, e nunca duplica: confere
+    /// por `matchedProficiencyID` (ou nome normalizado, pra entradas
+    /// antigas sem esse campo) antes de adicionar.
+    ///
+    /// Pedido do usuário (2026-09-24): a ficha já nasce com 6 linhas em
+    /// branco pro jogador preencher (`ProficienciesForm.onAppear`) —
+    /// sem esse cuidado, escolher um Kit que concede proficiência criava
+    /// uma linha NOVA além das 6 em branco, em vez de ocupar uma delas.
+    /// Por isso reaproveita a primeira linha vazia (sem nome e sem
+    /// proficiência já casada) que encontrar, e só cria uma linha nova
+    /// quando não sobra nenhuma vazia.
+    private func addBonusProficiencies(forKit kitName: String?) {
+        guard let kitName, let kit = kitDatabase.kit(named: kitName) else { return }
+        let bonusNames = kit.mechanics.proficiencies.bonus
+        guard !bonusNames.isEmpty else { return }
+
+        var entries = character.proficiencies ?? []
+        var existingKeys: Set<String> = Set(entries.compactMap { entry -> String? in
+            if let id = entry.matchedProficiencyID { return id }
+            let normalized = Fuzzy.normalize(entry.name)
+            return normalized.isEmpty ? nil : normalized
+        })
+
+        var added = false
+        for bonusName in bonusNames {
+            let matched = proficiencyDatabase.proficiencies.first {
+                Fuzzy.normalize($0.name) == Fuzzy.normalize(bonusName)
+            }
+            let key = matched?.id ?? Fuzzy.normalize(bonusName)
+            guard !key.isEmpty, !existingKeys.contains(key) else { continue }
+
+            let newEntry = ProficiencyEntry(name: matched?.name ?? bonusName, slots: 1, matchedProficiencyID: matched?.id)
+            // Pedido do usuário (2026-09-24): a ficha já nasce com 6
+            // linhas em branco pro jogador preencher (`ProficienciesForm.onAppear`)
+            // — em vez de criar uma linha NOVA e deixar as 6 em branco
+            // sobrando do lado, primeiro procura uma linha vazia (sem
+            // nome nem proficiência já casada) e reaproveita ela.
+            if let blankIndex = entries.firstIndex(where: { $0.name.trimmingCharacters(in: .whitespaces).isEmpty && $0.matchedProficiencyID == nil }) {
+                // Preserva `id`/`checked`/`target` da linha em branco
+                // (jogador pode ter anotado um alvo de rolagem numa
+                // linha ainda sem nome) — só o nome/slots/id casado vêm
+                // da proficiência bônus do kit.
+                entries[blankIndex].name = newEntry.name
+                entries[blankIndex].slots = newEntry.slots
+                entries[blankIndex].matchedProficiencyID = newEntry.matchedProficiencyID
+            } else {
+                entries.append(newEntry)
+            }
+            existingKeys.insert(key)
+            added = true
+        }
+
+        guard added else { return }
+        character.proficiencies = entries
+        character.markRecentAutoChange("proficiencies")
     }
 
     /// Carregado do bundle igual ao `main_badge` da tela de personagens —
@@ -1913,6 +2059,9 @@ private struct HeaderLine<Content: View>: View {
 private struct ClassPicker: View {
     @Binding var character: PlayerCharacter
     var campaignBinding: Binding<Campaign>? = nil
+    /// Item 9 do pedido do usuário (2026-09-24): trocar de classe também
+    /// resincroniza "Level Changes" — ver `select(_:)` abaixo.
+    @EnvironmentObject private var ruleset: RulesetRegistry
 
     var body: some View {
         Menu {
@@ -1936,6 +2085,10 @@ private struct ClassPicker: View {
         // classe atual (força mesmo se já tiver algo escrito) — ver
         // `PlayerCharacter.refreshHitDiceType()`.
         character.refreshHitDiceType(force: true)
+        // Item 9 do pedido do usuário (2026-09-24): "Level Changes"
+        // resincroniza com `force: true` — a tabela THAC0/Saves da
+        // classe anterior não serve mais pra classe nova.
+        ConsequenceEngine.refreshLevelChanges(for: &character, registry: ruleset, force: true)
         guard option.hasSpellSheet, character.spellSheets.isEmpty, let campaignBinding else { return }
         let session = campaignBinding.wrappedValue.activeSession()
         var sheet = SpellSheet()
@@ -1994,8 +2147,11 @@ private struct AbilityRowForm: View {
     let name: String
     @Binding var character: PlayerCharacter
     @Binding var score: Int
-    let cells: [(String, Binding<String>)]
-    var isPendingChange: Bool = false
+    /// Terceiro elemento (opcional): chave em
+    /// `PlayerCharacter.recentAutoChanges` pra ESTA célula específica (ex.
+    /// "strengthHit", "constitutionHP", ...) — ver `flashKey` abaixo pro
+    /// mesmo esquema aplicado ao score em si.
+    let cells: [(String, Binding<String>, String?)]
     /// Chave em `PlayerCharacter.recentAutoChanges` pra este atributo
     /// ("strength", "dexterity", ...) — usada pelo `ChangeFlash` quando o
     /// seletor de Raça (ou outra automação futura) muda este valor
@@ -2014,19 +2170,21 @@ private struct AbilityRowForm: View {
             FormNumberCell(value: $score, lower: 1, upper: 25)
                 .frame(width: 52)
                 .modifier(OptionalChangeFlash(character: $character, key: flashKey))
-                // Mesmo diâmetro do sinal do Level (68pt) — usuário
-                // reclamou que ficava "maior só perto do nível" e
-                // "pequeno" do lado dos atributos; agora só UM sinal
-                // aparece de cada vez em toda a ficha (`isPendingChange`
-                // já vem calculado como "sou eu o `effectiveChangedField`
-                // agora?"), então não tem mais risco de vários círculos
-                // grandes empilhados na tabela ao mesmo tempo.
-                .overlay(alignment: .topTrailing) {
-                    ConsequenceSignalBadge(character: $character, isActive: isPendingChange, diameter: 68)
-                        .offset(x: 20, y: -20)
-                }
+                // O sinal de consequência pendente não aparece mais aqui —
+                // virou um lugar só na ficha inteira, em cima do dragão no
+                // cabeçalho (ver `RecordHeaderForm.body`).
             ForEach(cells.indices, id: \.self) { index in
                 FormCell(label: cells[index].0, value: cells[index].1)
+                    // Item 2 do pedido do usuário (2026-09-24): "aumentar
+                    // atributos que impactam os ability scores não fazem
+                    // eles piscarem em verde, apesar de corretamente
+                    // ajustá-los" — subir um atributo e aplicar as
+                    // consequências automáticas (`ConsequencePreviewSheet`,
+                    // "Apply automatic changes") já escrevia certinho nestas
+                    // células (Hit Adj, Dmg Adj, HP Adj etc. — ver
+                    // `ConsequenceEngine.trackedRules`), mas nada marcava
+                    // `recentAutoChange` pra elas, então nunca piscavam.
+                    .modifier(OptionalChangeFlash(character: $character, key: cells[index].2))
             }
         }
     }
@@ -2040,43 +2198,43 @@ private struct AbilityScoresForm: View {
             FormSectionTitle(text: "Ability Scores")
             VStack(spacing: 0) {
                 AbilityRowForm(name: "STR", character: $character, score: $character.abilities.strength, cells: [
-                    ("Hit\nAdj", $character.details.strengthHit),
-                    ("Dmg\nAdj", $character.details.strengthDamage),
-                    ("Weight\nAllow", $character.details.strengthWeight),
-                    ("Max\nPress", $character.details.strengthMaxPress),
-                    ("Open\nDoors", $character.details.strengthDoors),
-                    ("Bend\nBars", $character.details.strengthBars)
-                ], isPendingChange: character.effectiveChangedField == "strength", flashKey: "strength")
+                    ("Hit\nAdj", $character.details.strengthHit, "strengthHit"),
+                    ("Dmg\nAdj", $character.details.strengthDamage, "strengthDamage"),
+                    ("Weight\nAllow", $character.details.strengthWeight, "strengthWeight"),
+                    ("Max\nPress", $character.details.strengthMaxPress, "strengthMaxPress"),
+                    ("Open\nDoors", $character.details.strengthDoors, "strengthDoors"),
+                    ("Bend\nBars", $character.details.strengthBars, "strengthBars")
+                ], flashKey: "strength")
                 AbilityRowForm(name: "DEX", character: $character, score: $character.abilities.dexterity, cells: [
-                    ("Surprise\nAdjustment", $character.details.dexterityReaction),
-                    ("Missile Att\nAdjustment", $character.details.dexterityMissile),
-                    ("Defensive\nAdjustment", $character.details.dexterityDefense)
-                ], isPendingChange: character.effectiveChangedField == "dexterity", flashKey: "dexterity")
+                    ("Surprise\nAdjustment", $character.details.dexterityReaction, "dexterityReaction"),
+                    ("Missile Att\nAdjustment", $character.details.dexterityMissile, "dexterityMissile"),
+                    ("Defensive\nAdjustment", $character.details.dexterityDefense, "dexterityDefense")
+                ], flashKey: "dexterity")
                 AbilityRowForm(name: "CON", character: $character, score: $character.abilities.constitution, cells: [
-                    ("HP\nAdj", $character.details.constitutionHP),
-                    ("System\nShock", $character.details.constitutionShock),
-                    ("Resurrect\nSurvival", $character.details.constitutionResurrection),
-                    ("Poison\nSave", $character.details.constitutionPoison),
-                    ("Regen", $character.details.constitutionRegen.orDefault(""))
-                ], isPendingChange: character.effectiveChangedField == "constitution", flashKey: "constitution")
+                    ("HP\nAdj", $character.details.constitutionHP, "constitutionHP"),
+                    ("System\nShock", $character.details.constitutionShock, "constitutionShock"),
+                    ("Resurrect\nSurvival", $character.details.constitutionResurrection, "constitutionResurrection"),
+                    ("Poison\nSave", $character.details.constitutionPoison, "constitutionPoison"),
+                    ("Regen", $character.details.constitutionRegen.orDefault(""), nil)
+                ], flashKey: "constitution")
                 AbilityRowForm(name: "INT", character: $character, score: $character.abilities.intelligence, cells: [
-                    ("Languages", $character.details.intelligenceLanguages),
-                    ("Spell\nLevel", $character.details.intelligenceMaxLevel),
-                    ("Learn\nSpell", $character.details.intelligenceLearn),
-                    ("Max/\nLevel", $character.details.intelligenceMaxPerLevel),
-                    ("Spell\nImmun", $character.details.intelligenceSpellImmunity.orDefault(""))
-                ], isPendingChange: character.effectiveChangedField == "intelligence", flashKey: "intelligence")
+                    ("Languages", $character.details.intelligenceLanguages, "intelligenceLanguages"),
+                    ("Spell\nLevel", $character.details.intelligenceMaxLevel, "intelligenceMaxLevel"),
+                    ("Learn\nSpell", $character.details.intelligenceLearn, "intelligenceLearn"),
+                    ("Max/\nLevel", $character.details.intelligenceMaxPerLevel, "intelligenceMaxPerLevel"),
+                    ("Spell\nImmun", $character.details.intelligenceSpellImmunity.orDefault(""), nil)
+                ], flashKey: "intelligence")
                 AbilityRowForm(name: "WIS", character: $character, score: $character.abilities.wisdom, cells: [
-                    ("Magical\nDef Adj", $character.details.wisdomDefense),
-                    ("Bonus\nSpells", $character.details.wisdomBonusSpells),
-                    ("Spell\nFailure", $character.details.wisdomFailure),
-                    ("Spell\nImmun", $character.details.wisdomSpellImmunity.orDefault(""))
-                ], isPendingChange: character.effectiveChangedField == "wisdom", flashKey: "wisdom")
+                    ("Magical\nDef Adj", $character.details.wisdomDefense, "wisdomDefense"),
+                    ("Bonus\nSpells", $character.details.wisdomBonusSpells, "wisdomBonusSpells"),
+                    ("Spell\nFailure", $character.details.wisdomFailure, "wisdomFailure"),
+                    ("Spell\nImmun", $character.details.wisdomSpellImmunity.orDefault(""), nil)
+                ], flashKey: "wisdom")
                 AbilityRowForm(name: "CHA", character: $character, score: $character.abilities.charisma, cells: [
-                    ("Max # of\nHenchmen", $character.details.charismaHenchmen),
-                    ("Loyalty\nBase", $character.details.charismaLoyalty),
-                    ("Reaction\nAdjustment", $character.details.charismaReaction)
-                ], isPendingChange: character.effectiveChangedField == "charisma", flashKey: "charisma")
+                    ("Max # of\nHenchmen", $character.details.charismaHenchmen, "charismaHenchmen"),
+                    ("Loyalty\nBase", $character.details.charismaLoyalty, "charismaLoyalty"),
+                    ("Reaction\nAdjustment", $character.details.charismaReaction, "charismaReaction")
+                ], flashKey: "charisma")
             }
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
         }
@@ -2113,6 +2271,7 @@ private struct AbilityScoresForm: View {
 // dessincronizado dos outros dois.
 private struct SavingThrowsForm: View {
     @Binding var character: PlayerCharacter
+    @EnvironmentObject private var ruleset: RulesetRegistry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -2126,8 +2285,16 @@ private struct SavingThrowsForm: View {
             // pequeno... tá errado") por `PendingConsequenceHighlight`,
             // que tinge o próprio título de verde em vez de um ícone do
             // lado.
+            //
+            // Item 1 do pedido do usuário (2026-09-24): usava
+            // `character.hasPendingConsequences` (o sinal GLOBAL — liga com
+            // QUALQUER atributo pendente de revisão) em vez de checar se
+            // Saving Throws especificamente mudaria — subir WIS, que não
+            // entra na tabela de resistência, ainda assim acendia este
+            // realce. Troca pra `hasPendingConsequence(forKeys:)`, escopada
+            // só na regra "savingThrows" (ver `ConsequenceEngine.trackedRules`).
             FormSectionTitle(text: "Saving Throws", ruleID: "phb_ch09_the_saving_throw")
-                .pendingConsequenceHighlight(isActive: character.hasPendingConsequences)
+                .pendingConsequenceHighlight(isActive: character.hasPendingConsequence(forKeys: ["savingThrows"], registry: ruleset))
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     Text("").frame(maxWidth: .infinity, alignment: .leading)
@@ -2263,6 +2430,11 @@ private struct CombatForm: View {
             // já cabe na largura da tela.
             HStack(alignment: .top, spacing: 6) {
                     ArmorClassShield(armorClass: $character.armorClass)
+                        // Itens 7/10: pisca quando o AC muda sozinho por
+                        // causa de Armor/Shield/Magic Items — mesmo
+                        // vocabulário de `markRecentAutoChange("armorClass")`
+                        // em `ConsequenceEngine.recalculateArmorClass`.
+                        .changeFlash(character: $character, key: "armorClass")
 
                     VStack(spacing: 0) {
                         CombatLine(label: "Surprised AC", value: combat.surprisedAC.orDefault(""))
@@ -2321,6 +2493,13 @@ private struct CombatForm: View {
                                              size: 13, underline: false)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     .contentShape(Rectangle())
+                                    // Item 3 do pedido do usuário (2026-09-24):
+                                    // trocar de classe já ajustava o Hit Dice
+                                    // certinho (`PlayerCharacter.refreshHitDiceType`
+                                    // já chama `markRecentAutoChange("hitDiceType")`),
+                                    // só faltava este `.changeFlash` pra consumir o
+                                    // aviso e realmente piscar em verde.
+                                    .changeFlash(character: $character, key: "hitDiceType")
                             }
                             // Mesma largura da caixa de Hit Points logo
                             // acima, alinhado com ela, e bem colado —
@@ -2482,6 +2661,7 @@ private struct WoundsBlock: View {
 /// alguém correndo o dedo pela linha impressa.
 private struct Thac0TargetForm: View {
     @Binding var character: PlayerCharacter
+    @EnvironmentObject private var ruleset: RulesetRegistry
     private let cellWidth: CGFloat = 34
 
     var body: some View {
@@ -2494,10 +2674,16 @@ private struct Thac0TargetForm: View {
                 // (TODO.md item 41, usuário: "os campos alterados
                 // [deveriam ficar] em verde") por um realce direto no
                 // próprio campo do THAC0 base.
+                //
+                // Item 1 do pedido do usuário (2026-09-24): mudar WIS (ou
+                // qualquer atributo, mesmo os que não afetam THAC0) acendia
+                // este realce, porque usava `hasPendingConsequences` global.
+                // Escopado pra regra "thac0" — só acende quando o THAC0
+                // resolvido de verdade mudaria (ver `ConsequenceEngine`).
                 EditableNumber(value: $character.thac0, size: 17, lower: -10, upper: 25)
                     .frame(width: 40, height: 30)
                     .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
-                    .pendingConsequenceHighlight(isActive: character.hasPendingConsequences)
+                    .pendingConsequenceHighlight(isActive: character.hasPendingConsequence(forKeys: ["thac0"], registry: ruleset))
                 Text("(base — the table below fills itself in)")
                     .font(Paper.printedItalic(13))
                     .foregroundStyle(Paper.inkSoft)
@@ -2973,6 +3159,10 @@ private struct ProficienciesForm: View {
                 ProficiencyColumn(items: items, column: 2, abilities: character.abilities, campaign: campaign,
                                    characterClass: character.characterClass)
             }
+            // Item 5 do pedido do usuário (2026-09-24): avisa quando
+            // `RecordHeaderForm.addBonusProficiencies(forKit:)` acrescenta
+            // uma proficiência sozinho ao escolher/trocar de Kit.
+            .changeFlash(character: $character, key: "proficiencies")
             AddLineButton(title: "add proficiency") {
                 items.wrappedValue.append(ProficiencyEntry())
             }
@@ -2993,19 +3183,24 @@ private struct ProficienciesForm: View {
 
 private struct ArmorBlock: View {
     @Binding var character: PlayerCharacter
-
-    // Só o campo "Armor" abre o seletor (ver `ArmorPickerSheet` — só lista
-    // `kind == .armor`, porque elmo/escudo não têm AC isolado na tabela do
-    // PHB pra sugerir aqui, ver `ArmorPiece`). "Shield" continua texto
-    // livre como sempre foi, sem dado da base pra sugerir ainda.
     @State private var showArmorPicker = false
+    // Item 7 do pedido do usuário (2026-09-24): o seletor de armadura
+    // ("Armor") já existia, mas "Shield" ficava só como texto livre — sem
+    // seletor nenhum, e sem AC pra sugerir (ver `ArmorPickerSheet`).
+    @State private var showShieldPicker = false
+
+    // Precisa da base de Magic Items aqui (não só em `RecordSheetPageTwo`)
+    // porque tanto mudar a Armor/Shield escolhida QUANTO mudar a lista de
+    // Magic Items pode afetar o AC final — ver
+    // `ConsequenceEngine.recalculateArmorClass`.
+    @EnvironmentObject private var magicItemDatabase: MagicItemDatabase
 
     var body: some View {
         SheetBlock(title: "Armor", trailing: "base AC 10") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 12)],
                       alignment: .leading, spacing: 2) {
                 ArmorField(label: "Armor", value: $character.armorRating, onPick: { showArmorPicker = true })
-                ArmorField(label: "Shield", value: $character.shieldRating)
+                ArmorField(label: "Shield", value: $character.shieldRating, onPick: { showShieldPicker = true })
                 ArmorField(label: "Dexterity", value: $character.details.dexterityDefense)
                 HStack(spacing: 4) {
                     FieldLabel(text: "Movement")
@@ -3016,7 +3211,20 @@ private struct ArmorBlock: View {
             }
         }
         .sheet(isPresented: $showArmorPicker) {
-            ArmorPickerSheet(armorRating: $character.armorRating)
+            ArmorPickerSheet(rating: $character.armorRating, kind: .armor)
+        }
+        .sheet(isPresented: $showShieldPicker) {
+            ArmorPickerSheet(rating: $character.shieldRating, kind: .shield)
+        }
+        // Item 7: escolher (ou editar a mão) Armor/Shield agora recalcula
+        // o AC final da página 1 sozinho — ver
+        // `ConsequenceEngine.recalculateArmorClass` pro porquê de não
+        // rodar em `onAppear`.
+        .onChange(of: character.armorRating) { _, _ in
+            ConsequenceEngine.recalculateArmorClass(for: &character, magicItemDatabase: magicItemDatabase)
+        }
+        .onChange(of: character.shieldRating) { _, _ in
+            ConsequenceEngine.recalculateArmorClass(for: &character, magicItemDatabase: magicItemDatabase)
         }
     }
 }

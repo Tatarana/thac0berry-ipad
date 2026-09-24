@@ -228,7 +228,10 @@ struct KitDetailSheet: View {
                             onChoose()
                             dismiss()
                         }
-                        .font(Paper.printed(13))
+                        // Item 4 do pedido do usuário (2026-09-24):
+                        // "choose" numa fonte bem menor que "close" —
+                        // padronizado nos 16pt do "close" ao lado.
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                     }
                     Button("close") { dismiss() }
@@ -258,12 +261,30 @@ struct KitDetailSheet: View {
                             KitDetailField(label: "Source", value: kit.sourceBook)
                         }
 
-                        VStack(alignment: .leading, spacing: 4) {
+                        // Item 6 do pedido do usuário (2026-09-24):
+                        // "Descrições de Kits com tabelas wikitext
+                        // quebradas" — `fullText` cru vinha com a tabela-
+                        // resumo da wiki (`{| ... |}`) grudada no texto
+                        // pra 56 dos 91 kits. `displaySections` (`Models/Kit.swift`)
+                        // descarta essa tabela (o dado dela já aparece
+                        // estruturado no grid de cima e nos `featureSection`
+                        // abaixo) e separa o resto em blocos por título.
+                        VStack(alignment: .leading, spacing: 14) {
                             FieldLabel(text: "Description")
-                            Text(kit.description.fullText)
-                                .font(Paper.printed(14))
-                                .foregroundStyle(Paper.ink)
-                                .lineSpacing(4)
+                            ForEach(kit.description.displaySections) { section in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if !section.title.isEmpty {
+                                        Text(section.title.uppercased())
+                                            .font(Paper.printed(11))
+                                            .tracking(0.8)
+                                            .foregroundStyle(Paper.inkSoft)
+                                    }
+                                    Text(section.body)
+                                        .font(Paper.printed(14))
+                                        .foregroundStyle(Paper.ink)
+                                        .lineSpacing(4)
+                                }
+                            }
                         }
 
                         featureSection(label: "Role", text: kit.features.role)

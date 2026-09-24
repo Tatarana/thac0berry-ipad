@@ -1697,7 +1697,9 @@ struct SpellDetailSheet: View {
                     }
                     if let onChangeSpell {
                         Button("change", action: onChangeSpell)
-                            .font(Paper.printedItalic(13))
+                            // Item 4 do pedido do usuário (2026-09-24):
+                            // padronizado nos 16pt do "close" ao lado.
+                            .font(Paper.printedItalic(16))
                             .foregroundStyle(Paper.inkSoft)
                     }
                     Button("close") { dismiss() }

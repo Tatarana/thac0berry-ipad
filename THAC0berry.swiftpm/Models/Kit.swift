@@ -54,12 +54,85 @@ struct KitClassEligibility: Codable, Hashable {
 struct KitDescription: Codable, Hashable {
     /// Resumo de um parágrafo, pra listas/cards.
     let briefSummary: String
-    /// Texto corrido já limpo de marcação de wiki — pronto pra exibir
-    /// direto numa `Text`/`PaperTextEditor` de detalhe.
+    /// Texto corrido — o comentário original dizia "já limpo de marcação
+    /// de wiki", mas isso nunca foi verdade pra 56 dos 91 kits (ver
+    /// `displaySections` abaixo). Mantido como veio (não regerado nesta
+    /// sessão) — a limpeza acontece só na hora de EXIBIR, via
+    /// `displaySections`.
     let fullText: String
     /// Wikitext original, mantido só como referência/depuração — não é
     /// pensado pra aparecer na UI.
     let rawWikitext: String
+
+    /// Um bloco da descrição já limpo pra exibir — `title` vazio quando o
+    /// texto não tinha nenhum "## Heading" pra nomear a seção.
+    struct Section: Hashable, Identifiable {
+        var id: String { title }
+        let title: String
+        let body: String
+    }
+
+    /// Item 6 do pedido do usuário (2026-09-24): "Descrições de Kits com
+    /// tabelas wikitext quebradas (ex.: Ilmater - Alleviator)". Bug real,
+    /// confirmado em 56 dos 91 kits (todos os de sacerdote especializado,
+    /// um por divindade — os outros 35, do estilo Complete Handbook, já
+    /// eram texto limpo): `fullText` começa com o wikitext CRU da
+    /// tabela-resumo da wiki (`{| class="article-table" ... |}\n! colspan
+    /// ...`), porque o pipeline de conversão (fora do app, não regerado
+    /// aqui) só tratava negrito/links, nunca tabela.
+    ///
+    /// A boa notícia: TODO dado daquela tabela (Racial/Ability
+    /// Requirements, Prime Requisite, Hit Die, Weapon/Nonweapon Slots,
+    /// Bonus/Recommended Proficiencies etc.) já aparece em campos
+    /// ESTRUTURADOS de verdade em outro lugar da própria `KitDetailSheet`
+    /// (`kit.mechanics.*` e `kit.features.*`) — então a tabela crua é só
+    /// DESCARTADA aqui, sem perder informação nenhuma, só o wikitext
+    /// quebrado que duplicava esses campos. O que sobra (os parágrafos de
+    /// prosa — Overview/Description/Role-Playing/Special Abilities/
+    /// Special Disadvantages nos 56 com tabela; o texto corrido de
+    /// handbook nos outros 35) vira uma lista de seções por
+    /// `## Heading`, sem símbolo de wiki nenhum sobrando — `**negrito**`
+    /// também é removido (a UI não teria como renderizar isso como
+    /// negrito de qualquer forma).
+    var displaySections: [Section] {
+        var text = fullText
+        if let tableStart = text.range(of: "{|"), let tableEnd = text.range(of: "|}") {
+            text.removeSubrange(tableStart.lowerBound..<tableEnd.upperBound)
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return [] }
+
+        var sections: [Section] = []
+        var currentTitle = ""
+        var currentBody: [Substring] = []
+
+        func flush() {
+            let body = currentBody.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !currentTitle.isEmpty || !body.isEmpty else { return }
+            sections.append(Section(title: currentTitle, body: KitDescription.stripInlineMarkup(body)))
+            currentBody = []
+        }
+
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("## ") {
+                flush()
+                currentTitle = line.dropFirst(3).trimmingCharacters(in: .whitespaces)
+            } else {
+                currentBody.append(line)
+            }
+        }
+        flush()
+
+        // Nenhum "## " no texto inteiro (não deveria acontecer nos 91
+        // kits atuais, mas não custa ter uma saída segura pra dado
+        // futuro nesse formato): devolve o texto inteiro como uma seção
+        // sem título, em vez de sumir com a descrição.
+        return sections.isEmpty ? [Section(title: "", body: KitDescription.stripInlineMarkup(text))] : sections
+    }
+
+    private static func stripInlineMarkup(_ text: String) -> String {
+        text.replacingOccurrences(of: "**", with: "")
+    }
 }
 
 /// Texto livre por seção, como aparece no livro — cada campo é `nil`

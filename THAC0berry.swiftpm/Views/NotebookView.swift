@@ -185,6 +185,9 @@ private final class NotebookPageController: UIHostingController<AnyView> {
 /// global de abas.
 struct NotebookBeadRow: View {
     @Binding var campaign: Campaign
+    // Item 3 do pedido do usuário (2026-09-24): folha nova nasce com o
+    // estilo de papel padrão configurado em Settings.
+    @EnvironmentObject private var library: CharacterLibrary
     /// Qual página está aberta — era um `Binding<CharacterSheetView.SheetPage>`
     /// direto, mas isso amarrava o caderno a sempre estar dentro de uma
     /// `CharacterSheetView`. Desacoplado pra `Binding<UUID?>` puro: dentro
@@ -249,7 +252,7 @@ struct NotebookBeadRow: View {
     }
 
     private func addPage(_ kind: NotebookPageKind) {
-        selection = campaign.addNotebookPage(kind: kind)
+        selection = campaign.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
     }
 
     /// Apaga a página; se era a que estava aberta, pula pra uma vizinha.
@@ -280,6 +283,13 @@ private struct NotebookPageView: View {
     let onDelete: () -> Void
 
     private var kind: NotebookPageKind { entry.kind ?? .transcribed }
+
+    // Item 2 do pedido do usuário (2026-09-24): "crie mais dois estilos de
+    // folha: pautada e quadriculada, com a opção de trocar qual tipo de
+    // folha" — folha SEM `paperStyle` salvo (criada antes deste pedido, ou
+    // nunca trocada) cai pra `.plain`, que já era o único estilo que
+    // existia.
+    private var style: NotebookPaperStyle { entry.paperStyle ?? .plain }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -315,6 +325,29 @@ private struct NotebookPageView: View {
                 .font(Paper.printedItalic(11))
                 .foregroundStyle(Paper.inkSoft)
 
+            // Item 2: troca o estilo de papel DESTA folha — cada folha
+            // guarda a própria escolha (ver `NotebookEntry.paperStyle`),
+            // independente do padrão configurado em Settings (item 3), que
+            // só vale pra folha nova.
+            Menu {
+                ForEach(NotebookPaperStyle.allCases, id: \.self) { option in
+                    Button {
+                        entry.paperStyle = option
+                    } label: {
+                        if option == style {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
+                        }
+                    }
+                }
+            } label: {
+                Text(style.label)
+                    .font(Paper.printedItalic(11))
+                    .foregroundStyle(Paper.inkSoft)
+                    .underline()
+            }
+
             Button(action: onDelete) {
                 Text("✕")
                     .font(Paper.printed(14))
@@ -335,14 +368,70 @@ private struct NotebookPageView: View {
             NotebookTextArea(text: $entry.text,
                               placeholder: "Write freely — NPCs met, clues, decisions made…")
                 .frame(minHeight: 420)
+                .background(NotebookPaperTexture(style: style))
                 .overlay(Rectangle().stroke(Paper.hairline, lineWidth: 1))
         case .freeform:
             // Tela de desenho de verdade — sem transcrição nenhuma, pra
             // quem tem letra feia ou quer desenhar um mapa/rabisco.
             DrawingCanvas(drawingData: $entry.drawingData)
                 .frame(minHeight: 420)
+                .background(NotebookPaperTexture(style: style))
                 .overlay(Rectangle().stroke(Paper.hairline, lineWidth: 1))
         }
+    }
+}
+
+/// O desenho de fundo de uma folha — item 2 do pedido do usuário
+/// (2026-09-24). `.plain` não desenha nada (folha lisa, comportamento
+/// idêntico a antes deste pedido existir); `.lined` desenha linhas
+/// horizontais tipo caderno pautado; `.grid` desenha uma malha quadriculada.
+/// Fica só como FUNDO (`.background`) atrás do texto/traço — nunca captura
+/// toque nem atrapalha o Scribble/PencilKit por cima.
+private struct NotebookPaperTexture: View {
+    let style: NotebookPaperStyle
+
+    /// Mesmo tom (`Paper.inkSoft`) já usado pros rótulos secundários da
+    /// ficha, bem apagado — o objetivo é sugerir "papel pautado/
+    /// quadriculado de verdade", não competir visualmente com a tinta
+    /// escrita por cima.
+    private var lineColor: Color { Paper.inkSoft.opacity(0.28) }
+
+    var body: some View {
+        Canvas { context, size in
+            switch style {
+            case .plain:
+                break
+            case .lined:
+                let spacing: CGFloat = 28
+                var y = spacing
+                while y < size.height {
+                    var path = Path()
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: size.width, y: y))
+                    context.stroke(path, with: .color(lineColor), lineWidth: 1)
+                    y += spacing
+                }
+            case .grid:
+                let cell: CGFloat = 22
+                var x = cell
+                while x < size.width {
+                    var path = Path()
+                    path.move(to: CGPoint(x: x, y: 0))
+                    path.addLine(to: CGPoint(x: x, y: size.height))
+                    context.stroke(path, with: .color(lineColor), lineWidth: 0.8)
+                    x += cell
+                }
+                var y = cell
+                while y < size.height {
+                    var path = Path()
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: size.width, y: y))
+                    context.stroke(path, with: .color(lineColor), lineWidth: 0.8)
+                    y += cell
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -353,6 +442,10 @@ struct NotebookEmptyState: View {
     /// Ver o comentário em `NotebookBeadRow.selection` — mesma troca de
     /// `Binding<CharacterSheetView.SheetPage>` por `Binding<UUID?>` puro.
     @Binding var selection: UUID?
+    // Item 3 do pedido do usuário (2026-09-24): mesmo motivo de
+    // `NotebookBeadRow.library` — a primeira folha do caderno também nasce
+    // com o padrão configurado em Settings.
+    @EnvironmentObject private var library: CharacterLibrary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -375,7 +468,7 @@ struct NotebookEmptyState: View {
     }
 
     private func addPage(_ kind: NotebookPageKind) {
-        selection = campaign.addNotebookPage(kind: kind)
+        selection = campaign.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
     }
 }
 
@@ -409,12 +502,35 @@ private struct NewPageButton: View {
 struct DrawingCanvas: UIViewRepresentable {
     @Binding var drawingData: Data?
 
+    /// Item 1 do pedido do usuário (2026-09-24): "a cor padrão da caneta é
+    /// branca, e isso é horrível pq mal dá pra ver. Troca pelo preto."
+    ///
+    /// AJUSTE (2026-09-24, terceira tentativa — v1.62 e v1.63 reafirmavam
+    /// `.black` de várias formas e o usuário reportou "Nada mudou" nas
+    /// duas): a teoria de corrida assíncrona com o `PKToolPicker` estava
+    /// errada — reafirmar a MESMA cor não muda nada se o problema nunca foi
+    /// timing. O PencilKit trata `UIColor.black`/`.white` como cores
+    /// ADAPTATIVAS: ele inverte automaticamente entre preto e branco de
+    /// acordo com o `userInterfaceStyle` (claro/escuro) do canvas, pra
+    /// tinta continuar visível em qualquer fundo — é um comportamento
+    /// documentado da Apple, não um bug de sincronização. Como o papel
+    /// deste app é sempre claro mas o SISTEMA podia estar em Modo Escuro,
+    /// o preto literal virava branco por baixo dos panos, e reatribuir
+    /// `.black` de novo (mesmo três vezes) não tinha efeito nenhum, porque
+    /// a própria COR continuava sendo a adaptativa. Duas mudanças juntas
+    /// resolvem a causa raiz: (a) trocar o preto puro por um RGB explícito
+    /// bem próximo do preto — deixa de ser a cor especial que o PencilKit
+    /// reconhece e inverte; (b) forçar o canvas a ficar sempre em modo
+    /// claro (`overrideUserInterfaceStyle`), removendo de vez o gatilho
+    /// que causava a inversão, não importa o tema do sistema.
+    static let defaultInkColor = UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1)
+
     func makeUIView(context: Context) -> PKCanvasView {
         let canvas = PKCanvasView()
         canvas.backgroundColor = .clear
+        canvas.overrideUserInterfaceStyle = .light
         canvas.drawingPolicy = .anyInput
-        canvas.tool = PKInkingTool(.pen, color: UIColor(red: 0.118, green: 0.208, blue: 0.341, alpha: 1),
-                                   width: 3)
+        canvas.tool = PKInkingTool(.pen, color: Self.defaultInkColor, width: 3)
         canvas.delegate = context.coordinator
         if let data = drawingData, let drawing = try? PKDrawing(data: data) {
             canvas.drawing = drawing
@@ -432,13 +548,40 @@ struct DrawingCanvas: UIViewRepresentable {
         // canvas agora (`PKToolPicker()`), guardada no Coordinator pra não
         // recriar uma a cada `updateUIView` (senão o picker "esquece" a
         // ferramenta escolhida a cada toque na tela).
+        // Reforça o modo claro aqui também — `overrideUserInterfaceStyle`
+        // de vez em quando é reavaliado quando a view entra numa hierarquia
+        // nova (ex.: folheando pra esta página de novo); garantir de novo
+        // a cada `updateUIView` não custa nada e fecha essa brecha.
+        if uiView.overrideUserInterfaceStyle != .light {
+            uiView.overrideUserInterfaceStyle = .light
+        }
+
         if !context.coordinator.didAttachToolPicker, uiView.window != nil {
             context.coordinator.didAttachToolPicker = true
             let toolPicker = PKToolPicker()
+            // AJUSTE (2026-09-24, mesmo dia — usuário reportou que a tinta
+            // já saía preta, mas o SELETOR DE COR do próprio PKToolPicker
+            // continuava mostrando branco como a cor atual): o
+            // `PKToolPicker` é um popover do SISTEMA, fora da hierarquia de
+            // views do app — ele tem sua PRÓPRIA `overrideUserInterfaceStyle`,
+            // independente da que já força o `PKCanvasView` pro modo claro
+            // acima. Sem travar o picker também, ele seguia o tema do
+            // sistema e desenhava seus próprios swatches (inclusive o que
+            // mostra a cor "atual") de forma adaptativa, mesmo já não
+            // afetando mais o traço em si.
+            toolPicker.overrideUserInterfaceStyle = .light
             context.coordinator.toolPicker = toolPicker
             toolPicker.setVisible(true, forFirstResponder: uiView)
             toolPicker.addObserver(uiView)
             uiView.becomeFirstResponder()
+
+            // A causa raiz era a cor adaptativa preto/branco do PencilKit
+            // (ver comentário em `defaultInkColor`), não uma corrida com o
+            // `PKToolPicker` — mas como o picker pode mesmo trocar a
+            // ferramenta ativa ao anexar, reafirma a cor (já não-adaptativa
+            // agora) logo em seguida, só nesse anexo inicial, sem brigar
+            // com uma escolha do jogador depois.
+            uiView.tool = PKInkingTool(.pen, color: Self.defaultInkColor, width: 3)
         }
 
         // Só recarrega o traço se o dado mudou por fora (folheou pra outra

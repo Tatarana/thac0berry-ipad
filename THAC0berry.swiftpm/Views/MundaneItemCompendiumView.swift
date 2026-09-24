@@ -217,12 +217,16 @@ struct MundaneItemDetailSheet: View {
                             onChoose()
                             dismiss()
                         }
-                        .font(Paper.printed(13))
+                        // Item 4 do pedido do usuário (2026-09-24):
+                        // "choose"/"change" numa fonte bem menor que
+                        // "close" — padronizados nos 16pt do "close" ao
+                        // lado (mantendo o itálico do "change").
+                        .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
                     }
                     if let onChangeItem {
                         Button("change", action: onChangeItem)
-                            .font(Paper.printedItalic(13))
+                            .font(Paper.printedItalic(16))
                             .foregroundStyle(Paper.inkSoft)
                     }
                     Button("close") { dismiss() }

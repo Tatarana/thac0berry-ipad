@@ -3709,6 +3709,303 @@ outros ajustes.
 (todos: botão "close" 13pt → 16pt); mais os subtítulos e o link
 "View deity" listados acima. `Package.swift` (1.45/152 → 1.46/153).
 
+## 59. v1.47 — ícones novos: Mage Grimoire, Priest Grimoire, Rules Reference, Deities
+
+**2026-09-23.** Usuário mandou um zip com 4 ilustrações novas (PNG com
+fundo transparente, estilo medalhão redondo — couro gravado, aro de
+runas, bússola N/S/L/O): uma pro Mage Grimoire, uma pro Priest
+Grimoire, uma pra Rules Reference (substituindo as três ilustrações
+que já existiam) e uma pro Deities (item novo, criado no item 56 e
+que até agora só tinha o SF Symbol `crown.fill` como fallback, sem
+arte própria).
+
+As imagens vieram num canvas bem mais largo que o conteúdo (1408×768,
+com o medalhão real ocupando só uns 700×690px centralizados) — se
+tivesse usado o arquivo cru, o `Image.bundled(...)` +
+`.aspectRatio(contentMode: .fit)` do `CompendiumTile` ia encaixar o
+canvas inteiro na caixa de 78×62pt, deixando o medalhão minúsculo com
+uma faixa transparente enorme dos dois lados. Recortei cada uma pro
+bounding box real do conteúdo (com ~8% de margem), então cada arquivo
+final ficou perto de quadrado (~800×768) em vez do
+16:9 original.
+
+Os 4 arquivos entram exatamente nos nomes que o `CompendiumTile`
+já espera via `imageName` (`Views/CompendiumHubView.swift`) —
+`icon_mage_grimoire`, `icon_priest_grimoire`, `icon_rules_reference` e
+`icon_deities` — então nenhuma linha de código mudou, só os PNGs em
+`Resources/`. O tile de Deities (que desde o item 56 já tinha
+`imageName: "icon_deities"` no código, só sem o arquivo) passa a
+mostrar a ilustração de verdade em vez do fallback de SF Symbol.
+
+**Arquivos mexidos**: `Resources/icon_mage_grimoire.png`,
+`Resources/icon_priest_grimoire.png`,
+`Resources/icon_rules_reference.png` (substituídos),
+`Resources/icon_deities.png` (novo). `Package.swift` (1.46/153 →
+1.47/154).
+
+## 60. PLANEJADO — reorganizar o Compendium Hub em macro-categorias
+
+**2026-09-23.** Discutido, não implementado ainda (usuário pediu pra
+deixar pra depois). Hoje o Compendium Hub (`CompendiumHubView`) é uma
+lista só com 10 tiles (Priest Grimoire, Priest Kits, Deities, Rules
+Reference, Proficiencies, Weapons, Armor, Equipment, Magic Items,
+Mage Grimoire) e vai crescer mais. Estrutura combinada, pra quando
+formos implementar:
+
+- **Characters** (conteúdo específico de classe) → hoje só **Priest**
+  (Priest Grimoire + Priest Kits) e **Mage** (Grimoire, ainda "coming
+  soon"). **Não** criar tiles vazios de Warrior/Rogue — o app não tem
+  nenhum conteúdo dessas classes ainda (precisaria de *Complete
+  Fighter's Handbook*/*Complete Thief's Handbook* convertidos, que o
+  usuário não mandou). Acrescentar essas classes como mais uma
+  entrada dentro de Characters só quando esse material chegar.
+- **Rules & Lore** (referência, não amarrada a uma classe) → Rules
+  Reference, Proficiencies, **Deities**. Decisão importante: Deities
+  fica FORA de Priest — o link "?" de divindade no campo "Patron
+  Deity / Religion" da ficha (item 56) aparece pra qualquer classe,
+  não só Priest, então enterrar Deities dentro do submenu de Priest
+  esconderia isso.
+- **Items** → Weapons, Armor, Equipment, Magic Items (sem mudança de
+  conteúdo, só de onde fica no hub).
+
+Navegação: 3 níveis pra Characters (Hub → Characters → Priest →
+Grimoire/Kits), 2 níveis pra Rules & Lore e Items (Hub → categoria →
+item direto, sem terceiro nível, já que não há sub-agrupamento ali).
+
+## 61. v1.48 — sinal de consequência pendente vira ponto único, em cima do dragão
+
+**2026-09-23.** O `ConsequenceSignalBadge` (o ícone que acende quando
+nível ou algum atributo mudou e ainda não foi revisado —
+`character.hasPendingConsequences`) tinha virado parametrizado no item
+41: um badge por campo, aparecendo ao lado do Level OU de uma das seis
+linhas de Ability Scores, dependendo de qual campo mudou por último
+(`effectiveChangedField`). Usuário achou ruim ele "aparecer em pontos
+diversos" e pediu um lugar fixo: sempre em cima do dragão
+(`record_badge.png`, no canto superior direito da Ficha — o distintivo
+do grupo, abaixo do título "Advanced Dungeons & Dragons / 2nd Edition"),
+no mesmo tamanho dele (92pt), "como se substituindo".
+
+Removidos os dois call sites antigos — o overlay no `HeaderLine` do
+Level (`RecordHeaderForm`) e o overlay em `AbilityRowForm` (usado nas
+seis linhas STR/DEX/CON/INT/WIS/CHA, junto o parâmetro `isPendingChange`
+que só servia pra alimentar aquele badge, agora sem uso). No lugar,
+`RecordHeaderForm` passou a decidir entre mostrar o dragão OU o
+`ConsequenceSignalBadge` (92pt) no mesmo `if`/`else`, na mesma posição:
+dragão quando `character.hasPendingConsequences == false` (estado
+normal), badge quando `true`. Único sinal de consequência pendente na
+ficha inteira agora — continua abrindo `ConsequencePreviewSheet` ao
+tocar, como antes.
+
+Não mexi no `PendingConsequenceHighlight` (o realce verde direto nos
+títulos de "Saving Throws" e "THAC0", do item 41) — é outro mecanismo,
+não um ícone, e o usuário não pediu mudança ali.
+
+**Arquivos mexidos**: `Views/CharacterSheetView.swift` (removidos os
+dois overlays de `ConsequenceSignalBadge` e o parâmetro
+`isPendingChange` de `AbilityRowForm`; `RecordHeaderForm` alterna
+dragão/badge), `Views/ConsequencePreviewSheet.swift` (comentário de
+`ConsequenceSignalBadge` atualizado pra refletir o call site único).
+`Package.swift` (1.47/154 → 1.48/155).
+
+## 62. v1.49 — lote de 11 itens (bugs de realce, fonte, AC, automações de raça/kit, tabelas de Kit)
+
+**2026-09-24.** Usuário mandou uma lista numerada de 11 pedidos (sem os
+prints originais, que ficaram pra outra rodada se precisar). Todos os 11
+implementados — o item 11 (ícone do app) chegou pouco depois, num anexo à
+parte.
+
+1. **Realce verde do THAC0 disparando com qualquer atributo** — `Thac0TargetForm`/
+   `SavingThrowsForm` liam `character.hasPendingConsequences` (flag GLOBAL:
+   liga com nível OU qualquer um dos 6 atributos pendente de revisão) em
+   vez de checar se aquela seção especificamente mudaria. Nova
+   `PlayerCharacter.hasPendingConsequence(forKeys:registry:)`, escopada por
+   `ConsequenceEngine.diff` — THAC0 só acende pra "thac0", Saving Throws só
+   pra "savingThrows".
+2. **Ability Details (Hit Adj, Dmg Adj etc.) não piscavam** — "Apply
+   automatic changes" já escrevia certinho nesses campos
+   (`ConsequenceEngine.applyAutomatic`) mas nunca chamava
+   `markRecentAutoChange`, e `AbilityRowForm` não tinha `.changeFlash`
+   nenhum nas células. Os dois corrigidos — `cells` agora carrega uma
+   chave de flash por coluna.
+3. **Hit Dice não piscava ao trocar de classe** — `refreshHitDiceType(force:)`
+   já marcava `recentAutoChange("hitDiceType")` certinho, só que nenhuma
+   view lia essa chave. `.changeFlash` adicionado no campo.
+4. **Fonte do "choose" menor que "close"** — o item 58 tinha deixado
+   "choose"/"change" de fora de propósito ao padronizar "close" pra 16pt.
+   Agora os dois batem: `Armor`, `Mundane Item`, `Proficiency`, `Weapon`,
+   `Kit`, `Magic Item` e `Spell` (os 7 compêndios/sheets com esse par de
+   botões).
+5. **Proficiência de bônus do Kit não entrava sozinha na ficha** — só
+   `KitProficiencyRules.bonus` (grátis, concedida pelo kit) — `recommended`
+   continua só sugestão. `RecordHeaderForm.addBonusProficiencies` reaproveita
+   linha vazia ou cria uma nova, sem duplicar (nome normalizado) e linkando
+   com `ProficiencyDatabase` quando bate.
+6. **Tabelas quebradas na descrição de Kits (ex. Ilmater - Alleviator)** —
+   `fullText` de 55 dos 91 kits começa com a tabela "Class Information" em
+   sintaxe crua de wikitable (`{| ... |}`), que `Text(String)` mostra como
+   lixo de barras/traços. Correção EM TEMPO DE EXIBIÇÃO (sem editar os 91
+   arquivos `EmbeddedKits_Part*.swift`, arriscado demais pra fazer à mão):
+   `KitDescription.displaySections` remove essa tabela (100% redundante com
+   os campos estruturados que `KitDetailSheet` já mostra) e separa o resto
+   por cabeçalho `##`, renderizado em negrito de verdade.
+7. **Full Plate: "1" solto e AC base não mudava** — o "1" já era o AC
+   correto da Full Plate (PHB Table 26 dá o AC RESULTANTE, não um
+   modificador), só nunca tinha sido ligado a `character.armorClass` — o
+   seletor só anotava o texto de referência. Agora: `equippedArmorBaseAC`/
+   `hasShieldEquipped`/`magicArmorBonus` (novos campos) +
+   `recalculateArmorClass()` recalculam o AC de verdade. Ampliado pra
+   Shield (seletor novo, mesmo `ArmorPickerSheet` com `target: .shield`,
+   dá −1 fixo — regra à parte da tabela, nenhum `ArmorPiece` de escudo tem
+   `baseAC` isolado no corpus).
+8. **Movement não preenchia sozinho pela raça** — tabela pequena e fechada
+   (6 valores, PHB Table 6 — diferente das tabelas de progressão por
+   nível×classe que faltam no corpus), hardcoded em
+   `RaceOption.baseMovementRate` como as outras tabelas de raça já
+   existentes no arquivo. Preenche o número solto (`character.movement`) E
+   a linha "Base" da tabela de Movement da página 2 — colunas Jog/Run/Day
+   continuam manuais (não achei fonte confiável dos multiplicadores).
+9. **Level Changes não se ajustava por classe/raça** — reaproveita as
+   tabelas por nível que o Motor de Consequências já tinha
+   (`Thac0ByLevelProvider`/`SavingThrowsByLevelProvider`) pra preencher as
+   linhas THAC0/Saving Throws sozinho (`ConsequenceEngine.refreshLevelChanges`,
+   varre níveis 1–20 e detecta onde o valor muda). Weapon/Non-weapon
+   Proficiencies continuam manuais — essa tabela (em que nível cada classe
+   ganha proficiência nova) segue sem fonte estruturada no corpus, mesma
+   lacuna já registrada na avaliação do item 21.
+10. **Magic Items de armadura não mudavam o AC** — `MagicItemDefenseBonus.acBonus`
+    dos itens com `classification.broadCategory == "Armor/Shield"` agora
+    soma em `character.magicArmorBonus`, recalculado a cada mudança na
+    lista "Magic Items" (`RecordSheetPageTwo.refreshMagicArmorBonus`,
+    `.onChange(of: character.page2MagicItems)`) e alimenta o mesmo
+    `recalculateArmorClass()` do item 7.
+11. **Ícone do app** — usuário mandou a arte (dragão policial de óculos
+    escuros e revólver, pixel art, emblema circular azul sobre fundo
+    branco, 1254×1254). O projeto nunca teve ícone próprio antes (só o
+    padrão do Swift Playgrounds) — criado `Resources/Assets.xcassets/
+    AppIcon.appiconset` no formato "single size" moderno (um PNG só,
+    1024×1024, sem canal alfa — ícone de app não pode ter transparência;
+    o sistema arredonda os cantos sozinho em tempo de exibição, sem
+    precisar gerar o conjunto antigo de tamanhos por idiom) e ligado via
+    `iconAssetName: "AppIcon"` no `.iOSApplication` do `Package.swift`.
+
+**Arquivos mexidos**: `Models/Character.swift` (`hasPendingConsequence`,
+`equippedArmorBaseAC`/`hasShieldEquipped`/`magicArmorBonus`/
+`recalculateArmorClass`), `Models/Race.swift` (`baseMovementRate`, Movement
+no `apply(to:)`), `Models/Kit.swift` (`KitDescription.displaySections`),
+`Store/ConsequenceEngine.swift` (`applyAutomatic` marca `recentAutoChange`,
+`refreshLevelChanges`), `Views/CharacterSheetView.swift` (flashes
+escopados, `AbilityRowForm`/`LevelChangeRowView` com chave por célula,
+`ArmorClassShield`/`ArmorBlock` usando `character` inteiro, kit→proficiência,
+recálculo de AC mágico), `Views/ArmorCompendiumView.swift`
+(`ArmorPickerSheet` com `target: .armor/.shield`), `Views/KitCompendiumView.swift`
+(`KitDetailSheet` por seções, fonte do "choose"),
+`Views/MundaneItemCompendiumView.swift`/`ProficiencyCompendiumView.swift`/
+`WeaponCompendiumView.swift`/`MagicItemCompendiumView.swift`/
+`SpellSheetView.swift` (fonte do "choose"/"change");
+`Resources/Assets.xcassets/AppIcon.appiconset/` (novo, ícone do app).
+`Package.swift` (1.48/155 → 1.49/156, `iconAssetName: "AppIcon"`).
+
+**Correção 2026-09-24 (v1.50)**: o Playground do usuário não compilou —
+"Extra argument 'iconAssetName' in call" (print anexado). O parâmetro que
+eu tinha usado no `.iOSApplication(...)` não existe na API real do
+`AppleProductTypes`; o certo é `appIcon:` (tipo `AppIcon`, via
+`.asset("AppIcon")`), não `iconAssetName:`. `Package.swift` corrigido
+(1.49/156 → 1.50/157); o resto (asset catalog, `AppIcon.appiconset`) não
+mudou — o ícone já estava certo, só a chamada que estava errada.
+
+**Correção 2026-09-24 (v1.51)**: segundo erro de build, agora em
+`Views/CharacterSheetView.swift` — "Value of type 'Kit' has no member
+'proficiencies'" (print anexado), no `addBonusProficiencies(forKit:)` do
+item 5. `bonus` mora dentro de `KitMechanics.proficiencies`
+(`kit.mechanics.proficiencies.bonus`), não direto em `Kit` — eu tinha
+escrito `kit.proficiencies.bonus`, que nem existe (ver `Models/Kit.swift`:
+`Kit.mechanics: KitMechanics`, e é `KitMechanics.proficiencies` que é do
+tipo `KitProficiencyRules`, com `bonus: [String]`). Corrigido; conferido
+também que não havia nenhum outro acesso direto tipo `kit.armor`/
+`kit.weapons`/etc. escapando de `kit.mechanics.*` no resto do arquivo.
+`Package.swift` 1.50/157 → 1.51/158.
+
+**Item 11 DESLIGADO temporariamente (v1.52), 2026-09-24**: depois das duas
+correções acima, o build voltou a falhar — dessa vez sem NENHUMA mensagem
+em lugar nenhum (nem no painel "App/Package" que mostrou os dois erros
+anteriores). Revisei o resto do lote inteiro de novo, função por função,
+tipo por tipo (`ArmorPickerSheet`, `refreshMagicArmorBonus`,
+`RecordSheetPageTwo`, `LevelChangesForm`, `RecordHeaderForm`, etc. contra
+os modelos reais) e não achei mais nada — sem esse texto de erro pra
+seguir, e sem Xcode/simulador neste ambiente pra compilar de verdade, não
+dá pra confirmar mais nada por leitura de código sozinha. Como o Swift
+Playgrounds é conhecido por engolir erros do compilador de asset catalog
+(`actool`) sem mostrar nada na UI (diferente de erro de código Swift, que
+sempre aparece nesse painel), e essa foi a única peça nova desde o último
+build que funcionou, a hipótese mais forte é aí — mesmo o PNG em si tendo
+sido conferido e batendo com o formato certo (1024×1024, RGB 8-bit, sem
+alpha, sRGB, sem interlace). Decisão: tirar o ícone da equação por enquanto pra destravar o
+teste real dos outros 10 itens (que são o que importa primeiro). Em
+`Package.swift`: `appIcon: .asset("AppIcon")` removido. Em disco:
+`Resources/Assets.xcassets` movido pra `_icon_wip/Assets.xcassets` (fora
+da pasta `Resources/`, então fora do `.process("Resources")` do target —
+não entra mais no build; os arquivos continuam no repo, só não fazem
+parte do pacote enviado). `Package.swift` 1.51/158 → 1.52/159. Item 11
+fica pendente — reabrir depois que o resto estiver confirmado, com o
+Playground rodando de novo pra dar sinal de vida no painel de erro caso
+volte a travar.
+
+**ROLLBACK COMPLETO (v1.48, 2026-09-24)**: mesmo sem o ícone (v1.52), o
+build continuou falhando exatamente do mesmo jeito — sem NENHUMA aba/
+mensagem de erro em lugar nenhum, nem depois de "Apagar Dados do App e
+Reiniciar". Como dois conteúdos bem diferentes (com ícone e sem ícone)
+deram o mesmíssimo silêncio, o ícone deixou de ser suspeito — e sem
+Xcode/simulador neste ambiente pra compilar de verdade e sem NENHUMA
+mensagem de erro pra investigar, não dava mais pra confirmar nada por
+leitura de código sozinha (já tinha revisado o lote inteiro umas 3 vezes).
+A pedido do usuário ("volta pro último build estável"), TODO o lote de 11
+itens de hoje (2026-09-24) foi revertido à mão, arquivo por arquivo, de
+volta ao estado exato de antes desta sessão (`Package.swift` 1.48/155,
+igual ao início do dia):
+- `Package.swift`: `appIcon`/versão revertidos pra 1.48/155.
+- `Models/Character.swift`: removidos `equippedArmorBaseAC`/
+  `hasShieldEquipped`/`magicArmorBonus`/`recalculateArmorClass()` (itens
+  7/10) e `hasPendingConsequence(forKeys:registry:)` (itens 1/3).
+- `Models/Kit.swift`: removido `KitDescription.displaySections`/`Section`
+  (item 6) — `fullText` volta a ser exibido cru.
+- `Models/Race.swift`: removidos `baseMovementRate` e o preenchimento
+  automático de "Movement" em `apply(to:)` (item 8).
+- `Store/ConsequenceEngine.swift`: removido `markRecentAutoChange` em
+  `applyAutomatic` (item 2) e `refreshLevelChanges`/`levelChangeRow`
+  inteiros (item 9).
+- `Views/CharacterSheetView.swift`: `SavingThrowsForm`/`Thac0TargetForm`
+  voltam a usar `character.hasPendingConsequences` global (não mais
+  escopado); `AbilityRowForm.cells` volta a ser 2-tuple sem flash por
+  célula; removido `.changeFlash` de Hit Dice/Movement/Proficiencies;
+  `ArmorClassShield` volta a receber `armorClass: Binding<Int>` direto;
+  `ArmorBlock` perde o seletor de Shield (só Armor); `LevelChangeRowView`/
+  `LevelChangesForm` voltam à forma sem `character`/`flashKey`/auto-
+  preenchimento; `RecordHeaderForm` perde `ruleset`/`kitDatabase`/
+  `proficiencyDatabase` e `addBonusProficiencies`; `ClassPicker` perde a
+  chamada a `refreshLevelChanges`; `RecordSheetPageTwo` perde
+  `magicItemDatabase`/`refreshMagicArmorBonus`.
+- `Views/ArmorCompendiumView.swift`: `ArmorPickerSheet` volta a só Armor
+  (`armorRating: Binding<String>`, sem `target`/`character`/recálculo de
+  AC); fonte do "choose" volta a 13pt.
+- `Views/KitCompendiumView.swift`: descrição do Kit volta a
+  `Text(kit.description.fullText)` cru; fonte do "choose" volta a 13pt.
+- `Views/MagicItemCompendiumView.swift`, `MundaneItemCompendiumView.swift`,
+  `ProficiencyCompendiumView.swift`, `SpellSheetView.swift`,
+  `WeaponCompendiumView.swift`: fontes de "choose"/"change" voltam a
+  13pt.
+- Ícone do app: `Assets.xcassets` continua parado fora do pacote (pasta
+  `_icon_wip/` na raiz do repo, não dentro de `THAC0berry.swiftpm/`) —
+  os arquivos não se perderam, só ficam de fora até retomar o item 11
+  com calma, num momento separado desta sessão.
+
+Resultado: a ficha volta a ter exatamente os bugs originais dos itens
+1–10 do pedido do usuário (2026-09-24) — nenhum deles foi corrigido nesta
+versão —, mas o projeto volta ao estado que rodava antes de qualquer
+mudança de hoje. Todos os 11 itens continuam pendentes de reabertura,
+um de cada vez, com verificação de build a cada passo (não mais em lote),
+já que não há Xcode/simulador neste ambiente pra confirmar compilação
+antes de entregar.
+
 ## Ordem sugerida de execução
 
 1. ~~Importar a base~~ — feito, item 1 completo.
@@ -3719,3 +4016,638 @@ outros ajustes.
    iPad de verdade, sem simulador aqui — ver ressalva no próprio item).
 5. ~~Tela Principal + ícones ilustrados~~ — feito, item 8 completo (falta só
    decidir o destino do selo "Session-active", sem pressa).
+
+## LOTE 1 (v1.53, 2026-09-24) — itens 1, 2, 3 reimplementados
+
+Depois do rollback pra v1.48 (build estável confirmada pelo usuário:
+"Essa versão rodou!"), o usuário pediu pra reimplementar a lista de 10
+itens pendentes **em lotes de 3, com verificação de build entre cada
+lote** — em vez de tudo de uma vez, que foi o que causou o build
+silenciosamente quebrado da rodada anterior. Este é o Lote 1.
+
+- **Item 1** — "aumentar/diminuir a WIS fazia o THAC0 piscar em verde
+  mesmo sem gerar ajuste nele": `Models/Character.swift` ganhou de volta
+  `hasPendingConsequence(forKeys:registry:)`, uma versão ESCOPADA de
+  `hasPendingConsequences` (que era global — qualquer consequência
+  pendente acendia TODOS os realces). `Views/CharacterSheetView.swift`:
+  `SavingThrowsForm` e `Thac0TargetForm` voltam a ter
+  `@EnvironmentObject private var ruleset: RulesetRegistry` e usam
+  `.pendingConsequenceHighlight(isActive: character.hasPendingConsequence(forKeys: [...], registry: ruleset))`
+  com a chave específica de cada seção ("savingThrows"/"thac0") em vez do
+  sinal global.
+- **Item 2** — "aumentar atributos que impactam os ability scores não
+  fazem eles piscarem em verde, apesar de corretamente ajustá-los":
+  `Store/ConsequenceEngine.swift`: `applyAutomatic` volta a chamar
+  `character.markRecentAutoChange(rule.key)` depois de `apply(newValue,
+  &character)` — as regras já escreviam certinho no personagem (THAC0,
+  Saving Throws, campos de Ability Details) mas nunca marcavam a mudança
+  pro `ChangeFlash` consumir. `Views/CharacterSheetView.swift`:
+  `AbilityRowForm.cells` volta a `[(String, Binding<String>, String?)]`
+  (terceiro elemento = chave do flash), com
+  `.modifier(OptionalChangeFlash(character: $character, key: cells[index].2))`
+  em cada célula; as 6 chamadas de `AbilityRowForm` em `AbilityScoresForm`
+  (STR/DEX/CON/INT/WIS/CHA) voltam a passar as chaves de cada campo
+  (ex.: `("Hit\nAdj", $character.details.strengthHit, "strengthHit")`,
+  `nil` pros campos sem regra rastreada ainda).
+- **Item 3** — "mudar de Classe ajusta o Hit Dice certinho, mas não
+  pisca em verde como aviso": `PlayerCharacter.refreshHitDiceType(force:)`
+  já chamava `markRecentAutoChange("hitDiceType")` (não foi tocado nesta
+  sessão — sempre esteve lá, mesmo na v1.48). Faltava só o lado da view:
+  `CombatForm` em `Views/CharacterSheetView.swift`, o campo "Hit Dice:"
+  ganhou `.changeFlash(character: $character, key: "hitDiceType")`.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): sweep
+`grep -rn "2026-09-24"` nos 3 arquivos tocados, contagem de chaves
+`{`/`}` balanceada em cada um, e grep confirmando que nenhum símbolo dos
+Lotes 2/3/4 (`baseMovementRate`, `refreshLevelChanges`,
+`addBonusProficiencies`, `displaySections`, `equippedArmorBaseAC`,
+`hasShieldEquipped`, `magicArmorBonus`, `recalculateArmorClass`,
+`refreshMagicArmorBonus`) voltou junto, e que o ícone (`appIcon`/
+`iconAssetName`) continua fora do `Package.swift`.
+
+`Package.swift`: `displayVersion` "1.48"→"1.53" (pulando 1.49-1.52, que
+ficaram associados à rodada de build quebrado), `bundleVersion`
+"155"→"156".
+
+**Itens 4, 5, 6, 7, 8, 9, 10 continuam pendentes** — Lote 2 (itens 4, 8,
+9), Lote 3 (itens 5, 6), Lote 4 (itens 7, 10), cada um só depois do
+usuário confirmar que o lote anterior compilou. Item 11 (ícone) continua
+parado em `_icon_wip/` fora do pacote.
+
+## LOTE 2 (v1.54, 2026-09-24) — itens 4, 8, 9 reimplementados
+
+Depois do usuário confirmar que o Lote 1 (v1.53) rodou, seguindo o Lote 2:
+itens 4, 8 e 9.
+
+- **Item 4** — "choose"/"change" numa fonte bem menor que "close",
+  padronizar em todas as janelas de escolha: `Views/KitCompendiumView.swift`,
+  `ArmorCompendiumView.swift`, `MundaneItemCompendiumView.swift`,
+  `ProficiencyCompendiumView.swift`, `WeaponCompendiumView.swift`,
+  `MagicItemCompendiumView.swift`, `SpellSheetView.swift` — todos os
+  botões "choose" (`Paper.printed`) e "change" (`Paper.printedItalic`)
+  foram de 13pt pra 16pt, igual o "close" que já ficava do lado.
+- **Item 8** — "Movement preenchido automaticamente ao escolher raça":
+  `Models/Race.swift` ganhou `baseMovementRate` (Human/Elf/Half-Elf
+  12", Dwarf/Gnome/Halfling 6" — taxa-padrão de Table 7 do PHB) e
+  `apply(to:)` agora preenche `page2Movement.base` sozinho (só se
+  estava vazio — nunca sobrescreve) e marca
+  `markRecentAutoChange("page2MovementBase")`. Só o campo "Base" é
+  preenchido — Jog/Run/Day dependem de fatores de encumbrance que o
+  app não modela ainda, continuam manuais. `Views/CharacterSheetView.swift`:
+  `MovementForm`, linha "Base", ganhou
+  `.changeFlash(character: $character, key: "page2MovementBase")`.
+- **Item 9** — "Level Changes ajustado automaticamente por classe/raça":
+  `Store/ConsequenceEngine.swift` ganhou `refreshLevelChanges(for:registry:force:)`,
+  que preenche as linhas "THAC0" e "Saving Throws" da tabela "Level
+  Changes" (página 2) varrendo os níveis 1–20 com o MESMO
+  `registry.resolve` que já calcula THAC0/Saves de verdade
+  (`Thac0ByLevelProvider`/`SavingThrowsByLevelProvider` — Tables 53/60
+  do PHB, já conferidas contra o livro) — sem duplicar tabela nenhuma,
+  só observando em que níveis o valor resolvido muda. As linhas
+  "Weapon Proficiencies"/"Non-weapon Proficiencies" ficam de fora de
+  propósito: o app não tem uma tabela verificada de quando cada classe
+  ganha slot novo, e chutar esse número arriscava escrever algo errado
+  — melhor continuar em branco, como sempre foi. Chamado com
+  `force: false` (só preenche linha vazia) ao editar o nível
+  (`RecordHeaderForm`, no `.onChange(of: character.level)` e no
+  `.onAppear`, rede de segurança pra fichas antigas) e com
+  `force: true` (resincroniza mesmo se já tinha algo escrito — a
+  tabela muda de classe pra classe) em `ClassPicker.select`.
+  `Views/CharacterSheetView.swift`: `RecordHeaderForm` e `ClassPicker`
+  ganharam `@EnvironmentObject private var ruleset: RulesetRegistry`;
+  `LevelChangesForm`, linhas "THAC0" e "Saving Throws", ganharam
+  `.changeFlash(character: $character, key: "levelChanges")`.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): sweep
+`grep` confirmando ausência de todo símbolo do Lote 3/4
+(`addBonusProficiencies`, `displaySections`, `equippedArmorBaseAC`,
+`hasShieldEquipped`, `magicArmorBonus`, `recalculateArmorClass`,
+`refreshMagicArmorBonus`), contagem de chaves `{`/`}` balanceada em
+todos os 10 arquivos tocados, e conferência de que nenhum botão
+"choose"/"change" ficou em 13pt.
+
+`Package.swift`: `displayVersion` "1.53"→"1.54", `bundleVersion`
+"156"→"157".
+
+**Itens 5, 6, 7, 10 continuam pendentes** — Lote 3 (itens 5, 6), Lote 4
+(itens 7, 10), cada um só depois do usuário confirmar que o lote
+anterior compilou. Item 11 (ícone) continua parado em `_icon_wip/` fora
+do pacote.
+
+## AJUSTE v1.55 — coluna "By" de Level Changes (item 9)
+
+Usuário perguntou, depois do Lote 2 (v1.54), por que a coluna "By" de
+"Level Changes" vinha preenchida com o texto genérico "book table" —
+pediu ou um link pra consultar a tabela, ou aplicar o valor de verdade
+na linha/coluna. Resposta: os dois.
+
+- `Store/ConsequenceEngine.swift`: `refreshLevelChanges` não escreve
+  mais nada em "By" (não tinha um número CERTO pra pôr ali — a variação
+  de THAC0/Saves entre uma parada e outra não é constante, ex.: Priest
+  cai 2 pontos do nível 3 pro 4 mas só 1 do 10 pro 13). Duas mudanças no
+  lugar:
+  1. "At Levels" da linha THAC0 agora embute o valor de verdade que o
+     THAC0 passa a valer em cada parada — ex. "4 (→18), 7 (→16), 10
+     (→14)" — puxado do mesmo `registry.resolve` que grava o THAC0 real
+     da ficha (não é um número novo, é o mesmo já verificado).
+  2. Saving Throws não embute os 5 números na célula (ficaria
+     ilegível) — pra essa linha os valores reais já aparecem ao vivo na
+     seção "Saving Throws" da própria ficha (pisca em verde quando muda,
+     ver item 1), então "At Levels" só avisa QUANDO conferir.
+  Novo dicionário `ConsequenceEngine.levelChangeRuleIDs` mapeia cada
+  linha pro ID da regra embutida correspondente
+  (`phb_ch09_calculating_thac0`/`phb_ch09_the_saving_throw`).
+- `Views/CharacterSheetView.swift`: `LevelChangeRowView` ganhou um
+  `ruleID: String?` opcional que mostra o botão "?" (`RuleLinkButton`,
+  já usado em `FormSectionTitle`) ao lado do título da linha — abre a
+  tabela completa do livro (`RuleDetailSheet`) sem sair da ficha.
+  `LevelChangesForm` passa `ConsequenceEngine.levelChangeRuleIDs["thac0"]`/
+  `["savingThrows"]` nas duas linhas automáticas; Proficiências
+  continuam sem "?" (não têm regra embutida pra apontar).
+
+`Package.swift`: `displayVersion` "1.54"→"1.55", `bundleVersion`
+"157"→"158".
+
+## AJUSTE v1.56 — coluna "By" de Level Changes ganha valor de verdade
+
+Usuário perguntou de novo (2026-09-24): "'By' fica sempre vazio, como o
+jogador preenche? Dê um exemplo." Resposta certa: não deveria ficar pro
+jogador preencher — o app já TEM o dado, só faltava usar.
+
+- `Store/ConsequenceEngine.swift`: `levelChangeRow` agora devolve
+  `(by:, atLevels:)` em vez de só uma string. Pra THAC0, calcula o
+  delta entre uma parada e a anterior (`newInt - oldInt`, os dois já
+  resolvidos pelo mesmo `registry.resolve` que grava o THAC0 real) e
+  escreve a lista alinhada com "At Levels" — ex., um Cleric fica:
+  "By": "-2, -2, -2, -1, -2, -1" / "At Levels": "4, 7, 10, 13, 16, 19"
+  (mostrando que no nível 4 o THAC0 cai 2 pontos, no 7 cai mais 2, ...,
+  no 19 cai só 1). Um Fighter (cai 1 ponto por nível, do 2 ao 20) fica:
+  "By": "-1, -1, -1, -1, ..." (19 vezes) / "At Levels": "2–20".
+  `refreshLevelChanges` grava os dois campos agora, não só "At Levels".
+- Saving Throws continua sem preencher "By" — são 5 números mudando
+  junto (Paralyzation/Poison/Death, Rod/Staff/Wand, Petrification/
+  Polymorph, Breath Weapon, Spell), um delta só não diria a qual dos
+  cinco se refere. Pra essa linha os valores reais já aparecem ao vivo
+  na própria seção "Saving Throws" da ficha (pisca em verde quando
+  muda), e o botão "?" ao lado do título abre a Table 60 inteira.
+
+`Package.swift`: `displayVersion` "1.55"→"1.56", `bundleVersion`
+"158"→"159".
+
+## PENDÊNCIA — "Level Changes" (item 9) precisa repensar o design
+
+Usuário testou a v1.56 (2026-09-24): "Melhorou, mas acho que não
+funciona bem." Sem detalhar o quê especificamente incomodou — só pediu
+pra anotar aqui e seguir pros próximos lotes por ora. Retomar com calma
+numa sessão futura, sem pressa. Hipóteses a considerar quando isso
+voltar à mesa (nenhuma confirmada pelo usuário ainda):
+- A lista "By": "-2, -2, -2, -1, -2, -1" alinhada por posição com "At
+  Levels" pode estar confusa/pouco legível numa caixinha de texto
+  pequena — talvez precise de um formato mais parecido com o do PDF
+  original, ou de uma apresentação por linha em vez de tudo numa
+  string só.
+- Talvez o formato "4 (→18), 7 (→16)..." do "At Levels" da linha THAC0
+  esteja poluído — o parêntese com seta pode não ser o que o usuário
+  esperava ver ali.
+- Vale perguntar ao usuário, quando retomar, o que especificamente não
+  funcionou (muito texto? formato errado? preferia só o link "?" sem
+  nenhum preenchimento automático? preferia como estava nativamente no
+  PDF, sem nenhuma automação nessa tabela?) antes de tentar uma nova
+  versão — evitar mais um ciclo de tentativa e erro sem esse dado.
+
+## LOTE 3 (v1.57, 2026-09-24) — itens 5, 6 reimplementados
+
+Usuário confirmou anotar a pendência de "Level Changes" (ver seção
+acima) e pediu pra seguir pro próximo lote. Lote 3: itens 5 e 6.
+
+- **Item 5** — "Kit que concede Proficiência deveria adicioná-la
+  automaticamente na ficha": `Store/KitDatabase.swift` ganhou
+  `kit(named:)` (casa `character.kit`, texto livre, contra o nome de um
+  kit da base via `Fuzzy.normalize` — `character.kit` só guarda o nome,
+  nunca um id). `Views/CharacterSheetView.swift`: `RecordHeaderForm`
+  ganhou `@EnvironmentObject` de `KitDatabase`/`ProficiencyDatabase`, um
+  `.onChange(of: character.kit)` e o método
+  `addBonusProficiencies(forKit:)` — lê `kit.mechanics.proficiencies.bonus`
+  (a lista de proficiências que o kit CONCEDE de graça — distinta de
+  `recommended`, que é só sugestão), tenta casar cada nome com a base de
+  proficiências (`matchedProficiencyID`) e adiciona uma `ProficiencyEntry`
+  nova só se ainda não existir (confere por id casado ou nome
+  normalizado — nunca duplica, nunca remove o que já estava lá).
+  `ProficienciesForm` ganhou `.changeFlash(character: $character, key: "proficiencies")`
+  pra avisar quando isso acontece.
+- **Item 6** — "Descrições de Kits com tabelas wikitext quebradas (ex.:
+  Ilmater - Alleviator)": bug real, confirmado em 56 dos 91 kits (todos
+  os de sacerdote especializado, um por divindade) — `fullText` vinha
+  com a tabela-resumo CRUA da wiki (`{| class="article-table" ... |}`)
+  grudada no início do texto, porque o pipeline de conversão (fora do
+  app) só tratava negrito/links, nunca tabela. `Models/Kit.swift`:
+  `KitDescription` ganhou `Section` (title/body) e `displaySections`,
+  que descarta a tabela wikitext crua (o dado dela — Ability
+  Requirements, Prime Requisite, Weapon/Nonweapon Slots, Bonus/
+  Recommended Proficiencies etc. — já aparece estruturado em outro
+  lugar da própria `KitDetailSheet`, via `kit.mechanics.*`/
+  `kit.features.*`, então não perde informação nenhuma) e separa o
+  resto (Overview/Description/Role-Playing/Special Abilities/Special
+  Disadvantages) em blocos por `## Heading`, sem `**negrito**` cru
+  sobrando. `Views/KitCompendiumView.swift`: a seção "Description" da
+  `KitDetailSheet` trocou `Text(kit.description.fullText)` por um
+  `ForEach(kit.description.displaySections)`.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): sweep
+`grep` confirmando ausência de todo símbolo do Lote 4
+(`equippedArmorBaseAC`, `hasShieldEquipped`, `magicArmorBonus`,
+`recalculateArmorClass`, `refreshMagicArmorBonus`), contagem de chaves
+`{`/`}` balanceada nos 4 arquivos tocados.
+
+`Package.swift`: `displayVersion` "1.56"→"1.57", `bundleVersion`
+"159"→"160".
+
+**Item 7, 10 continuam pendentes** — Lote 4 (Armor/Shield AC, Magic
+Item AC), só depois do usuário confirmar que este lote compilou. Item
+11 (ícone) continua parado em `_icon_wip/` fora do pacote.
+
+## AJUSTE v1.58 — proficiência de Kit reaproveita linha vazia (item 5)
+
+Usuário testou o Lote 3 (2026-09-24) e pediu um ajuste: a ficha já
+nasce com 6 linhas de Proficiências em branco (`ProficienciesForm.onAppear`)
+pro jogador preencher — escolher um Kit que concede proficiência estava
+criando uma linha NOVA (a 7ª) em vez de ocupar uma das 6 vazias, o que
+deixava a seção com 6 linhas vazias + 1 preenchida em vez de só
+preencher uma das que já existiam.
+
+- `Views/CharacterSheetView.swift`: `addBonusProficiencies(forKit:)`
+  agora procura primeiro uma linha vazia existente (sem nome e sem
+  proficiência já casada — `matchedProficiencyID == nil`) antes de criar
+  uma linha nova, e reaproveita ela (preserva `id`/`checked`/`target`
+  daquela linha, só troca nome/slots/id casado). Só cria linha nova de
+  verdade quando não sobra nenhuma vazia (personagem que já preencheu
+  as 6 originais).
+
+`Package.swift`: `displayVersion` "1.57"→"1.58", `bundleVersion`
+"160"→"161".
+
+## LOTE 4 (v1.59, 2026-09-24) — itens 7 e 10: Armor Class automático
+
+Últimos dois itens da lista de 10 (item 11, ícone, continua parqueado
+à parte). Área de maior risco do pedido inteiro — é a mesma zona
+(`ArmorClassShield`/seletor de Armor/recálculo de AC por Magic Item)
+que já esteve implicada no travamento de build silencioso que levou
+ao rollback pra v1.48 no início desta sessão; usuário foi avisado
+antes de começar e confirmou ("Manda bala!").
+
+- Item 7 ("Armor mostra só '1' no campo, AC base não muda; estender
+  pra Shield"): o campo "Armor" da página 2 (`character.armorRating`)
+  e o círculo grande de AC da página 1 (`character.armorClass`)
+  viviam 100% desconectados — escolher uma armadura no seletor só
+  preenchia o campinho de texto, sem tocar no AC de verdade. "Shield"
+  nem seletor tinha.
+- Item 10 ("Magic Items — armadura mágica — não muda o AC"): a lista
+  "Magic Items" da página 2 também não tinha nenhuma ligação com o AC,
+  mesmo quando o item ligado (`matchedItemID`) tinha um
+  `defenseBonus.acBonus` de verdade na base.
+
+**O que mudou:**
+
+- `Store/ConsequenceEngine.swift`: nova `recalculateArmorClass(for:
+  magicItemDatabase:)`. Soma `armorRating` (já um AC final de verdade
+  na base embutida, ex. Plate Mail = 3) + `shieldRating` (escudo não
+  tem `baseAC` próprio na base — a regra central de 2e é -1 fixo de
+  AC por qualquer escudo, ver abaixo) + o `defenseBonus.acBonus` de
+  cada Magic Item ligado por `matchedItemID` (SUBTRAÍDO — AC menor é
+  melhor em 2e, `acBonus` vem como inteiro positivo representando o
+  nível de encantamento). Só escreve quando o total calculado é
+  diferente do AC atual, e só roda se `armorRating` for um número de
+  verdade (campo vazio ou texto livre não numérico não disparam
+  nada). Dexterity (`details.dexterityDefense`) fica de fora de
+  propósito — nenhum dos dois itens pediu isso, e essa conta já mexe
+  na área mais visível da ficha sem precisar arriscar contar um bônus
+  em dobro.
+- `Views/ArmorCompendiumView.swift`: `ArmorPickerSheet` generalizado
+  — trocou o binding fixo `armorRating` por `rating` + um parâmetro
+  `kind: ArmorPieceKind` (`.armor` por padrão), então a mesma sheet
+  serve pra Armor E Shield agora. `choose(_:)` grava o `baseAC` da
+  peça quando existe (armadura) ou, pra escudo (sem `baseAC` na
+  base), grava o "-1" fixo da regra central de 2e.
+- `Views/CharacterSheetView.swift`:
+  - `ArmorBlock`: campo "Shield" ganhou seletor próprio
+    (`showShieldPicker`/segunda `ArmorPickerSheet(rating: $character.
+    shieldRating, kind: .shield)`), igual ao que "Armor" já tinha.
+    `.onChange(of: character.armorRating)` e `.onChange(of: character.
+    shieldRating)` chamam `recalculateArmorClass` sempre que um dos
+    dois muda (seletor OU digitação direta).
+  - `RecordSheetPageTwo`: `.onChange(of: character.page2MagicItems)`
+    chama `recalculateArmorClass` sempre que a lista de Magic Items
+    muda (item ligado, trocado ou removido).
+  - `CombatForm`: `ArmorClassShield` ganhou
+    `.changeFlash(character: $character, key: "armorClass")` — o
+    círculo de AC pisca verde quando o recálculo automático mexe nele,
+    mesma linguagem visual já usada nos outros itens.
+
+De propósito, o recálculo NUNCA roda em `onAppear`/ao abrir a ficha —
+só reage a uma mudança de verdade em Armor/Shield/Magic Items. Rodar
+no `onAppear` sobrescreveria silenciosamente um AC que o jogador tenha
+ajustado a mão por um motivo que a conta automática não conhece (um
+efeito temporário, por exemplo) toda vez que ele trocasse de aba e
+voltasse — risco maior que o benefício de "sincronizar" uma ficha
+salva antes desta versão.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): sweep
+`grep` confirmando que `ArmorPickerSheet(rating:` é a única forma de
+chamada (nenhum resquício do parâmetro antigo `armorRating:` em outro
+lugar), ausência de qualquer símbolo do item 11 (ícone), contagem de
+chaves `{`/`}` balanceada nos 3 arquivos tocados
+(`Store/ConsequenceEngine.swift`, `Views/ArmorCompendiumView.swift`,
+`Views/CharacterSheetView.swift`).
+
+`Package.swift`: `displayVersion` "1.58"→"1.59", `bundleVersion`
+"161"→"162".
+
+**Os 10 itens de código do pedido original estão implementados.**
+Resta só o item 11 (ícone do app), parqueado à parte em `_icon_wip/`
+fora do `.swiftpm`, pra retomar só depois do usuário confirmar que
+este lote compilou — e a pendência já anotada sobre "Level Changes"
+(item 9), pra revisitar quando o usuário disser especificamente o que
+não funcionou bem.
+
+## AJUSTE v1.60 — Armor/Magic Items não recalculavam o AC (itens 7/10)
+
+Usuário testou o Lote 4 (2026-09-24) e reportou: "Ao mudar o valor em
+'Shield' o AC foi sensibilizado corretamente, mas depois mudei Armor
+e incluí/excluí armadura mágica e nada mudou o AC."
+
+**Causa raiz encontrada:** `ConsequenceEngine.recalculateArmorClass`
+tinha um `guard` travado só em `armorRating` — se esse campo não
+fosse um número válido no momento da chamada, a função inteira
+retornava sem calcular NADA, nem a parte de Shield nem a de Magic
+Items (que dependiam do mesmo cálculo). `shieldRating` já tinha o
+tratamento certo (`Int?` opcional — falha de parse conta como "sem
+contribuição", não trava a função); `armorRating` não. E existia uma
+fonte concreta de "lixo" nesse campo: `Models/SampleCharacter.swift`
+(a ficha de exemplo, Kelmon) tinha `shieldRating = "−2"` usando o
+SINAL DE MENOS matemático (U+2212, "−") em vez do hífen ASCII
+("-") — `Int.init?(String)` só reconhece o hífen comum. O iPadOS
+troca "-" por "–"/"−" sozinho em certos teclados/autocorreção, então
+um jogador digitando "-1" a mão corre o mesmo risco.
+
+- `Store/ConsequenceEngine.swift`: `recalculateArmorClass` reescrita
+  — `armorRating` agora usa o mesmo tratamento "soft" de
+  `shieldRating` (`Int?`, não trava mais os outros dois campos).
+  Nova `parsedRating(_:)` normaliza "−"/"–"/"—" pro hífen ASCII antes
+  do parse, resolvendo a causa concreta. A função só desiste de vez
+  quando NENHUM dos três sinais (Armor/Shield/Magic Items) existe —
+  preserva a intenção original de não forçar o AC pra 0 numa ficha
+  ainda sem equipamento nenhum.
+- `Models/SampleCharacter.swift`: `kelmon.shieldRating` trocado de
+  `"−2"` (sinal de menos matemático, inválido) pra `"-2"` (hífen
+  ASCII).
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+contagem de chaves `{`/`}` balanceada nos 2 arquivos tocados.
+
+`Package.swift`: `displayVersion` "1.59"→"1.60", `bundleVersion`
+"162"→"163".
+
+## LOTE 5 (v1.61, 2026-09-24) — item 11: ícone do app
+
+Último item do pedido original de 2026-09-24. Reaberto só agora, de
+propósito, depois dos 10 itens de código confirmados pelo usuário —
+essa é EXATAMENTE a peça que causou o travamento de build silencioso
+(sem nenhuma mensagem de erro em lugar nenhum) que levou ao rollback
+completo pra v1.48 no início desta sessão, inclusive com a MESMA
+imagem (dragão policial de óculos escuros e revólver, pixel art,
+emblema circular azul, 1254×1254 — reenviada pelo usuário agora).
+
+**Hipótese da causa raiz, revisitada:** relendo o histórico da
+tentativa anterior (linhas ~3928-3960 acima), o catálogo
+`Assets.xcassets/AppIcon.appiconset` tinha sido colocado DENTRO de
+`Resources/` (`Resources/Assets.xcassets/...`). Esse é o lugar
+errado — projetos de App do Swift Playgrounds esperam o
+`Assets.xcassets` na RAIZ do pacote, do lado do `Package.swift`, não
+dentro de uma pasta de recurso genérico (`Resources/`, que só é
+processada pelo `.process("Resources")` do target pra recursos de
+runtime — o catálogo de ícone é compilado por um caminho separado,
+específico do Swift Playgrounds). Nunca dá pra confirmar 100% sem
+Xcode/simulador neste ambiente, mas é uma diferença estrutural real e
+uma explicação plausível pro silêncio total do build (o Swift
+Playgrounds é conhecido por engolir erro de `actool`/asset catalog
+sem mostrar nada na UI, diferente de erro de código Swift).
+
+**O que mudou desta vez:**
+
+- `THAC0berry.swiftpm/Assets.xcassets/AppIcon.appiconset/` criado na
+  RAIZ do pacote (não dentro de `Resources/`) — `AppIcon.png`
+  (1024×1024, RGB 8-bit, SEM canal alfa — confirmado por script,
+  ícone de app não pode ter transparência) + `Contents.json` no
+  formato "single size" moderno (`idiom: "universal"`, um PNG só, sem
+  precisar gerar o conjunto antigo de tamanhos por idiom).
+- `Package.swift`: `appIcon: .asset("AppIcon")` adicionado ao
+  `.iOSApplication(...)` — MESMA posição/sintaxe já confirmada
+  correta na tentativa anterior (o parâmetro certo é `appIcon:`, não
+  `iconAssetName:`, que já tinha dado erro de compilação claro da vez
+  passada e foi corrigido; o problema que restou era silencioso e
+  ligado ao catálogo, não a este parâmetro). `displayVersion`
+  "1.60"→"1.61", `bundleVersion` "163"→"164".
+- `_icon_wip/` (pasta fora do pacote onde o ícone ficou parqueado o
+  dia inteiro) removida — o ícone agora vive de verdade dentro do
+  `.swiftpm`.
+
+Entregue como versão ISOLADA de propósito — se o build travar
+silenciosamente de novo, é só reverter este lote sozinho (`Package.
+swift` volta pra 1.60/163 sem `appIcon:`, `Assets.xcassets` sai do
+pacote) sem arriscar nenhum dos 10 itens de código já confirmados.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+`Assets.xcassets` confirmado FORA de `Resources/` (script), PNG
+confirmado 1024×1024 RGB sem alpha (script), nenhuma referência a
+`iconAssetName` sobrando em `Package.swift`.
+
+**Com isto, os 11 itens do pedido original de 2026-09-24 estão
+implementados** — resta confirmar que o build do Playground aceita o
+ícone desta vez, e a pendência já anotada sobre "Level Changes" (item
+9), que segue em aberto até o usuário detalhar o que não funcionou
+bem.
+
+## LOTE 6 (v1.62, 2026-09-24) — caderno: caneta preta, folha pautada/quadriculada
+
+Usuário testou v1.61 (ícone) — "Assim rodou liso! Uhuuuuu!!" — e trouxe
+três pedidos novos pro caderno de anotações:
+
+1. **Caneta abria branca** — quase invisível no papel claro do caderno.
+2. **Dois estilos de folha novos**: pautada e quadriculada, com opção de
+   trocar.
+3. **Configurações gerais**: escolher o estilo de folha PADRÃO pra folha
+   nova (liso/pautado/quadriculado).
+
+**O que mudou:**
+
+- `Views/NotebookView.swift` (`DrawingCanvas`, a folha de desenho livre):
+  cor da tinta trocada de um azul-marinho (`#1E3557`) pra preto
+  (`defaultInkColor = UIColor.black`). A causa do "branco" não era o
+  valor inicial (`makeUIView` já não era branco) — é que `PKToolPicker`
+  sincroniza, ao ser anexado, a ÚLTIMA cor de tinta usada em QUALQUER app
+  com Apple Pencil no aparelho (estado do SISTEMA, não deste app) por
+  cima do que já tinha sido definido — por isso a cor agora é reafirmada
+  de novo logo DEPOIS do anexo em `updateUIView`, não só em `makeUIView`.
+- `Models/Character.swift`: novo `enum NotebookPaperStyle` (`.plain`/
+  `.lined`/`.grid`) e `NotebookEntry.paperStyle: NotebookPaperStyle?`
+  (Optional pela convenção de sempre — folha antiga sem a chave cai pra
+  `.plain`, que já era o único estilo que existia). `Campaign.
+  addNotebookPage(kind:paperStyle:)` ganhou o segundo parâmetro (default
+  `.plain`, pra não quebrar chamada antiga).
+- `Views/NotebookView.swift`: nova `NotebookPaperTexture` — desenha linhas
+  horizontais (pautada) ou malha (quadriculada) como FUNDO da área de
+  escrita/desenho (`Canvas`, sem capturar toque — `.allowsHitTesting(false)`),
+  atrás tanto da folha transcrita quanto da de desenho livre. Cabeçalho da
+  folha (`NotebookPageView.header`) ganhou um `Menu` pra trocar o estilo
+  DESTA folha a qualquer momento — cada folha guarda a própria escolha,
+  independente da folha ao lado.
+- `Store/CharacterLibrary.swift`: novo `@Published var
+  defaultNotebookPaperStyle: NotebookPaperStyle = .plain` (mesmo padrão de
+  `favoriteSpellIDs` — persiste em `library.json`, entra no Export/Import
+  de backup, decode com fallback pra `.plain` em biblioteca salva antes
+  deste pedido).
+- `Views/SettingsView.swift`: nova seção "Notebook" com um Picker
+  segmentado ligado a `library.defaultNotebookPaperStyle` — só afeta
+  folha NOVA; folha existente mantém o que já tinha (trocável no próprio
+  cabeçalho, ver acima).
+- `NotebookBeadRow`/`NotebookEmptyState` (os dois lugares que criam folha
+  nova): ganharam `@EnvironmentObject private var library:
+  CharacterLibrary` pra ler o padrão configurado na hora de chamar
+  `addNotebookPage`.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): sweep
+`grep` confirmando as 2 chamadas de `addNotebookPage` atualizadas, os
+tipos novos (`NotebookPaperStyle`/`NotebookPaperTexture`) declarados uma
+única vez cada, contagem de chaves `{`/`}` balanceada nos 4 arquivos
+Swift tocados.
+
+`Package.swift`: `displayVersion` "1.61"→"1.62", `bundleVersion`
+"164"→"165".
+
+## AJUSTE v1.63 — caneta da escrita livre ainda abria branca
+
+Usuário testou v1.62 e reportou: "a cor da caneta na escrita livre
+permanece a branca por padrão", mesmo depois do ajuste de reafirmar a
+cor logo após anexar o `PKToolPicker`.
+
+**Causa raiz:** a reafirmação em v1.62 acontecia na MESMA passada de
+`setVisible`/`addObserver` — mas a sincronização do `PKToolPicker` (a
+última cor usada em qualquer app com Pencil no aparelho, ver AJUSTE
+v1.62 acima) acontece de forma ASSÍNCRONA, alguns instantes DEPOIS
+dessas chamadas retornarem, não durante. Uma atribuição só, síncrona,
+perdia essa corrida — o picker ainda vencia por cima logo em seguida.
+
+- `Views/NotebookView.swift` (`DrawingCanvas.updateUIView`): a cor
+  agora é reafirmada TRÊS vezes no anexo inicial — imediatamente, e de
+  novo via `DispatchQueue.main.async`/`asyncAfter(0.3s)`, que rodam
+  DEPOIS de qualquer sincronização pendente do picker no mesmo
+  runloop. Só acontece uma vez no anexo inicial — nunca briga com uma
+  cor que o jogador escolha depois.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+contagem de chaves `{`/`}` balanceada em `Views/NotebookView.swift`.
+
+`Package.swift`: `displayVersion` "1.62"→"1.63", `bundleVersion`
+"165"→"166".
+
+## AJUSTE v1.64 — causa raiz real da caneta branca: cor adaptativa do PencilKit
+
+Usuário testou v1.63 (reafirmação tripla contra suposta corrida
+assíncrona com o `PKToolPicker`) e reportou: "Nada mudou". Isso invalida
+a teoria usada em v1.62 e v1.63 — o problema nunca foi TIMING.
+
+**Causa raiz de verdade:** o PencilKit trata `UIColor.black` e
+`UIColor.white` como cores ADAPTATIVAS — ele inverte automaticamente
+entre preto e branco de acordo com o `userInterfaceStyle` (claro/escuro)
+do canvas, pra tinta continuar visível em qualquer fundo (comportamento
+documentado da Apple, não um bug de sincronização). O papel deste app é
+sempre claro, mas o SISTEMA podia estar em Modo Escuro — nesse caso o
+`.black` literal virava branco por baixo dos panos, e reatribuir
+`.black` de novo (mesmo três vezes, em instantes diferentes) não tinha
+efeito nenhum, porque a cor em si continuava sendo a adaptativa.
+
+- `Views/NotebookView.swift` (`DrawingCanvas`):
+  - `defaultInkColor` trocado de `UIColor.black` pra um RGB explícito
+    quase-preto (`UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1)`)
+    — deixa de ser a cor especial que o PencilKit reconhece e inverte.
+  - `makeUIView` e `updateUIView` agora forçam
+    `canvas.overrideUserInterfaceStyle = .light` no `PKCanvasView`,
+    removendo de vez o gatilho da inversão, não importa o tema do
+    sistema no aparelho.
+  - A reafirmação tripla de v1.63 (baseada na teoria de corrida, já
+    descartada) foi simplificada de volta pra uma reafirmação única
+    logo após anexar o `PKToolPicker` — suficiente agora que a cor em
+    si não é mais adaptativa.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+contagem de chaves `{`/`}` balanceada em `Views/NotebookView.swift`
+(141/141); sweep `grep` confirmando que nenhum outro lugar do arquivo
+usa `.black`/`.white`/`.label` (cores adaptativas) pra tinta.
+
+`Package.swift`: `displayVersion` "1.63"→"1.64", `bundleVersion`
+"166"→"167".
+
+## AJUSTE v1.65 — tinta já saía preta, mas o seletor de cor do PKToolPicker mostrava branco
+
+Usuário testou v1.64 (RGB explícito + canvas travado em modo claro) e
+confirmou que a TINTA já saía preta de verdade. Só sobrou um efeito
+colateral: o seletor de cor do próprio `PKToolPicker` (a barrinha
+flutuante da Apple Pencil, com os círculos de cor) continuava mostrando
+branco como a cor "atual" selecionada.
+
+**Causa raiz:** o `PKToolPicker` é um popover do SISTEMA, fora da
+hierarquia de views do app — ele tem sua PRÓPRIA propriedade
+`overrideUserInterfaceStyle`, independente da que o AJUSTE v1.64 já
+usa no `PKCanvasView`. Travar só o canvas resolve o traço desenhado na
+tela, mas não o picker: sem travar ele também, seus próprios swatches
+(inclusive o círculo que mostra a cor atual) continuavam seguindo o
+tema do sistema e resolvendo de forma adaptativa.
+
+- `Views/NotebookView.swift` (`DrawingCanvas.updateUIView`): agora
+  também define `toolPicker.overrideUserInterfaceStyle = .light` logo
+  ao criar a instância do picker, junto do travamento que já existia
+  no canvas.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+contagem de chaves `{`/`}` balanceada em `Views/NotebookView.swift`
+(141/141); confirmado via documentação oficial da Apple
+(`PKToolPicker.overrideUserInterfaceStyle`) que essa propriedade existe
+e controla exatamente a aparência do próprio picker, separada da do
+canvas.
+
+`Package.swift`: `displayVersion` "1.64"→"1.65", `bundleVersion`
+"167"→"168".
+
+## LOTE 7 (v1.66, 2026-09-24) — tirar a criação automática da campanha padrão e do Kelmon
+
+Pedido do usuário: "tire a criação automática da campanha padrão e do
+Kelmon".
+
+- `Store/CharacterLibrary.swift` (`load()`): na primeira execução (sem
+  `library.json` ainda no disco), o app parava de semear a campanha +
+  personagem de exemplo (`PlayerCharacter.kelmonWithCampaign()`, o
+  Kelmon) e simplesmente abria com `campaigns`/`characters` vazios —
+  já é o valor padrão dos `@Published` no topo da classe, então não
+  precisa de nenhum código extra pra isso.
+- Mesma remoção no branch de erro (JSON salvo de uma versão antiga que
+  não decodifica mais): antes também caía pro Kelmon de exemplo; agora
+  só registra o erro em `lastError` e deixa a pasta vazia, pronta pra
+  um Import de backup (`SettingsView`) se o jogador tiver um.
+- O helper `seedSample()` ficou sem chamada nenhuma — removido.
+  `Models/SampleCharacter.swift` (o `kelmonWithCampaign()` em si) foi
+  MANTIDO no projeto, só não é mais chamado de lugar nenhum — não tem
+  motivo pra apagar o arquivo por uma limpeza de referência que pode
+  voltar a ser útil (testes, por exemplo).
+- Conferido que as telas que listam campanha/personagem
+  (`CampaignListView`, `AllCharactersView`) já tinham estado vazio
+  (`campaigns.isEmpty`/`characters.isEmpty`) preparado de antes — abrir
+  sem nada semeado não é um estado novo pro app, só deixou de nascer
+  pré-preenchido.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível):
+contagem de chaves `{`/`}` balanceada em `Store/CharacterLibrary.swift`
+(82/82); sweep `grep` confirmando que `kelmonWithCampaign`/
+`seedSample` não têm mais nenhuma chamada ativa.
+
+`Package.swift`: `displayVersion` "1.65"→"1.66", `bundleVersion`
+"168"→"169".

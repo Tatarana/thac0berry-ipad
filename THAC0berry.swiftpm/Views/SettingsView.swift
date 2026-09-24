@@ -38,6 +38,7 @@ struct SettingsView: View {
                 Rectangle().fill(Ember.brassDim).frame(height: 1.4)
 
                 VStack(alignment: .leading, spacing: 10) {
+                    notebookSection
                     backupSection
 
                     HStack {
@@ -139,6 +140,33 @@ struct SettingsView: View {
                 .background(Color.white.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
+        }
+        .padding(14)
+        .emberCard(accent: Ember.brassDim)
+    }
+
+    /// Item 3 do pedido do usuário (2026-09-24): "nas configurações
+    /// gerais, deixar o jogador definir o tipo de folha padrão: liso,
+    /// pautado ou quadriculado" — vale só pra folha NOVA do caderno
+    /// (`Campaign.addNotebookPage`); folha já existente mantém o que já
+    /// tinha, trocável a qualquer momento no próprio cabeçalho da folha
+    /// (ver item 2, `NotebookPageView`).
+    private var notebookSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Notebook")
+                .font(Paper.printed(13))
+                .fontWeight(.bold)
+                .foregroundStyle(Ember.onObsidian)
+            Text("Default paper for new notebook pages. Existing pages keep whatever style they already have — change one from its own page.")
+                .font(Paper.printedItalic(12.5))
+                .foregroundStyle(Ember.onObsidianSoft)
+
+            Picker("Default paper", selection: $library.defaultNotebookPaperStyle) {
+                ForEach(NotebookPaperStyle.allCases, id: \.self) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
         }
         .padding(14)
         .emberCard(accent: Ember.brassDim)

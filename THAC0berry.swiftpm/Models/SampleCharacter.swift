@@ -61,7 +61,11 @@ extension PlayerCharacter {
         kelmon.hitPointsCurrent = 47
         kelmon.armorClass = 0
         kelmon.armorRating = "3"
-        kelmon.shieldRating = "−2"
+        // Hífen ASCII de propósito (não o "−" matemático/U+2212) — é
+        // exatamente essa troca de caractere que causava o bug corrigido em
+        // `ConsequenceEngine.recalculateArmorClass` (AJUSTE 2026-09-24):
+        // `Int.init?(String)` não reconhece o sinal de menos "bonito".
+        kelmon.shieldRating = "-2"
         kelmon.thac0 = 14
         kelmon.experience = 712_450
 

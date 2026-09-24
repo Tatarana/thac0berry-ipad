@@ -229,6 +229,21 @@ enum RaceOption: String, CaseIterable, Identifiable, Hashable {
         switch self { case .dwarf, .gnome, .halfling: return true; default: return false }
     }
 
+    // MARK: - Movement básico (Table 7, "Base Movement Rate")
+    // Item 8 do pedido do usuário (2026-09-24): "Movement preenchido
+    // automaticamente ao escolher raça" — mesma taxa-padrão de todo
+    // material 2e (Human/Elf/Half-Elf 12", Dwarf/Gnome/Halfling 6", os
+    // "pequenos" da lista). Só preenche o campo "Base" — os outros
+    // (Jog/Run/Day) dependem de fator de encumbrance e outras variáveis
+    // que o app não modela ainda, então continuam em branco pro jogador
+    // preencher à mão (igual antes desta mudança).
+    var baseMovementRate: String {
+        switch self {
+        case .human, .elf, .halfElf: return "12\""
+        case .dwarf, .gnome, .halfling: return "6\""
+        }
+    }
+
     // MARK: - Texto de referência (habilidades raciais) — preenche
     // `PlayerCharacter.racialAbilities` só se esse campo ainda estiver
     // vazio (nunca sobrescreve texto que o jogador já escreveu ali).
@@ -286,6 +301,16 @@ enum RaceOption: String, CaseIterable, Identifiable, Hashable {
         if character.racialAbilities?.isEmpty ?? true, let specialAbilitiesText {
             character.racialAbilities = specialAbilitiesText
             character.markRecentAutoChange("racialAbilities")
+        }
+
+        // Item 8 do pedido do usuário (2026-09-24): preenche "Movement"
+        // (página 2) sozinho ao escolher raça — mesmo cuidado de nunca
+        // sobrescrever um valor que o jogador já tenha digitado ali.
+        var movement = character.page2Movement ?? MovementRates()
+        if movement.base.isEmpty {
+            movement.base = baseMovementRate
+            character.page2Movement = movement
+            character.markRecentAutoChange("page2MovementBase")
         }
     }
 }
