@@ -45,7 +45,7 @@ struct NotebookPagerView: UIViewControllerRepresentable {
                 context.coordinator.isTransitioning = false
             }
         } else if let visible = pager.viewControllers?.first as? NotebookPageController {
-            visible.rootView = pageContent(for: visible.entryID)
+            visible.rootView = pageContent(for: visible.entryID, readiness: visible.readiness)
         }
     }
 
@@ -53,7 +53,7 @@ struct NotebookPagerView: UIViewControllerRepresentable {
 
     // MARK: - Conteúdo e vizinhança
 
-    fileprivate func pageContent(for id: UUID) -> AnyView {
+    fileprivate func pageContent(for id: UUID, readiness: PageReadiness) -> AnyView {
         guard let index = campaign.notebookEntries.firstIndex(where: { $0.id == id }) else {
             return AnyView(
                 Text("This page is no longer in the notebook.")
@@ -73,7 +73,8 @@ struct NotebookPagerView: UIViewControllerRepresentable {
                 ),
                 pageNumber: index + 1,
                 pageCount: campaign.notebookEntries.count,
-                onDelete: { deleteEntry(id) }
+                onDelete: { deleteEntry(id) },
+                pageReadiness: readiness
             )
             .padding(18)
         )
@@ -122,7 +123,13 @@ struct NotebookPagerView: UIViewControllerRepresentable {
         }
 
         fileprivate func makePage(for id: UUID) -> NotebookPageController? {
-            NotebookPageController(entryID: id, rootView: parent.pageContent(for: id))
+            // Cada folha ganha sua PRÓPRIA `PageReadiness` — ver o comentário
+            // em `PageReadiness` e em `NotebookPageController.viewDidAppear`
+            // pra causa raiz do crash que isso resolve.
+            let readiness = PageReadiness()
+            return NotebookPageController(entryID: id,
+                                          rootView: parent.pageContent(for: id, readiness: readiness),
+                                          readiness: readiness)
         }
 
         func pageViewController(_ pageViewController: UIPageViewController,
@@ -155,8 +162,40 @@ struct NotebookPagerView: UIViewControllerRepresentable {
                   let visible = pageViewController.viewControllers?.first as? NotebookPageController
             else { return }
             parent.currentID = visible.entryID
-            visible.rootView = parent.pageContent(for: visible.entryID)
+            visible.rootView = parent.pageContent(for: visible.entryID, readiness: visible.readiness)
         }
+    }
+}
+
+/// Sinaliza quando UMA folha específica do caderno terminou de "aparecer"
+/// de verdade — ver `NotebookPageController.viewDidAppear` — pra quem
+/// precisa saber que a animação de curl da página já passou, não só que a
+/// view entrou numa janela. Um objeto por folha (criado em `Coordinator.
+/// makePage`), guardado tanto no controller (que o completa) quanto na
+/// própria `DrawingCanvas` (que espera por ele) — não é `ObservableObject`
+/// de propósito: é só uma campainha de disparo único, sem precisar de
+/// Combine/SwiftUI pra isso.
+final class PageReadiness {
+    private var pending: (() -> Void)?
+    private(set) var isReady = false
+
+    /// Chama `block` assim que a folha terminar de aparecer — na hora, se
+    /// isso já tiver acontecido (ex.: reabrindo uma folha que já apareceu
+    /// antes e só teve o conteúdo atualizado no lugar).
+    func onReady(_ block: @escaping () -> Void) {
+        if isReady {
+            block()
+        } else {
+            pending = block
+        }
+    }
+
+    func markReady() {
+        guard !isReady else { return }
+        isReady = true
+        let block = pending
+        pending = nil
+        block?()
     }
 }
 
@@ -164,9 +203,11 @@ struct NotebookPagerView: UIViewControllerRepresentable {
 /// que ela representa — mesmo truque do `DayPageController`.
 private final class NotebookPageController: UIHostingController<AnyView> {
     let entryID: UUID
+    let readiness: PageReadiness
 
-    init(entryID: UUID, rootView: AnyView) {
+    init(entryID: UUID, rootView: AnyView, readiness: PageReadiness) {
         self.entryID = entryID
+        self.readiness = readiness
         super.init(rootView: rootView)
         view.backgroundColor = .clear
     }
@@ -174,6 +215,24 @@ private final class NotebookPageController: UIHostingController<AnyView> {
     @available(*, unavailable)
     required dynamic init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    // AJUSTE (crash na criação de página "Freeform"): a tentativa anterior
+    // (adiar o anexo do PKToolPicker com `DispatchQueue.main.async`) não
+    // resolveu — o usuário confirmou "está exatamente igual". Um só ciclo
+    // do run loop não é garantia nenhuma de que a animação de curl do
+    // `UIPageViewController` já tenha terminado; a curl roda por várias
+    // dezenas de ciclos. `viewDidAppear` é o sinal de verdade que o UIKit
+    // já dá pra "esta página terminou de aparecer" — inclusive depois do
+    // curl, tanto pra troca animada (`+` numa folha já existente) quanto
+    // pra primeira folha (`animated: false`, onde ele dispara assim que o
+    // pager entra na janela). `PageReadiness` carrega esse aviso até a
+    // `DrawingCanvas` correspondente, que só aí liga o `PKToolPicker` e
+    // pede o first responder — nunca mais no meio da transação de
+    // animação que o UIPageViewController ainda está processando.
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        readiness.markReady()
     }
 }
 
@@ -281,6 +340,7 @@ private struct NotebookPageView: View {
     let pageNumber: Int
     let pageCount: Int
     let onDelete: () -> Void
+    let pageReadiness: PageReadiness
 
     private var kind: NotebookPageKind { entry.kind ?? .transcribed }
 
@@ -373,7 +433,7 @@ private struct NotebookPageView: View {
         case .freeform:
             // Tela de desenho de verdade — sem transcrição nenhuma, pra
             // quem tem letra feia ou quer desenhar um mapa/rabisco.
-            DrawingCanvas(drawingData: $entry.drawingData)
+            DrawingCanvas(drawingData: $entry.drawingData, readiness: pageReadiness)
                 .frame(minHeight: 420)
                 .background(NotebookPaperTexture(style: style))
                 .overlay(Rectangle().stroke(Paper.hairline, lineWidth: 1))
@@ -501,6 +561,10 @@ private struct NewPageButton: View {
 /// assim que a página vira primeira respondedora.
 struct DrawingCanvas: UIViewRepresentable {
     @Binding var drawingData: Data?
+    /// Ver `PageReadiness` — avisa quando esta folha terminou de aparecer
+    /// de verdade (inclusive depois de qualquer animação de curl), pra só
+    /// então ligar o `PKToolPicker`.
+    let readiness: PageReadiness
 
     /// Item 1 do pedido do usuário (2026-09-24): "a cor padrão da caneta é
     /// branca, e isso é horrível pq mal dá pra ver. Troca pelo preto."
@@ -535,6 +599,10 @@ struct DrawingCanvas: UIViewRepresentable {
         if let data = drawingData, let drawing = try? PKDrawing(data: data) {
             canvas.drawing = drawing
         }
+        // Ver o comentário em `Coordinator.lastSyncedData`: registra aqui o
+        // valor que o canvas JÁ nasceu mostrando, pra `updateUIView` não
+        // achar que esse mesmo valor "mudou por fora" na primeira passada.
+        context.coordinator.lastSyncedData = drawingData
         return canvas
     }
 
@@ -556,38 +624,74 @@ struct DrawingCanvas: UIViewRepresentable {
             uiView.overrideUserInterfaceStyle = .light
         }
 
-        if !context.coordinator.didAttachToolPicker, uiView.window != nil {
+        if !context.coordinator.didAttachToolPicker {
             context.coordinator.didAttachToolPicker = true
-            let toolPicker = PKToolPicker()
-            // AJUSTE (2026-09-24, mesmo dia — usuário reportou que a tinta
-            // já saía preta, mas o SELETOR DE COR do próprio PKToolPicker
-            // continuava mostrando branco como a cor atual): o
-            // `PKToolPicker` é um popover do SISTEMA, fora da hierarquia de
-            // views do app — ele tem sua PRÓPRIA `overrideUserInterfaceStyle`,
-            // independente da que já força o `PKCanvasView` pro modo claro
-            // acima. Sem travar o picker também, ele seguia o tema do
-            // sistema e desenhava seus próprios swatches (inclusive o que
-            // mostra a cor "atual") de forma adaptativa, mesmo já não
-            // afetando mais o traço em si.
-            toolPicker.overrideUserInterfaceStyle = .light
-            context.coordinator.toolPicker = toolPicker
-            toolPicker.setVisible(true, forFirstResponder: uiView)
-            toolPicker.addObserver(uiView)
-            uiView.becomeFirstResponder()
 
-            // A causa raiz era a cor adaptativa preto/branco do PencilKit
-            // (ver comentário em `defaultInkColor`), não uma corrida com o
-            // `PKToolPicker` — mas como o picker pode mesmo trocar a
-            // ferramenta ativa ao anexar, reafirma a cor (já não-adaptativa
-            // agora) logo em seguida, só nesse anexo inicial, sem brigar
-            // com uma escolha do jogador depois.
-            uiView.tool = PKInkingTool(.pen, color: Self.defaultInkColor, width: 3)
+            // AJUSTE (crash na criação de página "Freeform" — tentativa 2):
+            // a primeira tentativa adiava o anexo do `PKToolPicker` com
+            // `DispatchQueue.main.async`, e o usuário confirmou que não
+            // mudou nada. Fazia sentido: um único ciclo do run loop não é
+            // garantia nenhuma de que a animação de curl do
+            // `UIPageViewController` (que dura vários ciclos) já tenha
+            // terminado — o anexo continuava caindo NO MEIO da transação de
+            // animação, só um instante mais tarde. `readiness.onReady`
+            // (ver `PageReadiness`/`NotebookPageController.viewDidAppear`)
+            // é o sinal de verdade do próprio UIKit de que a folha terminou
+            // de aparecer, curl incluso — não uma estimativa de tempo.
+            readiness.onReady { [weak uiView] in
+                guard let uiView, uiView.window != nil else { return }
+
+                let toolPicker = PKToolPicker()
+                // AJUSTE (2026-09-24, mesmo dia — usuário reportou que a tinta
+                // já saía preta, mas o SELETOR DE COR do próprio PKToolPicker
+                // continuava mostrando branco como a cor atual): o
+                // `PKToolPicker` é um popover do SISTEMA, fora da hierarquia de
+                // views do app — ele tem sua PRÓPRIA `overrideUserInterfaceStyle`,
+                // independente da que já força o `PKCanvasView` pro modo claro
+                // acima. Sem travar o picker também, ele seguia o tema do
+                // sistema e desenhava seus próprios swatches (inclusive o que
+                // mostra a cor "atual") de forma adaptativa, mesmo já não
+                // afetando mais o traço em si.
+                toolPicker.overrideUserInterfaceStyle = .light
+                context.coordinator.toolPicker = toolPicker
+                toolPicker.setVisible(true, forFirstResponder: uiView)
+                toolPicker.addObserver(uiView)
+                uiView.becomeFirstResponder()
+
+                // A causa raiz era a cor adaptativa preto/branco do PencilKit
+                // (ver comentário em `defaultInkColor`), não uma corrida com o
+                // `PKToolPicker` — mas como o picker pode mesmo trocar a
+                // ferramenta ativa ao anexar, reafirma a cor (já não-adaptativa
+                // agora) logo em seguida, só nesse anexo inicial, sem brigar
+                // com uma escolha do jogador depois.
+                uiView.tool = PKInkingTool(.pen, color: Self.defaultInkColor, width: 3)
+            }
         }
 
-        // Só recarrega o traço se o dado mudou por fora (folheou pra outra
-        // página) — comparar a cada toque evitaria perder o traço em curso.
-        let currentData = uiView.drawing.dataRepresentation()
-        guard currentData != (drawingData ?? Data()) else { return }
+        // AJUSTE (mesmo crash): esta comparação era o segundo problema, e
+        // provavelmente o de verdade — o `DispatchQueue.main.async` da
+        // tentativa 1 não tocava nela, o que bate com o usuário ter visto
+        // "exatamente igual" mesmo depois daquele ajuste. Antes comparava
+        // `uiView.drawing.dataRepresentation()` (o traço ATUAL do canvas,
+        // reserializado) contra `drawingData ?? Data()` — mas um
+        // `PKDrawing` vazio de verdade NÃO serializa como `Data()` vazio de
+        // verdade (o formato tem cabeçalho próprio mesmo sem traço nenhum).
+        // Numa folha nova (`drawingData == nil`), essa comparação batia
+        // "diferente" em TODA passada de `updateUIView`, e o `else if
+        // drawingData == nil` reatribuía `uiView.drawing = PKDrawing()` de
+        // novo — reatribuição que o `PKCanvasViewDelegate` pode enxergar
+        // como mudança e devolver pro binding (`canvasViewDrawingDidChange`),
+        // que por sua vez dispara outra passada de `updateUIView` ENQUANTO
+        // a primeira ainda podia estar em curso (e essa, ainda por cima,
+        // rodando no meio da animação de curl da criação da página) — o
+        // tipo de laço de atualização de estado que trava o app. A troca:
+        // comparar contra o último valor que o PRÓPRIO coordinator colocou
+        // ali (`lastSyncedData`), não contra uma reserialização do canvas
+        // nem contra `Data()` — sem esse mal-entendido, a folha só recarrega
+        // o traço quando o valor de fora muda de verdade (folheou pra outra
+        // página), nunca só por render de novo.
+        guard context.coordinator.lastSyncedData != drawingData else { return }
+        context.coordinator.lastSyncedData = drawingData
         if let data = drawingData, let drawing = try? PKDrawing(data: data) {
             uiView.drawing = drawing
         } else if drawingData == nil {
@@ -605,13 +709,19 @@ struct DrawingCanvas: UIViewRepresentable {
         /// referência forte, `PKToolPicker()` seria liberado assim que
         /// `updateUIView` termina e o picker sumiria da tela.
         var toolPicker: PKToolPicker?
+        /// Último valor de `drawingData` que ESTE coordinator já colocou no
+        /// canvas ou já leu de volta dele — ver o comentário grande em
+        /// `updateUIView` pra causa raiz que essa comparação evita.
+        var lastSyncedData: Data?
 
         init(_ parent: DrawingCanvas) {
             self.parent = parent
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            parent.drawingData = canvasView.drawing.dataRepresentation()
+            let data = canvasView.drawing.dataRepresentation()
+            lastSyncedData = data
+            parent.drawingData = data
         }
     }
 }

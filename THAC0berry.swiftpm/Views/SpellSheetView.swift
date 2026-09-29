@@ -66,6 +66,26 @@ struct SpellSheetView: View {
         .sheet(item: $detailSlot) { slot in
             SpellDetailSheet(spell: slot.preparedSpellID.flatMap { spellbook.spell(id: $0) },
                               freeName: slot.preparedSpellName,
+                              // Itens 4 e 5 (2026-09-27): "change" reabre o
+                              // mesmo editor completo que a bolinha do slot
+                              // já abria (`SlotEditorSheet` — trocar, limpar
+                              // ou marcar/desmarcar), só que agora também
+                              // alcançável a partir da própria linha
+                              // memorizada, não só da bolinha.
+                              onChangeSpell: {
+                                  detailSlot = nil
+                                  DispatchQueue.main.async { editingSlot = slot }
+                              },
+                              isSpent: slot.isSpent,
+                              onToggleSpent: { toggleSpent(slot) },
+                              // Pedido do usuário (2026-09-28): "só consigo
+                              // marcar como usada ou trocar, não consigo
+                              // limpar o slot". `SlotEditorSheet` (a bolinha
+                              // do círculo) já tinha "clear slot" desde
+                              // sempre — só faltava alcançável direto daqui,
+                              // sem o passo extra de "change" → "clear
+                              // slot" no editor completo.
+                              onClearSlot: slot.isEmpty ? nil : { clearSlot(slot) },
                               isFavorite: slot.preparedSpellID.map(library.isFavorite) ?? false,
                               onToggleFavorite: slot.preparedSpellID.map { id in { library.toggleFavorite(id) } })
         }
@@ -91,6 +111,24 @@ struct SpellSheetView: View {
         case .turnUndead:
             TurnUndeadBlock(sheet: $sheet)
         }
+    }
+
+    /// Alterna gasto/não-gasto de um slot — mesma conta que `CircleBlock.
+    /// toggle(_:)` já faz pro gesto de riscar, exposta aqui também pro
+    /// botão "mark/unmark as used" de `SpellDetailSheet` (item 5,
+    /// 2026-09-27).
+    private func toggleSpent(_ slot: SpellSlot) {
+        guard let index = sheet.slotBoard.slots.firstIndex(where: { $0.id == slot.id }) else { return }
+        sheet.slotBoard.slots[index].isSpent.toggle()
+    }
+
+    /// Esvazia o slot (nome, magia casada e "gasto" voltam ao zero) —
+    /// mesma ação que "clear slot" já fazia em `SlotEditorSheet`, exposta
+    /// aqui também pro botão de `SpellDetailSheet` (pedido do usuário,
+    /// 2026-09-28: só dava pra marcar como usada ou trocar, não limpar).
+    private func clearSlot(_ slot: SpellSlot) {
+        guard let index = sheet.slotBoard.slots.firstIndex(where: { $0.id == slot.id }) else { return }
+        sheet.slotBoard.slots[index].clear()
     }
 
     /// Peso aproximado de altura de um bloco — número de linhas de magia
@@ -204,7 +242,21 @@ private struct CircleBlock: View {
         let slots: [SpellSlot] = sheet.slotBoard.slots(level: level, caster: caster)
         // Sacerdotes com Sabedoria alta ganham slots bônus por círculo — a
         // ficha oficial mostra "total (base+bônus)" ao lado do título.
-        let bonus: Int = caster == .divine ? character.details.wisdomBonus(forCircle: level) : 0
+        //
+        // CORREÇÃO (2026-09-26): antes lia `character.details.wisdomBonus
+        // (forCircle:)`, que depende de um campo de texto livre
+        // (`AbilityDetails.wisdomBonusSpells`) só regravado quando o
+        // jogador muda a Sabedoria e aplica as consequências automáticas —
+        // podia ficar em branco (personagem novo) ou desatualizado
+        // indefinidamente. Passa a calcular direto da Tabela 5
+        // (`WisdomTable.bonusSpellTotals`), usando `sheet.wisdomAtCreation`
+        // (a Sabedoria congelada no dia em que ESTA folha foi criada — ver
+        // `SpellSheetBeadRow.newSheet()`) em vez da Sabedoria atual do
+        // personagem, pra bater com a mesma contagem que
+        // `computedSpellSlotAllotments` usou pra montar `slots.count`.
+        let bonus: Int = caster == .divine
+            ? (WisdomTable.bonusSpellTotals(forScore: sheet.wisdomAtCreation)?[level] ?? 0)
+            : 0
         let base: Int = max(slots.count - bonus, 0)
         let title: String = bonus > 0
             ? "Level \(level) - \(slots.count) Slots (\(base)+\(bonus))"
@@ -806,7 +858,24 @@ private struct MagicItemCard: View {
     @Binding var item: MagicItem
     let onDeleteItem: () -> Void
 
+    // Item 1 do pedido do usuário (2026-09-27): "Item" era só texto livre —
+    // passou a também abrir o catálogo (`MagicItemDatabase`), mesmo padrão
+    // já usado em `MagicItemQuantifiedRow` (Magic Items da página 2): tocar
+    // no nome abre a descrição do catálogo quando já está ligado a um item
+    // de lá, ou o buscador quando não está — e o buscador sempre oferece
+    // "usar como digitado", nunca obriga escolher um item existente.
+    @EnvironmentObject private var magicItemDatabase: MagicItemDatabase
     @State private var showDescription = false
+    @State private var showCatalogDetail = false
+    @State private var showCatalogPicker = false
+
+    private var matchedItem: CompendiumMagicItem? {
+        if let id = item.matchedItemID, let match = magicItemDatabase.item(id: id) {
+            return match
+        }
+        guard !item.name.isEmpty else { return nil }
+        return magicItemDatabase.items.first { $0.name == item.name }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -817,10 +886,17 @@ private struct MagicItemCard: View {
             // largura do texto.
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .bottom, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 2) {
                         FieldLabel(text: "Item")
-                        EditableText(value: $item.name, placeholder: "item name",
-                                     size: 19, underline: false)
+                        Button {
+                            if matchedItem != nil { showCatalogDetail = true } else { showCatalogPicker = true }
+                        } label: {
+                            Text(item.name.isEmpty ? "item name" : item.name)
+                                .font(Paper.hand(19))
+                                .foregroundStyle(item.name.isEmpty ? Paper.inkSoft : Paper.penInk)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Spacer(minLength: 8)
@@ -865,6 +941,17 @@ private struct MagicItemCard: View {
         .sheet(isPresented: $showDescription) {
             ItemDescriptionSheet(item: $item)
         }
+        .sheet(isPresented: $showCatalogDetail) {
+            if let matchedItem {
+                MagicItemDetailSheet(item: matchedItem, onChangeItem: {
+                    showCatalogDetail = false
+                    DispatchQueue.main.async { showCatalogPicker = true }
+                })
+            }
+        }
+        .sheet(isPresented: $showCatalogPicker) {
+            MagicItemPickerSheet(name: $item.name, matchedItemID: $item.matchedItemID)
+        }
     }
 }
 
@@ -886,7 +973,16 @@ private struct ItemSpellRow: View {
             // "Dmg/Heal" — o botão de trocar a magia agora mora dentro da
             // própria janela de descrição, aberta ao tocar o nome.
             HStack(alignment: .center, spacing: 8) {
-                Button { showDetail = true } label: {
+                // Item 2 do pedido do usuário (2026-09-27): uma magia ainda
+                // sem nome vai direto pro buscador (lista as magias
+                // disponíveis, mas aceita texto livre) — igual ao padrão
+                // dos outros lugares onde se escolhe magia (slots de
+                // memorização, Additional Spells). Antes ia pra
+                // `SpellDetailSheet` vazia ("Unnamed Spell"), que exigia um
+                // toque extra em "change" só pra chegar aqui.
+                Button {
+                    if item.spellName.isEmpty { showPicker = true } else { showDetail = true }
+                } label: {
                     Text(item.spellName.isEmpty ? "spell" : item.spellName)
                         .font(Paper.hand(20))
                         .foregroundStyle(item.spellName.isEmpty ? Paper.inkSoft : Paper.penInk)
@@ -1012,7 +1108,7 @@ struct TallyBoard: View {
             TallyMarks(count: count, isExhausted: isExhausted)
             if strokeLength > 0 {
                 Rectangle()
-                    .fill(isExhausted ? Paper.redInk : Paper.ink)
+                    .fill(isExhausted ? Paper.tallyMarkExhausted : Paper.tallyMark)
                     .frame(width: 2.4, height: strokeLength)
                     .rotationEffect(.degrees(8))
                     .padding(.leading, 3)
@@ -1021,6 +1117,23 @@ struct TallyBoard: View {
         .frame(minWidth: 70, minHeight: markHeight, alignment: .leading)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        // Pedido do usuário (2026-09-28): "não está claro onde riscar" —
+        // antes esta área era transparente, então o campo de contagem se
+        // perdia dentro do resto da folha. Um fundo escuro de verdade
+        // ("poço de tinta") marca a área de toque igual a um campo de
+        // escrita marca a linha — e como ficou escuro o bastante pra
+        // precisar de contraste, os traços (acima) e o alvo do
+        // `TallyInput` (que também define o hairline de contorno)
+        // passaram a usar `Paper.tallyMark`, claro, em vez da tinta
+        // escura de sempre.
+        .background(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Paper.tallyWell)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(Paper.tallyMark.opacity(0.22), lineWidth: 1)
+        )
         // O traço é reconhecido em UIKit, e não por um gesto do SwiftUI,
         // porque a mesma view precisa dizer ao iPadOS que aqui a caneta
         // desenha em vez de escrever — senão o Scribble rouba o risco e o
@@ -1047,8 +1160,11 @@ struct TallyBoard: View {
 }
 
 /// Os traços agrupados de cinco em cinco, com o quinto cruzando os outros
-/// quatro — a marca de contagem clássica. Pretos enquanto sobra carga;
-/// todos viram vermelhos quando o item chega ao fim dela.
+/// quatro — a marca de contagem clássica. Claros (`Paper.tallyMark`)
+/// enquanto sobra carga, pra aparecer sobre o fundo escuro de
+/// `TallyBoard`; todos viram um vermelho claro (`tallyMarkExhausted`,
+/// não o `Paper.redInk` escuro de sempre — sumiria no mesmo fundo) quando
+/// o item chega ao fim dela.
 struct TallyMarks: View {
     let count: Int
     let isExhausted: Bool
@@ -1057,7 +1173,7 @@ struct TallyMarks: View {
     private let barHeight: CGFloat = 18
     private let barSpacing: CGFloat = 3
 
-    private var color: Color { isExhausted ? Paper.redInk : Paper.ink }
+    private var color: Color { isExhausted ? Paper.tallyMarkExhausted : Paper.tallyMark }
 
     var body: some View {
         FlowRow(spacing: 8, lineSpacing: 6) {
@@ -1203,24 +1319,50 @@ private struct SpellWritingSheet: View {
                     DottedRule()
                 }
 
+                // Item 2 do pedido do usuário (2026-09-27, segunda rodada):
+                // esse botão já existia, mas ficava dentro da lista rolável,
+                // embaixo das sugestões, em letra pequena — fácil de nunca
+                // ver, principalmente com a lista de "já digitando" tendo
+                // até 8 candidatos antes dele. Fixo aqui embaixo do campo de
+                // escrita (fora do ScrollView, sempre visível assim que se
+                // escreve algo) e com estilo de botão de verdade — mesmo
+                // "pill" do "Use ... as-is" do buscador de itens mágicos —
+                // em vez de texto itálico apagado.
+                if !handwritten.isEmpty {
+                    Button {
+                        pick(name: handwritten, spell: nil)
+                    } label: {
+                        Text("Use \"\(handwritten)\" as-is")
+                            .font(Paper.printed(13).bold())
+                            .foregroundStyle(Paper.sheet)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Paper.ink)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        if !handwritten.isEmpty {
+                        if handwritten.isEmpty {
+                            // Já listar as magias disponíveis, sem esperar o
+                            // jogador digitar nada primeiro — igual o
+                            // `SlotEditorSheet` já faz com `levelList`. Sem
+                            // círculo/conjurador certo aqui (um item mágico
+                            // pode conjurar qualquer magia do jogo), então é
+                            // a base inteira, só em ordem alfabética.
+                            ForEach(allSpells) { spell in
+                                SpellPaperRow(spell: spell, hint: nil) {
+                                    pick(name: spell.name, spell: spell)
+                                }
+                            }
+                        } else {
                             ForEach(candidates) { match in
                                 SpellPaperRow(spell: match.spell, hint: match.confidenceLabel) {
                                     pick(name: match.spell.name, spell: match.spell)
                                 }
                             }
-
-                            Button {
-                                pick(name: handwritten, spell: nil)
-                            } label: {
-                                let label: String = "use \"" + handwritten + "\" as-is"
-                                Text(label)
-                                    .font(Paper.printedItalic(13))
-                                    .foregroundStyle(Paper.inkSoft)
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -1228,6 +1370,10 @@ private struct SpellWritingSheet: View {
             .padding(24)
         }
         .onAppear { handwritten = initialText }
+    }
+
+    private var allSpells: [Spell] {
+        spellbook.spells.sorted { $0.name < $1.name }
     }
 
     private var candidates: [SpellMatch] {
@@ -1259,6 +1405,16 @@ private struct AdditionalSpellsBlock: View {
     @EnvironmentObject private var spellbook: SpellDatabase
 
     @State private var handwritten: String = ""
+    /// Item 3 do pedido do usuário (2026-09-27): as linhas em branco
+    /// embaixo da folha eram só decorativas (`Color.clear` + `DottedRule`,
+    /// sem nenhum `HandwritingField`) — pareciam campo de escrita, mas só a
+    /// `writingLine` de cima realmente escrevia. 6/7 linhas fixas davam a
+    /// falsa impressão de um teto de magias registráveis por dia, quando na
+    /// real a única forma de adicionar é sempre a mesma linha ativa (que
+    /// nunca desaparece — cada "commit" limpa e continua pronta pra
+    /// próxima). Reduzido o padrão pra 3, com um botão "add line" pra somar
+    /// mais quando precisar (puramente visual — não é um teto de verdade).
+    @State private var extraBlankLines: Int = 0
 
     var body: some View {
         SheetBlock(title: "Additional Spells", trailing: "write the spell with the pencil") {
@@ -1289,6 +1445,11 @@ private struct AdditionalSpellsBlock: View {
                         DottedRule()
                     }
                 }
+
+                AddItemSpellButton(title: "add line") {
+                    extraBlankLines += 1
+                }
+                .padding(.top, 6)
             }
         }
     }
@@ -1340,7 +1501,8 @@ private struct AdditionalSpellsBlock: View {
 
     private var blankLines: Int {
         let used: Int = sheet.entries.count
-        return used >= 6 ? 1 : 6 - used
+        let base = used >= 3 ? 1 : 3 - used
+        return base + extraBlankLines
     }
 
     /// Lançar de novo uma magia que já está na folha não vira uma linha
@@ -1655,16 +1817,36 @@ private struct SlotEditorSheet: View {
 
 // MARK: - Descrição completa da magia
 
-/// Aberta com um toque simples na linha memorizada. Não mexe no slot — só
-/// mostra a descrição. Quando a magia não está na base (nome livre), mostra
-/// um texto de placeholder no lugar da descrição real.
+/// Aberta com um toque simples na linha memorizada. Por padrão não mexe no
+/// slot — só mostra a descrição; os botões "change"/"mark as used" (itens 4
+/// e 5, 2026-09-27) são opt-in por chamador, pra quem quiser as duas ações
+/// direto daqui, sem precisar achar a bolinha do slot. Quando a magia não
+/// está na base (nome livre), mostra um texto de placeholder no lugar da
+/// descrição real.
 struct SpellDetailSheet: View {
     let spell: Spell?
     let freeName: String?
-    /// Só vem preenchido pra magias de item mágico — o círculo de magia
-    /// tem sua própria janela de troca, aberta pela grade, e não passa
-    /// esse retorno.
+    /// Itens 4 e 5 do pedido do usuário (2026-09-27): "escolhi uma magia
+    /// num slot e não consigo mais trocar" / "risquei uma magia usada e não
+    /// consigo desmarcar". As duas ações já existiam (a bolinha do slot
+    /// abre `SlotEditorSheet`, com trocar/limpar/marcar; riscar a linha de
+    /// novo desmarca), só não do jeito mais óbvio — tocar na PRÓPRIA linha
+    /// memorizada abre só esta descrição, sem nenhum botão de ação. Agora
+    /// os dois caminhos vêm aqui também, quando o chamador os passa: "só
+    /// pra magias de item mágico" (comentário antigo) não é mais verdade
+    /// pra `onChangeSpell` — o círculo de magia passa a preencher também.
     var onChangeSpell: (() -> Void)? = nil
+    /// `nil` esconde o botão de marcar/desmarcar por completo (usado nas
+    /// magias de item mágico e em Additional Spells, que não têm "gasto" —
+    /// só em slots de memorização de verdade).
+    var isSpent: Bool? = nil
+    var onToggleSpent: (() -> Void)? = nil
+    /// Pedido do usuário (2026-09-28): "só consigo marcar como usada ou
+    /// trocar, não consigo limpar o slot". `nil` esconde o botão por
+    /// completo — mesmo critério de `onToggleSpent`: só faz sentido num
+    /// slot de memorização de verdade (item mágico e Additional Spells não
+    /// têm slot pra esvaziar, só a própria entrada).
+    var onClearSlot: (() -> Void)? = nil
     /// A estrela de favorito só aparece quando a magia existe de verdade na
     /// base (tem `spell` com `id`) — não faz sentido favoritar um nome
     /// livre que não bate com nada. `nil` esconde a estrela por completo.
@@ -1705,6 +1887,45 @@ struct SpellDetailSheet: View {
                     Button("close") { dismiss() }
                         .font(Paper.printed(16))
                         .foregroundStyle(Paper.inkSoft)
+                }
+
+                if isSpent != nil || onClearSlot != nil {
+                    HStack {
+                        if let isSpent, let onToggleSpent {
+                            Button(action: onToggleSpent) {
+                                // Item 4 do pedido do usuário (2026-09-27,
+                                // segunda rodada): estava em 13pt itálico,
+                                // discreto demais perto do "change"/"close"
+                                // ao lado (16pt) — igualado ao mesmo tamanho
+                                // dos dois.
+                                Text(isSpent ? "unmark as used" : "mark as used")
+                                    .font(Paper.printedItalic(16))
+                                    .foregroundStyle(Paper.inkSoft)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Spacer()
+
+                        // Pedido do usuário (2026-09-28): "só consigo
+                        // marcar como usada ou trocar, não consigo limpar o
+                        // slot". Mesma ação de "clear slot" que a bolinha
+                        // do círculo já tinha (`SlotEditorSheet`), agora
+                        // também direto daqui — em vermelho, como qualquer
+                        // outra ação destrutiva da ficha (ex.: apagar
+                        // folha/item).
+                        if let onClearSlot {
+                            Button {
+                                onClearSlot()
+                                dismiss()
+                            } label: {
+                                Text("clear slot")
+                                    .font(Paper.printedItalic(16))
+                                    .foregroundStyle(Paper.redInk)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
 
                 Rectangle().fill(Paper.ink).frame(height: 1.4)

@@ -1,17 +1,35 @@
 import Foundation
 
-/// Base de regras embutida (PHB + DMG + CPrH, 385 entradas / ~202 tabelas) — mesmo
-/// padrão de `KitDatabase`/`SpellDatabase`: `EmbeddedRules.entries` já são
-/// literais Swift compilados (ver `EmbeddedRules_Part1.swift`...`Part20.swift`
-/// e o comentário em `Rule.swift`), então não há nada pra falhar em
-/// runtime — `loadError` fica sempre `nil`, mantido só pra bater com o
-/// padrão das outras databases caso uma fonte externa entre no futuro.
+/// Base de regras (PHB + DMG + CPrH, 385 entradas / ~202 tabelas) — lida de
+/// `Resources/rules.json` em runtime (ver o comentário grande em
+/// `Rule.swift`/`RuleEntry` pro porquê da volta ao JSON, 2026-09-25: o
+/// literal Swift gigante que morava aqui antes travava o archive de
+/// distribuição do Swift Playgrounds). Mesmo mecanismo de leitura de
+/// `SpellDatabase.priestFiles()` — `Bundle.main.resourceURL` +
+/// `FileManager.contentsOfDirectory`, já comprovado confiável neste
+/// toolchain — em vez de `Bundle.main.url(forResource:)` direto.
 final class RulesDatabase: ObservableObject {
     @Published private(set) var entries: [RuleEntry] = []
     @Published private(set) var loadError: String? = nil
 
     init() {
-        entries = EmbeddedRules.entries
+        load()
+    }
+
+    private func load() {
+        guard let resourceURL = Bundle.main.resourceURL,
+              let fileURL = try? FileManager.default.contentsOfDirectory(at: resourceURL, includingPropertiesForKeys: nil)
+                  .first(where: { $0.lastPathComponent == "rules.json" })
+        else {
+            loadError = "Couldn't find rules.json in the app bundle."
+            return
+        }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            entries = try JSONDecoder().decode([RuleEntry].self, from: data)
+        } catch {
+            loadError = "Couldn't read rules.json: \(error.localizedDescription)"
+        }
     }
 
     func entry(id: String) -> RuleEntry? {

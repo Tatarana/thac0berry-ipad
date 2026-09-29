@@ -12,15 +12,12 @@ import Foundation
 ///
 /// Os 91 kits em si (97 originais menos os 6 "Create Your Own" — cartas em
 /// branco sem regra nenhuma, removidos por não servirem pra nada num app de
-/// fichas) vêm de `EmbeddedKits.kits` (`Store/EmbeddedKits.swift`)
-/// — literais Swift de verdade, não JSON de bundle (ver o comentário
-/// grande lá e em `KitDatabase` pro porquê: três tentativas diferentes de
-/// ler isso de um recurso JSON falharam, e a causa real só apareceu depois
-/// de tudo — 13 dos 97 kits não têm a chave `mechanics.armor.allowedTypes`,
-/// o que derrubava o decode do array inteiro). O JSON original convertido
-/// da wiki por um pipeline separado (fora do app), mesmo espírito de
-/// `Scripts/convert_spells.py`, ainda é a fonte de onde `EmbeddedKits.swift`
-/// foi gerado — só não faz mais parte do bundle do app.
+/// fichas) vêm de `Resources/kits.json` (ver o comentário grande em
+/// `KitDatabase.swift` pro histórico completo: três tentativas diferentes
+/// de ler isso de JSON já tinham falhado — 13 dos 97 kits não têm a chave
+/// `mechanics.armor.allowedTypes`, o que derrubava o decode do array
+/// inteiro — mas isso já foi corrigido em `KitArmorRules.init(from:)`
+/// abaixo, então voltar a ler JSON em runtime é seguro de novo).
 struct Kit: Codable, Identifiable, Hashable {
     let id: String
     let name: String

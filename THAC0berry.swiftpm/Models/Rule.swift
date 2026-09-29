@@ -10,13 +10,19 @@ import Foundation
 /// dado, ~4 trechos de wikitext solto, 111 tabelas com cabeçalhos genéricos
 /// "Col N" recuperados a partir do livro original).
 ///
-/// Igual a `Kit`: nada de `Bundle`/`JSONDecoder` em runtime — literais Swift
-/// compilados direto em `EmbeddedRules_PartN.swift` (ver o comentário em
-/// `Store/EmbeddedKits.swift`/`KitDatabase.swift` pro histórico completo do
-/// porquê). O volume aqui é bem maior (274 entradas contra 97 kits), então
-/// os arquivos-parte são ainda mais granulares pra não estourar o
-/// type-checker.
-struct RuleEntry: Identifiable, Hashable {
+/// AJUSTE (2026-09-25, pedido do usuário: "converter os dados embutidos de
+/// código Swift pra JSON"): voltou a carregar de `Resources/rules.json`
+/// via `Codable` — não por causa do bug histórico de decode (aquele era
+/// só do `Kit`, já corrigido, ver `KitArmorRules.init(from:)`), mas porque
+/// o literal Swift gigante (385 entradas espalhadas em ~28 arquivos
+/// `EmbeddedRules_PartN.swift`, a técnica documentada abaixo) continuava
+/// travando o ARCHIVE de distribuição do Swift Playgrounds mesmo dividido
+/// em partes — a compilação de Release/Archive usa "whole module
+/// optimization", que reconstrói tudo num único módulo de qualquer forma,
+/// anulando o benefício da divisão em arquivos que só ajuda o build de
+/// Debug/execução local. JSON lido em runtime não passa pelo
+/// type-checker, então não tem esse limite.
+struct RuleEntry: Identifiable, Hashable, Codable {
     let id: String
     let book: String // "PHB" ou "DMG"
     let chapterNumber: Int
@@ -44,7 +50,7 @@ struct RuleEntry: Identifiable, Hashable {
     var displayTitle: String { topic }
 }
 
-struct RuleTable: Identifiable, Hashable {
+struct RuleTable: Identifiable, Hashable, Codable {
     /// "Table 53", "Table 10A" etc. — usado como parte do `id` porque não
     /// é garantidamente único sozinho entre livros diferentes.
     let tableNumber: String

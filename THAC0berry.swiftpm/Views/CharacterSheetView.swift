@@ -1,6 +1,21 @@
 import SwiftUI
 import UIKit
 
+/// Verde se algum Efeito Ativo estiver ajudando o campo `polarity`
+/// representa, vermelho se estiver atrapalhando, ou `defaultColor` se
+/// nenhum efeito mexe ali agora — pedido do usuário (2026-09-28): "todos
+/// os ajustes temporários devem permanecer na cor verde se bons ou
+/// vermelhos se ruins" (persistente, ao contrário do pisca-e-apaga do
+/// `ChangeFlash`). `PlayerCharacter.activeEffectPolarity(for:)` decide
+/// bom/ruim; isto só traduz pra cor.
+private func polarityColor(_ polarity: PlayerCharacter.EffectPolarity?, default defaultColor: Color) -> Color {
+    switch polarity {
+    case .good?: return Paper.greenInk
+    case .bad?: return Paper.redInk
+    case nil: return defaultColor
+    }
+}
+
 /// As folhas de um personagem: a ficha em si e uma folha de magias por dia
 /// de jogo. As abas de papel no alto trocam de folha, como quem passa as
 /// páginas de uma pasta.
@@ -28,6 +43,14 @@ struct CharacterSheetView: View {
         case spells(UUID)
         case campaignIndex
         case spellbook
+        /// Efeitos Ativos (2026-09-28) — magias/itens com duração finita
+        /// (Regenerate, Stone Skin, Recitation, poções que sobrescrevem
+        /// um atributo, PV temporário não-curável). Ver
+        /// `Views/ActiveEffectsView.swift`. Disponível pra QUALQUER
+        /// classe (ao contrário de `.spells`/`.spellbook`, que só
+        /// existem pra quem tem ficha de magia) — efeitos temporários
+        /// acontecem com guerreiro tanto quanto com clérigo.
+        case effects
     }
 
     var body: some View {
@@ -122,10 +145,27 @@ struct CharacterSheetView: View {
                                 .padding(18)
                         }
                         .transition(.opacity)
+                    case .effects:
+                        ScrollView {
+                            ActiveEffectsView(character: $character)
+                                .padding(18)
+                        }
+                        .transition(.opacity)
                     }
                 }
                 .animation(.easeInOut(duration: 0.3), value: page)
             }
+        }
+        // Pedido do usuário (2026-09-29): o contador de "ataques
+        // negados" (Stone Skin e afins) deveria aparecer na Ficha, não só
+        // dentro da aba de Efeitos Ativos — uma janelinha flutuante fixa
+        // no canto, visível em QUALQUER aba (`page`), pra riscar um
+        // ataque anulado sem sair de onde se está.
+        .overlay(alignment: .topTrailing) {
+            AttackNegationFloatingBadge(character: $character)
+                .padding(.top, 78)
+                .padding(.trailing, 14)
+                .allowsHitTesting(true)
         }
         // Se a classe mudou pra uma sem ficha de magia enquanto uma folha ou
         // o índice estavam abertos, volta pra Ficha — nenhuma das duas abas
@@ -138,7 +178,10 @@ struct CharacterSheetView: View {
             if recordSheetPageIndex > 1 { recordSheetPageIndex = 0 }
             switch page {
             case .spells, .campaignIndex, .spellbook: page = .record
-            case .record, .notebook: break
+            // .effects fica disponível pra qualquer classe (ver comentário
+            // em `SheetPage.effects`), então uma troca de classe nunca
+            // precisa tirar ninguém de lá.
+            case .record, .notebook, .effects: break
             }
         }
         // O UIPageViewController do folhear de dias tem o próprio gesto de
@@ -218,6 +261,55 @@ private struct NoCampaignNotice: View {
     }
 }
 
+/// Janelinha flutuante fixa no canto superior direito da Ficha, visível em
+/// QUALQUER aba (`page`) — replica o contador "X de Y" de cada
+/// `.attackNegation` ativo (Stone Skin e afins) pra riscar um ataque
+/// anulado sem precisar abrir a aba "✨ Efeitos Ativos" toda vez. Some
+/// sozinha quando não há nenhum `.attackNegation` ativo. Pedido do
+/// usuário (2026-09-29).
+private struct AttackNegationFloatingBadge: View {
+    @Binding var character: PlayerCharacter
+
+    private var items: [PlayerCharacter.ActiveAttackNegation] { character.activeAttackNegations }
+
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(items) { item in
+                    HStack(spacing: 6) {
+                        Image(systemName: "shield.lefthalf.filled")
+                            .font(.system(size: 11))
+                            .foregroundStyle(item.component.isExhausted ? Paper.redInk : Paper.penInk)
+                        Text(item.effectName.isEmpty ? "Effect" : item.effectName)
+                            .font(Paper.printed(10.5))
+                            .foregroundStyle(Paper.inkSoft)
+                            .lineLimit(1)
+                        TallyBoard(
+                            count: item.component.usedCount,
+                            isExhausted: item.component.isExhausted,
+                            onAdd: {
+                                character.adjustAttackNegation(effectID: item.effectID, componentID: item.component.id, by: 1)
+                            },
+                            onRemove: {
+                                character.adjustAttackNegation(effectID: item.effectID, componentID: item.component.id, by: -1)
+                            }
+                        )
+                        Text("\(item.component.usedCount)/\(item.component.maxUses)")
+                            .font(Paper.hand(13))
+                            .foregroundStyle(item.component.isExhausted ? Paper.redInk : Paper.penInk)
+                    }
+                }
+            }
+            .padding(8)
+            .background(Paper.sheet.opacity(0.97))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Paper.ink, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+            .transition(.opacity)
+        }
+    }
+}
+
 /// Um UIViewController "fantasma", sem conteúdo visível, só pra alcançar o
 /// UINavigationController de dentro do SwiftUI e desligar o
 /// `interactivePopGestureRecognizer` (o "puxar da borda esquerda pra
@@ -290,6 +382,16 @@ private struct SheetTabs: View {
                 openNotebook()
             }
             .accessibilityLabel("Notebook")
+
+            // Efeitos Ativos (2026-09-28) — pra qualquer classe, por isso
+            // fica na fileira principal junto de Sheet/Notebook, e não
+            // escondida no menu ☰ com Sessions/Spellbook (que só existem
+            // pra quem tem ficha de magia).
+            PaperTabIcon(systemImage: "sparkles", isSelected: page == .effects,
+                        isGlowing: character.hasActiveEffects) {
+                page = .effects
+            }
+            .accessibilityLabel("Active Effects")
 
             // Só a sessão ativa (a de hoje) fica na fileira — sessões
             // anteriores não somem, só passam a ficar a um toque de
@@ -558,6 +660,11 @@ struct AddBeadLabel: View {
 private struct PaperTabIcon: View {
     let systemImage: String
     let isSelected: Bool
+    /// Brilho PERSISTENTE (não depende de estar selecionada) — pedido do
+    /// usuário (2026-09-28): o ícone de Efeitos Ativos ("✨") deve
+    /// continuar brilhando enquanto houver algum efeito ativo, pra nunca
+    /// esquecer um ligado numa aba que não é a que está aberta agora.
+    var isGlowing: Bool = false
     let action: () -> Void
     // Fase 4 do plano: a fileira de abas estava "morta" — trocava de cor
     // e só. Agora um toque dá um salto elástico curto no ícone tocado, e a
@@ -586,11 +693,12 @@ private struct PaperTabIcon: View {
         }) {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? Paper.chrome : Paper.sheet)
+                .foregroundStyle(isSelected ? Paper.chrome : (isGlowing ? Ember.glow : Paper.sheet))
                 .frame(width: 38, height: 30)
                 .background(isSelected ? Paper.sheet : Color.white.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .shadow(color: isSelected ? Ember.glow.opacity(0.7) : .clear, radius: isSelected ? 6 : 0)
+                .shadow(color: (isSelected || isGlowing) ? Ember.glow.opacity(0.7) : .clear,
+                        radius: (isSelected || isGlowing) ? 6 : 0)
                 .scaleEffect(bounce ? 1.24 : 1.0)
         }
         .buttonStyle(.plain)
@@ -1097,7 +1205,7 @@ private struct MagicItemQuantifiedRow: View {
             }
         }
         .sheet(isPresented: $showPicker) {
-            MagicItemPickerSheet(entry: $entry)
+            MagicItemPickerSheet(name: $entry.name, matchedItemID: $entry.matchedItemID)
         }
     }
 }
@@ -1669,9 +1777,13 @@ private struct FormNumberCell: View {
     @Binding var value: Int
     var lower: Int = -99
     var upper: Int = 99
+    /// Verde/vermelho persistente enquanto um Efeito Ativo mexer neste
+    /// campo — ver `polarityColor`. `Paper.penInk` (o padrão do
+    /// `EditableNumber`) quando não há nada ativo.
+    var color: Color = Paper.penInk
 
     var body: some View {
-        EditableNumber(value: $value, size: 22, lower: lower, upper: upper)
+        EditableNumber(value: $value, size: 22, color: color, lower: lower, upper: upper)
             .frame(minHeight: 42)
             .frame(maxWidth: .infinity)
             .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
@@ -1696,13 +1808,16 @@ private struct ShieldShape: Shape {
 
 private struct ArmorClassShield: View {
     @Binding var armorClass: Int
+    /// Verde/vermelho persistente enquanto um Efeito Ativo mexer na CA —
+    /// ver `polarityColor`.
+    var color: Color = Paper.penInk
 
     var body: some View {
         VStack(spacing: 3) {
             Text("ARMOR").font(Paper.printed(11)).tracking(1.5)
             ZStack {
                 ShieldShape().stroke(Paper.ink, lineWidth: 1.6)
-                EditableNumber(value: $armorClass, size: 28, lower: -10, upper: 10)
+                EditableNumber(value: $armorClass, size: 28, color: color, lower: -10, upper: 10)
                     .padding(.top, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -2167,7 +2282,8 @@ private struct AbilityRowForm: View {
                 .foregroundStyle(Paper.ink)
                 .frame(width: 46, alignment: .leading)
                 .padding(.leading, 2)
-            FormNumberCell(value: $score, lower: 1, upper: 25)
+            FormNumberCell(value: $score, lower: 1, upper: 25,
+                           color: polarityColor(flashKey.flatMap { character.activeEffectPolarity(for: $0) }, default: Paper.penInk))
                 .frame(width: 52)
                 .modifier(OptionalChangeFlash(character: $character, key: flashKey))
                 // O sinal de consequência pendente não aparece mais aqui —
@@ -2309,7 +2425,8 @@ private struct SavingThrowsForm: View {
                 .padding(.horizontal, 4)
 
                 ForEach(SavingThrows.labels) { entry in
-                    SaveLineForm(saves: $character.saves, entry: entry)
+                    SaveLineForm(saves: $character.saves, entry: entry,
+                                color: polarityColor(character.activeEffectPolarity(for: "savingThrows"), default: Paper.ink))
                 }
                 SaveResistanceLine(character: $character, saves: $character.saves)
             }
@@ -2321,6 +2438,11 @@ private struct SavingThrowsForm: View {
 private struct SaveLineForm: View {
     @Binding var saves: SavingThrows
     let entry: SavingThrows.SaveEntry
+    /// Verde/vermelho persistente enquanto um Efeito Ativo mexer nos
+    /// Saving Throws (`allSaves`) — tinge o "Total", que é o número que
+    /// realmente vale na mesa (`Paper.ink`, o padrão de sempre, quando
+    /// não há nada ativo).
+    var color: Color = Paper.ink
 
     var body: some View {
         HStack(spacing: 0) {
@@ -2352,7 +2474,7 @@ private struct SaveLineForm: View {
             // pra deixar claro que é o número que vale na mesa.
             Text("\(saves.total(for: entry))")
                 .font(Paper.printed(15).bold())
-                .foregroundStyle(Paper.ink)
+                .foregroundStyle(color)
                 .frame(width: 34, height: 32)
                 .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
         }
@@ -2429,7 +2551,8 @@ private struct CombatForm: View {
             // Sem scroll horizontal: com as colunas mais compactas, tudo
             // já cabe na largura da tela.
             HStack(alignment: .top, spacing: 6) {
-                    ArmorClassShield(armorClass: $character.armorClass)
+                    ArmorClassShield(armorClass: $character.armorClass,
+                                     color: polarityColor(character.activeEffectPolarity(for: "armorClass"), default: Paper.penInk))
                         // Itens 7/10: pisca quando o AC muda sozinho por
                         // causa de Armor/Shield/Magic Items — mesmo
                         // vocabulário de `markRecentAutoChange("armorClass")`
@@ -2638,7 +2761,11 @@ private struct WoundsBlock: View {
     private func commit() {
         defer { draft = ""; isAdding = false }
         guard let dmg = Int(draft.trimmingCharacters(in: .whitespaces)), dmg != 0 else { return }
-        character.hitPointsCurrent -= dmg
+        // `applyDamage` (não mais `hitPointsCurrent -=` direto) — ponto
+        // único de dano, pra descontar primeiro de qualquer PV temporário
+        // não-curável ativo e disparar um Regenerate pendente (pedido do
+        // usuário, 2026-09-28: "Efeitos Ativos" — ver `Models/ActiveEffect.swift`).
+        character.applyDamage(dmg)
         var updated = character.combat ?? CombatDetails()
         let existing = updated.wounds ?? ""
         updated.wounds = existing.isEmpty ? "\(dmg)" : existing + "\n\(dmg)"
@@ -2680,10 +2807,17 @@ private struct Thac0TargetForm: View {
                 // este realce, porque usava `hasPendingConsequences` global.
                 // Escopado pra regra "thac0" — só acende quando o THAC0
                 // resolvido de verdade mudaria (ver `ConsequenceEngine`).
-                EditableNumber(value: $character.thac0, size: 17, lower: -10, upper: 25)
+                EditableNumber(value: $character.thac0, size: 17,
+                               color: polarityColor(character.activeEffectPolarity(for: "thac0"), default: Paper.penInk),
+                               lower: -10, upper: 25)
                     .frame(width: 40, height: 30)
                     .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
                     .pendingConsequenceHighlight(isActive: character.hasPendingConsequence(forKeys: ["thac0"], registry: ruleset))
+                    // Efeitos Ativos (2026-09-28) podem substituir o THAC0
+                    // sozinhos (`.statOverride`) — reaproveita o mesmo
+                    // `ChangeFlash` da Força/CA/etc, em vez de inventar
+                    // outro sinal só pra isso.
+                    .changeFlash(character: $character, key: "thac0")
                 Text("(base — the table below fills itself in)")
                     .font(Paper.printedItalic(13))
                     .foregroundStyle(Paper.inkSoft)

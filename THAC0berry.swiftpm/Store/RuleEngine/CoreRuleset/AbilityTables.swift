@@ -208,28 +208,51 @@ enum WisdomTable {
 
     /// Soma cumulativa das magias bônus por círculo até a Sabedoria dada,
     /// no formato "+N / +N / ..." esperado por `AbilityDetails.wisdomBonusSpells`
-    /// (posição = círculo, começando em 1). A tabela impressa repete a
-    /// mesma linha em pares de score adjacentes (13/14, 15/16, ...) — cada
-    /// par representa UM patamar do PHB, não dois ganhos separados, então
-    /// só soma quando a lista de círculos muda em relação ao score anterior
-    /// (confirmado contra os valores conhecidos de Sabedoria 9-18: ex.
-    /// Sabedoria 16 = +1 no 1º círculo e +1 no 2º, nunca +2/+2).
+    /// (posição = círculo, começando em 1).
+    ///
+    /// CORREÇÃO (2026-09-26): a versão anterior pulava a soma quando a
+    /// lista de círculos de um score repetia a do score anterior (ex.:
+    /// Sabedoria 13 e 14 mostram "1st" nos dois, então só somava uma vez).
+    /// Isso está ERRADO — cada score de 13 a 25 é seu próprio evento de
+    /// bônus, mesmo quando a linha impressa parece repetir o círculo do
+    /// score anterior. A prova está no próprio texto da regra (Table 5,
+    /// `Resources/rules.json`, id `phb_ch01_wisdom`): "a priest with a
+    /// wisdom of 15 is entitled to TWO 1st-level bonus spells and ONE
+    /// 2nd-level bonus spell" — ou seja, em Sabedoria 15 o 1º círculo já
+    /// está em +2 (ganho em 13 E em 14), não +1. Somando sem pular
+    /// repetidos: Sabedoria 19 dá 1º=+3, 2º=+2, 3º=+2, 4º=+1 (bate com o
+    /// exemplo relatado pelo usuário: clérigo nível 11, 5 slots base de 1º
+    /// círculo + 3 de bônus = 8).
     static func bonusSpells(forScore score: Int) -> String? {
-        guard score >= 9 else { return nil }
-        var totals: [Int: Int] = [:]
-        var previous: [Int]? = nil
-        for s in 1...score {
-            let circles = bonusSpellsByScore[s] ?? []
-            if circles != previous {
-                for circle in circles {
-                    totals[circle, default: 0] += 1
-                }
-            }
-            previous = circles
-        }
-        guard let maxCircle = totals.keys.max() else { return nil }
+        guard let totals = bonusSpellTotals(forScore: score), let maxCircle = totals.keys.max() else { return nil }
         let parts = (1...maxCircle).map { "+\(totals[$0] ?? 0)" }
         return parts.joined(separator: " / ")
+    }
+
+    /// Mesma soma de `bonusSpells(forScore:)`, mas como `[círculo: total]`
+    /// em vez de texto formatado — usada por `PriestTables.spellProgression`
+    /// (`Character.swift`) pra somar o bônus de verdade na grade de slots
+    /// da Priest Spell Sheet, não só no texto informativo da célula "Bonus
+    /// Spells" da tabela de atributos.
+    ///
+    /// CORREÇÃO (2026-09-26, mesmo dia do ajuste acima): até aqui essa soma
+    /// só alimentava o campo de texto `AbilityDetails.wisdomBonusSpells`,
+    /// que é editável e só é regravado quando o jogador muda a Sabedoria e
+    /// aplica as consequências automáticas — nunca chega na grade real de
+    /// slots (`PlayerCharacter.computedSpellSlotAllotments`), que vinha
+    /// só da Tabela 24 (Priest Spell Progression), sem nenhum bônus de
+    /// Sabedoria somado. Resultado: consertar só o texto não mudava a
+    /// contagem de slots que o jogador via na ficha — exatamente o bug
+    /// relatado.
+    static func bonusSpellTotals(forScore score: Int) -> [Int: Int]? {
+        guard score >= 9 else { return nil }
+        var totals: [Int: Int] = [:]
+        for s in 1...score {
+            for circle in bonusSpellsByScore[s] ?? [] {
+                totals[circle, default: 0] += 1
+            }
+        }
+        return totals.isEmpty ? nil : totals
     }
 }
 

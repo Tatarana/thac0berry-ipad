@@ -30,8 +30,27 @@ enum Paper {
     static let inkSoft = Color(red: 0.420, green: 0.361, blue: 0.275) // #6B5C46
     static let penInk = Color(red: 0.118, green: 0.208, blue: 0.341)  // #1E3557 caneta azul
     static let redInk = Color(red: 0.549, green: 0.184, blue: 0.133)  // #8C2F22
+    /// Verde-tinta escuro, pareado com `redInk` em peso/contraste — pedido
+    /// do usuário (2026-09-29): o `Ember.mintGlow` usado antes pra marcar
+    /// ajuste "bom" era claro demais e quase sumia em cima do pergaminho
+    /// (`mintGlow` é pensado pra texto/gradiente sobre fundo ESCURO, não
+    /// pra tinta sobre papel claro).
+    static let greenInk = Color(red: 0.106, green: 0.376, blue: 0.176)  // #1B602D
 
     static let hairline = Color(red: 0.184, green: 0.153, blue: 0.110).opacity(0.42)
+
+    /// Pedido do usuário (2026-09-28): os campos de contagem por traço
+    /// (`TallyBoard`/`TallyMarks` — Turn Undead, cargas de item mágico,
+    /// conjurações extras) não sinalizavam bem ONDE riscar; o fundo era
+    /// transparente, então a área de contagem se perdia dentro do resto da
+    /// folha. `tallyWell` é o fundo escuro desse "poço de tinta" — mesma
+    /// cor de `ink`, só que preenchendo de verdade em vez de só escrever
+    /// por cima — e `tallyMark`/`tallyMarkExhausted` são os traços claros
+    /// que precisam existir por cima dele pra continuar legíveis (a mesma
+    /// cena de sempre, um risco claro na parede escura da cela).
+    static let tallyWell = Color(red: 0.184, green: 0.153, blue: 0.110)      // = ink
+    static let tallyMark = Color(red: 0.914, green: 0.863, blue: 0.745)     // = sheet
+    static let tallyMarkExhausted = Color(red: 0.925, green: 0.463, blue: 0.373) // #EC7660
 
     /// A "capa" do caderno — fundo escuro de couro que envolve a navegação
     /// (a fileira de abas, o menu) por fora das folhas de verdade. Só o

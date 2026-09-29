@@ -144,6 +144,20 @@ struct SpellSlot: Codable, Identifiable, Hashable {
     /// Nome livre, para magias que não estão na base embutida.
     var preparedSpellName: String? = nil
     var isSpent: Bool = false
+    /// Posição do slot dentro do próprio círculo — só existe pra dar ao
+    /// `sortSlots()` um critério de desempate que NÃO seja o `id`. Optional
+    /// pelo motivo de sempre: folha salva antes desta versão não tem essa
+    /// chave; ausência vira `0` pra todo mundo, o que é inofensivo (ver
+    /// comentário em `sortSlots`). Corrige o bug relatado pelo usuário
+    /// (2026-09-28): "ao criar uma nova priest spell sheet, as magias
+    /// aparecem em ordem totalmente aleatória" — `SpellSheet.nextDay()`
+    /// dá um `id` NOVO e aleatório pra cada slot de propósito (dois dias
+    /// não podem ter slots com a mesma identidade), mas o desempate do
+    /// sort usava justamente esse `id`, então a ordem visual do círculo
+    /// virava loteria a cada dia novo. `orderKey` nunca é regenerado por
+    /// `nextDay()` — só o `id` muda — então a ordem sobrevive à criação da
+    /// folha nova.
+    var orderKey: Int = 0
 
     var isEmpty: Bool { preparedSpellID == nil && preparedSpellName == nil }
 
@@ -205,13 +219,30 @@ enum PriestTables {
 
     /// Slots de cada círculo (1–7) pro nível/Sabedoria dados — `count > 0`
     /// só quando a tabela concede e (se houver requisito) a Sabedoria bate.
+    ///
+    /// CORREÇÃO (2026-09-26): até aqui esta função nunca somava o bônus de
+    /// magia por Sabedoria alta (Tabela 5 do PHB, `WisdomTable.
+    /// bonusSpellTotals` em `AbilityTables.swift`) — só usava `wisdom` pra
+    /// travar/destravar 6º e 7º círculo (`wisdomRequirementByCircle`).
+    /// Relatado pelo usuário: clérigo nível 11 com Sabedoria 19 mostrava
+    /// sempre 5 slots de 1º círculo (só a base da Tabela 24), nunca os 8
+    /// (5 base + 3 de bônus) que a regra manda. Um conserto anterior, no
+    /// mesmo dia, já tinha corrigido a SOMA do bônus (`bonusSpellTotals`),
+    /// mas isso só alimentava um campo de texto informativo
+    /// (`AbilityDetails.wisdomBonusSpells`) que nunca influenciava a grade
+    /// de slots de verdade — o bug real estava aqui. Bônus só entra em
+    /// círculos que a Tabela 24 já concede nesse nível (regra do livro:
+    /// "these spells are available only when the priest is entitled to
+    /// spells of the appropriate level") — nunca cria um círculo novo
+    /// sozinho.
     static func spellProgression(level: Int, wisdom: Int) -> [Int] {
         let row = spellProgressionRows[max(0, min(level, spellProgressionRows.count) - 1)]
+        let bonusByCircle = WisdomTable.bonusSpellTotals(forScore: wisdom) ?? [:]
         return row.enumerated().map { index, count in
             let circle = index + 1
             guard let count else { return 0 }
             if let required = wisdomRequirementByCircle[circle], wisdom < required { return 0 }
-            return count
+            return count + (bonusByCircle[circle] ?? 0)
         }
     }
 
@@ -301,8 +332,13 @@ struct SpellSlotBoard: Codable, Hashable {
             }
             existing = Array(existing.prefix(count))
         } else {
+            // `orderKey` sequencial a partir do maior já usado NESTE círculo
+            // — nunca a partir de um novo `UUID()` aleatório (era esse o
+            // bug: ver o comentário em `SpellSlot.orderKey`).
+            var nextOrder = (existing.map(\.orderKey).max() ?? -1) + 1
             while existing.count < count {
-                existing.append(SpellSlot(level: level, caster: caster))
+                existing.append(SpellSlot(level: level, caster: caster, orderKey: nextOrder))
+                nextOrder += 1
             }
         }
         slots.append(contentsOf: existing)
@@ -318,8 +354,17 @@ struct SpellSlotBoard: Codable, Hashable {
         return 0
     }
 
-    /// Ordem determinística: sem o id no critério, os chips embaralham a cada
-    /// edição, porque sort não é estável.
+    /// Ordem determinística: sem ALGUM critério de desempate, os chips
+    /// embaralham a cada edição, porque sort não garante manter a ordem
+    /// original entre dois slots "empatados" nos outros dois critérios.
+    ///
+    /// AJUSTE (2026-09-28): o desempate usava `id.uuidString`, e isso
+    /// causava exatamente o bug oposto do que pretendia evitar — `id` é
+    /// deliberadamente re-sorteado a cada `SpellSheet.nextDay()` (ver
+    /// comentário lá), então a ordem visual do círculo virava loteria toda
+    /// vez que se criava uma folha nova, mesmo com os MESMOS feitiços
+    /// memorizados nos MESMOS slots. Trocado por `orderKey`, que `nextDay()`
+    /// nunca toca — só o `id` muda de um dia pro outro.
     private mutating func sortSlots() {
         slots.sort { (lhs: SpellSlot, rhs: SpellSlot) -> Bool in
             if lhs.caster != rhs.caster {
@@ -328,7 +373,7 @@ struct SpellSlotBoard: Codable, Hashable {
             if lhs.level != rhs.level {
                 return lhs.level < rhs.level
             }
-            return lhs.id.uuidString < rhs.id.uuidString
+            return lhs.orderKey < rhs.orderKey
         }
     }
 
@@ -625,6 +670,17 @@ struct AbilityDetails: Codable, Hashable {
 
     /// O bônus de um círculo específico, lido do texto livre acima. `0`
     /// quando o círculo não tem bônus (ou o texto não cobre esse círculo).
+    ///
+    /// SEM USO desde 2026-09-26: a grade real de slots
+    /// (`PriestTables.spellProgression`) e o rótulo "(base+bônus)" da
+    /// Priest Spell Sheet (`SpellSheetView.CircleBlock`) passaram a
+    /// calcular direto de `WisdomTable.bonusSpellTotals`, em vez de ler
+    /// este texto livre — que só é regravado quando o jogador muda a
+    /// Sabedoria e aplica as consequências automáticas, então podia ficar
+    /// em branco ou desatualizado sem nada perceber. Mantido aqui só como
+    /// leitor auxiliar do campo de texto (que continua existindo, editável,
+    /// só de referência na tabela de atributos), caso alguma tela futura
+    /// precise do valor que o jogador digitou à mão ali.
     func wisdomBonus(forCircle level: Int) -> Int {
         let parts = wisdomBonusSpells
             .replacingOccurrences(of: " ", with: "")
@@ -1157,6 +1213,359 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// campo continua visível.
     mutating func clearRecentAutoChange(_ key: String) {
         recentAutoChanges?.remove(key)
+    }
+
+    // MARK: - Efeitos Ativos (2026-09-28, revisado 2026-09-28)
+    //
+    // Ver `Models/ActiveEffect.swift` pro desenho geral (um `ActiveEffect`
+    // é o "item" — nome/duração/notas — e carrega uma lista dinâmica de
+    // `EffectComponent`, o mecanismo em si; um item pode ter mais de um
+    // componente, ex. Recitation = bônus em To Hit + bônus em Saves).
+    // Optional pelo mesmo motivo de sempre (fichas salvas antes desta
+    // versão não têm essa chave).
+    var activeEffects: [ActiveEffect]? = nil
+
+    /// `true` quando existe pelo menos um efeito ativo — liga o brilho
+    /// contínuo do ícone "✨" na fileira de abas (`SheetTabs`), pedido do
+    /// usuário pra nunca esquecer um efeito ligado.
+    var hasActiveEffects: Bool { !(activeEffects ?? []).isEmpty }
+
+    /// Um componente `.attackNegation`, junto do item (`ActiveEffect`) a
+    /// que pertence — usado só pela "pequena janela flutuante" na Ficha
+    /// (pedido do usuário, 2026-09-29: "bônus de ataque negado deveria
+    /// replicar o contador para a ficha do personagem"), pra não precisar
+    /// abrir a aba de Efeitos Ativos só pra riscar um ataque anulado.
+    struct ActiveAttackNegation: Identifiable {
+        var id: UUID { component.id }
+        var effectID: UUID
+        var effectName: String
+        var component: EffectComponent
+    }
+
+    var activeAttackNegations: [ActiveAttackNegation] {
+        (activeEffects ?? []).flatMap { effect in
+            effect.components
+                .filter { $0.kind == .attackNegation }
+                .map { ActiveAttackNegation(effectID: effect.id, effectName: effect.name, component: $0) }
+        }
+    }
+
+    /// Ajusta o contador de UM `.attackNegation` sem passar pela tela de
+    /// Efeitos Ativos — mesma escrita que `ActiveEffectCard.updateComponent`
+    /// faz, só que endereçada por `effectID`/`componentID` em vez de
+    /// receber o `ActiveEffect` inteiro (a janela flutuante não guarda
+    /// isso, só os ids).
+    mutating func adjustAttackNegation(effectID: UUID, componentID: UUID, by delta: Int) {
+        guard var effects = activeEffects,
+              let effectIndex = effects.firstIndex(where: { $0.id == effectID }),
+              let componentIndex = effects[effectIndex].components.firstIndex(where: { $0.id == componentID })
+        else { return }
+        var component = effects[effectIndex].components[componentIndex]
+        component.usedCount = min(max(component.usedCount + delta, 0), component.maxUses)
+        effects[effectIndex].components[componentIndex] = component
+        activeEffects = effects
+    }
+
+    mutating func addActiveEffect(_ effect: ActiveEffect) {
+        activeEffects = (activeEffects ?? []) + [effect]
+    }
+
+    mutating func updateActiveEffect(_ effect: ActiveEffect) {
+        guard var list = activeEffects,
+              let index = list.firstIndex(where: { $0.id == effect.id }) else { return }
+        list[index] = effect
+        activeEffects = list
+    }
+
+    /// Bom (verde) ou ruim (vermelho)? Usado pelos campos afetados
+    /// (Força, THAC0, CA, Saves...) pra ficarem tingidos ENQUANTO o
+    /// efeito estiver ativo — pedido do usuário (2026-09-28): "todos os
+    /// ajustes temporários devem permanecer na cor verde se bons ou
+    /// vermelhos se ruins". Diferente do `ChangeFlash`, que só pisca uma
+    /// vez e apaga, isto é consultado a cada redesenho do campo.
+    enum EffectPolarity { case good, bad }
+
+    /// Varre todos os componentes de todos os efeitos ativos procurando
+    /// algum que mexa no campo `key` (mesmo vocabulário de
+    /// `markRecentAutoChange`: "strength", "armorClass", "thac0",
+    /// "savingThrows"). Quando mais de um componente mexe no mesmo campo,
+    /// o mais recente decide a cor — raro (dois efeitos empilhados no
+    /// mesmo lugar), mas nunca indefinido.
+    func activeEffectPolarity(for key: String) -> EffectPolarity? {
+        var found: EffectPolarity? = nil
+        for effect in activeEffects ?? [] {
+            for component in effect.components {
+                switch component.kind {
+                case .statOverride where component.overrideStat.changeFlashKey == key:
+                    let better = component.overrideStat.lowerIsBetter
+                        ? component.overrideValue < component.previousValue
+                        : component.overrideValue > component.previousValue
+                    found = better ? .good : .bad
+                case .flatBonus where key == "thac0" && component.bonusTarget == .toHit:
+                    // THAC0 menor é melhor — um bônus de To Hit REDUZ o
+                    // THAC0 (ver `applyActiveEffect`), então um valor
+                    // positivo aqui é bom.
+                    found = component.bonusAmount >= 0 ? .good : .bad
+                case .flatBonus where key == "armorClass" && component.bonusTarget == .armorClass:
+                    found = component.bonusAmount >= 0 ? .good : .bad
+                case .flatBonus where key == "savingThrows" && component.bonusTarget == .allSaves:
+                    found = component.bonusAmount >= 0 ? .good : .bad
+                default:
+                    break
+                }
+            }
+        }
+        return found
+    }
+
+    /// Escreve o que o `effect` precisa na ficha de verdade — chamado
+    /// pra CADA componente, na hora de criar (ou reaplicar, num "Save"
+    /// de edição) um item. Recebe `inout` porque precisa guardar de
+    /// volta o que foi feito (a linha inserida, o valor anterior) pra
+    /// `revertActiveEffectApplication` saber desfazer exatamente aquilo,
+    /// e nada mais, quando o efeito for encerrado.
+    mutating func applyActiveEffect(_ effect: inout ActiveEffect) {
+        for index in effect.components.indices {
+            applyComponent(&effect.components[index], itemName: effect.name)
+        }
+    }
+
+    private mutating func applyComponent(_ component: inout EffectComponent, itemName: String) {
+        switch component.kind {
+        case .flatBonus:
+            switch component.bonusTarget {
+            case .toHit:
+                // "+N To Hit" na prática É "-N no THAC0" (número menor =
+                // mais fácil de acertar) — o único jeito de um bônus de
+                // acerto realmente REFLETIR em algum lugar da ficha, já
+                // que não existe outro campo de "to hit" avulso.
+                component.previousValue = thac0
+                thac0 -= component.bonusAmount
+                markRecentAutoChange("thac0")
+            case .armorClass:
+                // Mesma ideia: CA menor é melhor, então um bônus positivo
+                // SUBTRAI do valor de Armor Class.
+                component.previousValue = armorClass
+                armorClass -= component.bonusAmount
+                markRecentAutoChange("armorClass")
+            case .allSaves:
+                for entry in SavingThrows.labels where component.effectiveSaveIDs.contains(entry.id) {
+                    saves.setModifier(saves.modifier(for: entry.id) + component.bonusAmount, for: entry.id)
+                }
+                markRecentAutoChange("savingThrows")
+            case .damage:
+                // Não existe um único "total de dano" na ficha (cada arma
+                // tem sua própria linha) — o mais perto que dá de
+                // "refletir" é uma linha na tabela Damage Modifiers, só
+                // como lembrete de conferir na hora de rolar.
+                let displayName = itemName.isEmpty ? "Effect" : itemName
+                let noteText = component.bonusAmount >= 0 ? "+\(component.bonusAmount)" : "\(component.bonusAmount)"
+                var row = EquipmentItem()
+                row.name = displayName
+                row.note = noteText
+                damageModifiers = (damageModifiers ?? []) + [row]
+                component.appliedDamageRowID = row.id
+            }
+        case .statOverride:
+            switch component.overrideStat {
+            case .strength:
+                component.previousValue = abilities.strength
+                abilities.strength = component.overrideValue
+            case .dexterity:
+                component.previousValue = abilities.dexterity
+                abilities.dexterity = component.overrideValue
+            case .constitution:
+                component.previousValue = abilities.constitution
+                abilities.constitution = component.overrideValue
+            case .intelligence:
+                component.previousValue = abilities.intelligence
+                abilities.intelligence = component.overrideValue
+            case .wisdom:
+                component.previousValue = abilities.wisdom
+                abilities.wisdom = component.overrideValue
+            case .charisma:
+                component.previousValue = abilities.charisma
+                abilities.charisma = component.overrideValue
+            case .armorClass:
+                component.previousValue = armorClass
+                armorClass = component.overrideValue
+            case .thac0:
+                component.previousValue = thac0
+                thac0 = component.overrideValue
+            }
+            markRecentAutoChange(component.overrideStat.changeFlashKey)
+        case .tempHP:
+            // Some direto no PV atual (pedido do usuário, 2026-09-28: "o
+            // personagem tem 30/30 e recebe 10 temp, deveria pular pra
+            // 40/30") — sem contador visível separado; `tempHPRemaining`
+            // só existe pra `applyDamage`/`revertActiveEffectApplication`
+            // saberem quanto ainda não foi perdido.
+            component.tempHPRemaining = component.tempHPGranted
+            hitPointsCurrent += component.tempHPGranted
+        case .attackNegation, .bankedHeal, .note:
+            break
+        }
+    }
+
+    /// Desfaz exatamente o que `applyActiveEffect` tiver escrito —
+    /// chamado por `endActiveEffect` ao encerrar/descartar um efeito, e
+    /// por um "Save" de edição antes de reaplicar com os novos valores.
+    mutating func revertActiveEffectApplication(_ effect: ActiveEffect) {
+        for component in effect.components {
+            revertComponent(component)
+        }
+    }
+
+    private mutating func revertComponent(_ component: EffectComponent) {
+        switch component.kind {
+        case .flatBonus:
+            switch component.bonusTarget {
+            case .toHit:
+                thac0 = component.previousValue
+                markRecentAutoChange("thac0")
+            case .armorClass:
+                armorClass = component.previousValue
+                markRecentAutoChange("armorClass")
+            case .allSaves:
+                for entry in SavingThrows.labels where component.effectiveSaveIDs.contains(entry.id) {
+                    saves.setModifier(saves.modifier(for: entry.id) - component.bonusAmount, for: entry.id)
+                }
+                markRecentAutoChange("savingThrows")
+            case .damage:
+                damageModifiers?.removeAll { $0.id == component.appliedDamageRowID }
+            }
+        case .statOverride:
+            switch component.overrideStat {
+            case .strength: abilities.strength = component.previousValue
+            case .dexterity: abilities.dexterity = component.previousValue
+            case .constitution: abilities.constitution = component.previousValue
+            case .intelligence: abilities.intelligence = component.previousValue
+            case .wisdom: abilities.wisdom = component.previousValue
+            case .charisma: abilities.charisma = component.previousValue
+            case .armorClass: armorClass = component.previousValue
+            case .thac0: thac0 = component.previousValue
+            }
+            markRecentAutoChange(component.overrideStat.changeFlashKey)
+        case .tempHP:
+            // Só tira de volta o que ainda não foi perdido pra dano — o
+            // que já foi consumido nunca é devolvido, mesmo encerrando o
+            // efeito (é exatamente a regra "não pode ser curado").
+            hitPointsCurrent -= component.tempHPRemaining
+        case .attackNegation, .bankedHeal, .note:
+            break
+        }
+    }
+
+    /// Encerra um efeito — desfaz o que ele tiver aplicado na ficha e o
+    /// remove da lista. É a única forma de remover um efeito (tanto o
+    /// botão "End" quanto descartar um recém-criado passam por aqui), pra
+    /// nunca deixar um bônus/substituição "grudado" na ficha depois que o
+    /// cartão some.
+    mutating func endActiveEffect(id: UUID) {
+        guard let effect = activeEffects?.first(where: { $0.id == id }) else { return }
+        revertActiveEffectApplication(effect)
+        activeEffects?.removeAll { $0.id == id }
+    }
+
+    /// Salva a EDIÇÃO de um item já existente — pedido do usuário
+    /// (2026-09-28): "falta opção de editar efeito salvo". Não é só
+    /// "reverte tudo, aplica tudo de novo": isso funciona bem pra
+    /// `.flatBonus`/`.statOverride` (o valor anterior é sempre recapturado
+    /// do zero, então nunca empilha), mas faria um `.tempHP` em edição
+    /// "curar de volta" o que já tinha sido perdido pra dano, só por
+    /// trocar o nome do item — errado. Por isso compara componente por
+    /// componente (pelo `id`, estável entre uma edição e outra) e só
+    /// ajusta `.tempHP` pela DIFERENÇA entre o total antigo e o novo,
+    /// preservando o que já foi consumido.
+    mutating func saveEditedActiveEffect(replacing old: ActiveEffect, with newEffect: inout ActiveEffect) {
+        let oldByID = Dictionary(uniqueKeysWithValues: old.components.map { ($0.id, $0) })
+        let newIDs = Set(newEffect.components.map(\.id))
+
+        // Componentes que saíram da lista na edição: desfaz por completo,
+        // igual um "End" normal faria com eles.
+        for oldComponent in old.components where !newIDs.contains(oldComponent.id) {
+            revertComponent(oldComponent)
+        }
+
+        for index in newEffect.components.indices {
+            let id = newEffect.components[index].id
+            let previous = oldByID[id]
+            // Desfaz o que esse MESMO componente (mesmo id) tinha
+            // aplicado antes — cobre tanto "só mudou o valor" quanto
+            // "trocou de mecanismo no meio da edição" (`revertComponent`
+            // olha o `kind` do valor antigo, não do novo).
+            if let previous {
+                revertComponent(previous)
+            }
+            switch newEffect.components[index].kind {
+            case .flatBonus, .statOverride:
+                applyComponent(&newEffect.components[index], itemName: newEffect.name)
+            case .tempHP:
+                let previousRemaining = (previous?.kind == .tempHP) ? previous!.tempHPRemaining : 0
+                let previousGranted = (previous?.kind == .tempHP) ? previous!.tempHPGranted : 0
+                let delta = newEffect.components[index].tempHPGranted - previousGranted
+                let newRemaining = max(0, min(newEffect.components[index].tempHPGranted, previousRemaining + delta))
+                newEffect.components[index].tempHPRemaining = newRemaining
+                hitPointsCurrent += newRemaining
+            case .attackNegation, .bankedHeal, .note:
+                break
+            }
+        }
+    }
+
+    /// Ponto único por onde todo dano "de verdade" passa (chamado por
+    /// `WoundsBlock.commit`, em vez de mexer direto em
+    /// `hitPointsCurrent`) — pra poder interceptar os efeitos ativos que
+    /// reagem a dano, pedidos do usuário (2026-09-28):
+    ///   - PV temporário (`.tempHP`): já está somado em `hitPointsCurrent`
+    ///     desde a ativação (ver `applyComponent`) — aqui só desconta o
+    ///     bookkeeping de `tempHPRemaining` na mesma proporção, pra saber
+    ///     quanto ainda não foi perdido (o que SOBRAR quando o efeito
+    ///     acabar é descontado de novo; o que já foi perdido aqui nunca
+    ///     volta).
+    ///   - Regenerate pendente (`.bankedHeal`, ainda `healIsBanked`): o
+    ///     primeiro dano recebido dispara a cura (vira `healIsBanked =
+    ///     false`; a partir daí quem cura 1/round é o jogador, tocando o
+    ///     contador do cartão do efeito).
+    /// `amount` negativo (jogador digitou um número negativo na caixa de
+    /// Wounds) continua se comportando como sempre — cura direta, sem
+    /// passar por nenhum efeito, já que não é dano de verdade.
+    mutating func applyDamage(_ amount: Int) {
+        guard amount > 0 else {
+            hitPointsCurrent -= amount
+            return
+        }
+        // O PV temporário já foi somado a `hitPointsCurrent` na hora de
+        // ativar o efeito (ver `applyComponent`/item 10) — então o dano
+        // INTEIRO sempre sai de `hitPointsCurrent` aqui; este loop só
+        // atualiza o "quanto ainda resta" (`tempHPRemaining`) de cada
+        // componente `.tempHP` pra bookkeeping (saber quanto devolver se o
+        // efeito for encerrado antes de todo consumido) — ele NUNCA reduz
+        // o quanto é descontado do PV atual, ou o dano seria subcontado.
+        var toAccount = amount
+        if var effects = activeEffects {
+            for effectIndex in effects.indices {
+                for componentIndex in effects[effectIndex].components.indices {
+                    guard effects[effectIndex].components[componentIndex].kind == .tempHP,
+                          effects[effectIndex].components[componentIndex].tempHPRemaining > 0 else { continue }
+                    let pool = effects[effectIndex].components[componentIndex].tempHPRemaining
+                    let consumed = min(toAccount, pool)
+                    effects[effectIndex].components[componentIndex].tempHPRemaining -= consumed
+                    toAccount -= consumed
+                    if toAccount == 0 { break }
+                }
+                if toAccount == 0 { break }
+            }
+            for effectIndex in effects.indices {
+                for componentIndex in effects[effectIndex].components.indices
+                where effects[effectIndex].components[componentIndex].kind == .bankedHeal
+                    && effects[effectIndex].components[componentIndex].healIsBanked {
+                    effects[effectIndex].components[componentIndex].healIsBanked = false
+                }
+            }
+            activeEffects = effects
+        }
+        hitPointsCurrent -= amount
     }
 
     /// `true` quando nível ou atributos mudaram desde a última revisão —

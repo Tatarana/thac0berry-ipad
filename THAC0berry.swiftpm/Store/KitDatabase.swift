@@ -1,32 +1,47 @@
 import Foundation
 
-/// Base de kits de sacerdote — vem de `EmbeddedKits.kits`, literais Swift
-/// de verdade, SEM bundle/`Data`/`JSONDecoder` nenhum em runtime.
+/// Base de kits de sacerdote — lida de `Resources/kits.json` em runtime.
 ///
-/// **NÃO troque isso de volta pra ler JSON do bundle** (nem
-/// `Bundle.main.url(forResource:)`, nem varredura de diretório com
-/// `FileManager.contentsOfDirectory`, nem um arquivo único, nem vários
-/// pedaços menores) — TODAS essas variações foram tentadas nesta feature
-/// (v0.81 a v0.84) e todas falharam com a mesma mensagem genérica
-/// ("The data couldn't be read because it is missing"), pelo mesmo motivo
-/// que já tinha derrubado o `spells.json` de exemplo em v0.68-0.71 (ver
-/// `EmbeddedSampleSpells.swift`). A causa REAL só apareceu depois: não era
-/// bug de bundle nenhum — era `DecodingError.keyNotFound` (13 dos 97 kits
-/// não têm a chave `mechanics.armor.allowedTypes`), e o Swift renderiza
-/// esse erro especificamente com essa mesma frase genérica de "missing",
-/// fácil de confundir com arquivo sumido. Já corrigido em
-/// `KitArmorRules.init(from:)` (`Models/Kit.swift`) pra quem algum dia
-/// quiser voltar a decodificar JSON de verdade — mas a base em uso agora é
-/// a embutida, que nem passa perto de `JSONDecoder`.
+/// HISTÓRICO (pra quem ler isto e se assustar de novo): entre v0.81 e
+/// v0.84, TRÊS tentativas diferentes de ler isso de JSON de bundle
+/// falharam com a mesma mensagem genérica ("The data couldn't be read
+/// because it is missing"). A causa real era `DecodingError.keyNotFound`
+/// (13 dos 97 kits não têm a chave `mechanics.armor.allowedTypes`), que o
+/// Swift renderiza com essa mesma frase de "missing" — fácil de confundir
+/// com arquivo sumido. Isso já foi corrigido em `KitArmorRules.init(from:)`
+/// (`Models/Kit.swift`), que trata a chave ausente com `decodeIfPresent`.
+/// Por causa disso o app passou a embutir os 91 kits como literal Swift
+/// puro (`EmbeddedKits.swift`) — só que esse literal gigante (~1MB, ~91
+/// structs aninhados) virou um problema NOVO e diferente (2026-09-25): o
+/// archive de distribuição do Swift Playgrounds trava, porque a
+/// compilação de Release usa "whole module optimization" e recompila tudo
+/// junto, não importa quantos arquivos-parte o literal esteja dividido —
+/// só o build de Debug/execução local se beneficia da divisão. Como o
+/// bug de decode original já está corrigido, voltar pro JSON resolve os
+/// dois problemas: nada mais passa pelo type-checker em tempo de
+/// compilação, e o decode não tropeça mais na chave ausente.
 final class KitDatabase: ObservableObject {
     @Published private(set) var kits: [Kit] = []
-    /// Mantido só pra compatibilidade com o resto do app (`HomeView`/
-    /// `CampaignListView`/`KitCompendiumView` já checam isso) — sempre
-    /// `nil` agora que não há leitura de bundle nenhuma pra falhar.
     @Published private(set) var loadError: String? = nil
 
     init() {
-        kits = EmbeddedKits.kits.sorted { $0.name < $1.name }
+        load()
+    }
+
+    private func load() {
+        guard let resourceURL = Bundle.main.resourceURL,
+              let fileURL = try? FileManager.default.contentsOfDirectory(at: resourceURL, includingPropertiesForKeys: nil)
+                  .first(where: { $0.lastPathComponent == "kits.json" })
+        else {
+            loadError = "Couldn't find kits.json in the app bundle."
+            return
+        }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            kits = try JSONDecoder().decode([Kit].self, from: data).sorted { $0.name < $1.name }
+        } catch {
+            loadError = "Couldn't read kits.json: \(error.localizedDescription)"
+        }
     }
 
     func kit(id: String) -> Kit? {

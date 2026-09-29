@@ -504,12 +504,19 @@ struct MagicItemDetailSheet: View {
 /// Mesmo padrão de `MundaneItemPickerSheet`: busca por nome na base
 /// (`MagicItemDatabase`, 5.669 itens), "usar como digitado" pra item
 /// caseiro/criado pelo jogador quando a busca não bate em nada, e "ⓘ" em
-/// cada linha pra ver a descrição completa antes de escolher. Diferente do
-/// Mundane (que liga a um `Page2EquipmentEntry`), aqui a linha escolhida é
-/// um `QuantifiedItem` — guarda `name` + `matchedItemID`, mantendo
-/// `quantity`/`usedCount` que já estavam na linha.
+/// cada linha pra ver a descrição completa antes de escolher.
+///
+/// Trabalha em cima de `name`/`matchedItemID` separados (não mais um
+/// `QuantifiedItem` inteiro) desde 2026-09-27 — item 1 do pedido do
+/// usuário: reaproveitar este seletor também nos "Magic Item Spells" da
+/// Priest Spell Sheet (`SpellSheetView.swift`), cujo modelo
+/// (`SpellSheet.MagicItem`) não tem `quantity`/`usedCount` nenhum, só nome
+/// e descrição. O bloco "Magic Items" da página 2 (`MagicItemQuantifiedRow`)
+/// continua funcionando igual, só passando os dois campos de dentro do seu
+/// `QuantifiedItem` em vez do binding inteiro.
 struct MagicItemPickerSheet: View {
-    @Binding var entry: QuantifiedItem
+    @Binding var name: String
+    @Binding var matchedItemID: String?
     @EnvironmentObject private var magicItemDatabase: MagicItemDatabase
     @Environment(\.dismiss) private var dismiss
 
@@ -547,13 +554,13 @@ struct MagicItemPickerSheet: View {
                     .buttonStyle(.plain)
                 }
 
-                if !entry.name.isEmpty {
+                if !name.isEmpty {
                     Button {
-                        entry.name = ""
-                        entry.matchedItemID = nil
+                        name = ""
+                        matchedItemID = nil
                         dismiss()
                     } label: {
-                        Text("Clear current item (\(entry.name))")
+                        Text("Clear current item (\(name))")
                             .font(Paper.printedItalic(13))
                             .foregroundStyle(Paper.redInk)
                     }
@@ -575,7 +582,7 @@ struct MagicItemPickerSheet: View {
                         ForEach(filtered) { candidate in
                             MagicItemPickerRow(
                                 item: candidate,
-                                isSelected: entry.name == candidate.name,
+                                isSelected: name == candidate.name,
                                 onSelect: { choose(candidate) },
                                 onInfo: { detailItem = candidate }
                             )
@@ -606,16 +613,16 @@ struct MagicItemPickerSheet: View {
     }
 
     private func choose(_ candidate: CompendiumMagicItem) {
-        entry.name = candidate.name
-        entry.matchedItemID = candidate.id
+        name = candidate.name
+        matchedItemID = candidate.id
         dismiss()
     }
 
     private func useAsTyped() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        entry.name = trimmed
-        entry.matchedItemID = nil
+        name = trimmed
+        matchedItemID = nil
         dismiss()
     }
 }

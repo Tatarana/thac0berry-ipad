@@ -5,11 +5,9 @@ import Foundation
 /// cobrindo não só o PHB básico (Tabela 37) mas suplementos inteiros
 /// (Complete Handbooks, Player's Option: Skills & Powers, Dark Sun,
 /// Al-Qadim, Spelljammer, Council of Wyrms...). 372 entradas ao todo, vêm
-/// de `EmbeddedProficiencies.entries` (`Store/EmbeddedProficiencies.swift`)
-/// — literais Swift de verdade, não JSON de bundle, pelo mesmo motivo já
-/// documentado em `Kit.swift`/`KitDatabase.swift` (três tentativas
-/// diferentes de ler isso de um recurso JSON já falharam nesse toolchain
-/// pra Kits; não vale reabrir essa frente aqui).
+/// de `Resources/proficiencies.json` em runtime (ver o comentário em
+/// `KitDatabase.swift`/`ProficiencyDatabase.swift` pro histórico do vai-e-
+/// volta entre JSON e literal Swift).
 struct Proficiency: Codable, Identifiable, Hashable {
     let id: String
     let name: String

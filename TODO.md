@@ -4651,3 +4651,663 @@ contagem de chaves `{`/`}` balanceada em `Store/CharacterLibrary.swift`
 
 `Package.swift`: `displayVersion` "1.65"→"1.66", `bundleVersion`
 "168"→"169".
+
+## LOTE 8 (v1.67, 2026-09-25) — Rules/Kits/Proficiencies/Deities: de literal Swift pra JSON
+
+Pedido do usuário: analisar o que mais contribuía pro tamanho do projeto,
+depois de duas tentativas frustradas de mandar o app pra loja pelo Swift
+Playgrounds (erro genérico "Build failed", sem log nenhum acessível, e
+nenhum build sequer chegando no App Store Connect).
+
+**Diagnóstico:** o projeto tinha 27 MB de `Resources/` (imagens + JSON),
+mas o suspeito de verdade pro archive travar era outra coisa: 3.9 MB de
+dados embutidos como literal Swift puro em `Store/EmbeddedRules_PartN.swift`
+(29 arquivos), `EmbeddedKits_PartN.swift` (6), `EmbeddedProficiencies_PartN.swift`
+(26) e `EmbeddedDeities_PartN.swift` (9) — no total, 171 arquivos `.swift`/
+~56 mil linhas no projeto inteiro. Esses literais gigantes já tinham sido
+divididos em vários arquivos-parte numa sessão anterior especificamente
+pra evitar o erro clássico do type-checker do Swift ("unable to type-check
+this expression in reasonable time") — só que isso só ajuda o build de
+Debug/execução local: o build de Release/Archive (o que o "Distribute App"
+usa) compila com "whole module optimization", que junta tudo de nsovo
+num módulo só não importa quantos arquivos-parte existam. Isso bate com
+o sintoma relatado: "roda liso localmente, mas o archive pra loja sempre
+falha".
+
+**A solução, pedida e executada nesta sessão:** converter Rules, Kits,
+Proficiencies e Deities de volta pra JSON carregado em runtime (tirando
+tudo isso da frente do type-checker) — mantendo Armor/MundaneItems/
+Weapons/SampleSpells como estavam (pequenos, não valem o risco).
+
+- Escrito `Scripts/swift_lit_to_json.py` — um parser mecânico (tokenizer +
+  recursive descent) que lê o literal Swift diretamente e emite JSON, SEM
+  passar o texto por nenhum modelo de linguagem — importante pra um corpus
+  de texto de regras/livro que não pode sofrer paráfrase ou perda
+  silenciosa. Lida com string literal (mesmas regras de escape do JSON:
+  `\"` `\\` `\n` `\t` `\r`), número, bool, `nil`, array, dicionário
+  (inclusive `[:]` vazio), chamada de struct com argumento nomeado, e o
+  caso especial do enum `KitArmorRestriction` (`.asClass` → string
+  sentinela `"as_class"`, `.specific([...])` → array desembrulhado — o
+  mesmo formato que o `Codable` customizado dele já espera).
+- Gerados `Resources/rules.json` (385 registros), `Resources/kits.json`
+  (91), `Resources/proficiencies.json` (372), `Resources/deities.json`
+  (79) — contagens conferidas uma a uma contra o número de constantes
+  `let embeddedX000N` de origem (bate exato nos quatro) e contra os
+  comentários de cada `Models/*.swift` ("274 entradas... 385 no total
+  depois de CPrH", "97 kits menos 6 = 91", "372 proficiências", "79
+  divindades").
+- `Models/Rule.swift` (`RuleEntry`/`RuleTable`) e `Models/Deity.swift`
+  (`Deity`) ganharam conformidade `Codable` — não tinham antes porque só
+  existiam como literal. `Kit`/`Proficiency` já eram `Codable` de uma
+  tentativa anterior (ver histórico abaixo).
+- `Store/RulesDatabase.swift`, `KitDatabase.swift`,
+  `ProficiencyDatabase.swift`, `DeityDatabase.swift`: `init()` trocou de
+  `= EmbeddedX.entries` pra um `load()` que lê o JSON do bundle — mesmo
+  mecanismo já comprovado confiável neste toolchain em
+  `SpellDatabase.priestFiles()` (`Bundle.main.resourceURL` +
+  `FileManager.contentsOfDirectory`, filtrando pelo nome do arquivo, em
+  vez de `Bundle.main.url(forResource:)` direto).
+- **Sobre o bug histórico dos Kits** (documentado em `KitDatabase.swift`:
+  três tentativas de ler JSON já tinham falhado, v0.81-v0.84, com a
+  mensagem genérica "The data couldn't be read because it is missing"):
+  a causa real era `DecodingError.keyNotFound` (13 dos 97 kits sem a
+  chave `mechanics.armor.allowedTypes`), já corrigida faz tempo em
+  `KitArmorRules.init(from:)` com `decodeIfPresent`. Essa correção nunca
+  foi desfeita — só não tinha voltado a ser testada contra JSON de
+  verdade até agora. Os 91 kits decodificaram sem erro nenhum.
+- Removidos: `Store/EmbeddedRules.swift` + `EmbeddedRules_Part1..28.swift`,
+  `EmbeddedKits.swift` + `EmbeddedKits_Part1..5.swift`,
+  `EmbeddedProficiencies.swift` + `EmbeddedProficiencies_Part1..25.swift`,
+  `EmbeddedDeities.swift` + `EmbeddedDeities_Part1..8.swift` — 70 arquivos,
+  ~3.9 MB de código Swift.
+
+**Resultado:** o projeto inteiro caiu de 171 pra 101 arquivos `.swift`
+(~56 mil → ~27 mil linhas) — `Store/` sozinho foi de 5.1 MB de código
+Swift pra 336 KB. O peso total em disco do pacote praticamente não mudou
+(os mesmos dados só migraram de literal Swift pra JSON) — o que importa
+aqui não é o tamanho do `.ipa`, é o volume que o type-checker do Swift
+processa durante a compilação de Release/Archive.
+
+Verificação feita nesta sessão (sem Xcode/simulador disponível): contagem
+de chaves `{`/`}` balanceada nos 8 arquivos Swift tocados; contagem de
+registros de cada JSON conferida contra o número de constantes de origem
+(bate exato: 385/91/372/79); sweep `grep` confirmando que nenhum código
+fora dos 4 `*Database.swift` ainda referencia `EmbeddedRules`/
+`EmbeddedKits`/`EmbeddedProficiencies`/`EmbeddedDeities`; spot-check
+manual de registros específicos (Akadi, Amaunator, Adviser, a tabela
+"Method I Characters" da regra de criação de personagem) comparando o
+JSON gerado contra o texto original.
+
+**Ainda não verificado** (preciso do Playgrounds/Xcode de verdade pra
+confirmar): se isso realmente resolve o "Build failed" no archive de
+distribuição — a teoria é forte (literal Swift gigante é uma causa
+documentada e conhecida de travamento do type-checker em builds de
+Release), mas só um envio de verdade pra loja confirma.
+
+`Package.swift`: `displayVersion` "1.66"→"1.67", `bundleVersion`
+"169"→"170".
+
+## AJUSTE v1.68 (2026-09-26) — Bônus de magia por Sabedoria não era cumulativo
+
+Bug relatado pelo usuário: clérigo nível 11 com Sabedoria 19 deveria ter
+5 slots base de 1º círculo + 3 de bônus de Sabedoria = 8 no total, mas o
+app calculava só +2 no 1º círculo (7 no total).
+
+**Causa raiz:** `WisdomTable.bonusSpells(forScore:)`, em `AbilityTables.swift`,
+soma a Tabela 5 do PHB (`bonusSpellsByScore`, um valor por score de 13 a
+25) pra virar o texto "+N / +N / ..." usado em `AbilityDetails.wisdomBonusSpells`.
+A tabela impressa do livro mostra "1st" tanto na linha 13 quanto na 14
+(mesma leitura visual em Sabedoria 13-14, 15-16 etc.), e o código
+interpretava isso como "um patamar só, conta uma vez" — pulava a soma
+quando a lista de círculos de um score repetia a do score anterior.
+
+Isso está errado: cada score de 13 a 25 é seu próprio evento de bônus,
+mesmo repetindo o círculo do score anterior. A prova está no próprio
+texto da regra, já presente em `Resources/rules.json` (id
+`phb_ch01_wisdom`, extraído do PHB): "a priest with a wisdom of 15 is
+entitled to **two** 1st-level bonus spells and **one** 2nd-level bonus
+spell" — ou seja, em Sabedoria 15 o 1º círculo já está em +2 (ganho em
+13 E em 14 separadamente), não +1 como o código calculava.
+
+**Correção:** removida a checagem "só soma se mudou em relação ao score
+anterior" — agora soma a lista de círculos de TODO score de 1 até o
+score do personagem, sem pular repetidos.
+
+Conferido contra os dois pontos de verdade disponíveis no projeto: (1) o
+exemplo textual da própria regra (Sabedoria 15 → "+2 / +1", bate exato);
+(2) o personagem de amostra em `SampleCharacter.swift` (Sabedoria 17,
+`wisdomBonusSpells` hardcoded como "+2 / +2 / +1") — com a fórmula nova
+dá exatamente "+2 / +2 / +1"; com a fórmula antiga (bugada) dava
+"+1 / +1 / +1", ou seja, o sample já estava certo e só a fórmula estava
+errada. Para Sabedoria 19 (caso relatado): "+3 / +2 / +2 / +1" — 1º
+círculo +3, batendo com a conta do usuário (5 base + 3 = 8).
+
+`Package.swift`: `displayVersion` "1.67"→"1.68", `bundleVersion`
+"170"→"171".
+
+## AJUSTE v1.69 (2026-09-26) — o conserto da v1.68 não bastava: o bônus nunca chegava nos slots de verdade
+
+Usuário testou a v1.68 e reportou "Não funcionou. Tá igual". Investigando
+de novo: a v1.68 corrigiu a SOMA do bônus de Sabedoria (Tabela 5), mas só
+consertou o texto da célula "Bonus Spells" da tabela de atributos
+(`AbilityDetails.wisdomBonusSpells`) — um campo de texto livre que só é
+regravado quando o jogador muda a Sabedoria e toca em "Apply automatic
+changes" na prévia de consequências. Pior: mesmo esse texto NUNCA
+alimentava a grade real de slots da Priest Spell Sheet.
+
+**A causa raiz de verdade:** `PriestTables.spellProgression(level:wisdom:)`
+(`Models/Character.swift`), a função que `PlayerCharacter.
+computedSpellSlotAllotments` usa pra montar a grade de slots de folha nova,
+só lia a Tabela 24 (Priest Spell Progression) pura — usava `wisdom`
+apenas pra travar/destravar 6º e 7º círculo (`wisdomRequirementByCircle`,
+Sabedoria mínima 17/18), nunca somava o bônus da Tabela 5. Clérigo nível
+11 com Sabedoria 19 sempre teria 5 slots de 1º círculo, não importa o
+conserto no texto — o número real de slots nunca dependia dele.
+
+**Correção:**
+- `WisdomTable.bonusSpells(forScore:)` (`AbilityTables.swift`) virou uma
+  casca fina em cima de um novo `WisdomTable.bonusSpellTotals(forScore:)`,
+  que devolve `[círculo: total]` (não só o texto formatado) — pra dar pra
+  outro código somar de verdade, não só mostrar.
+- `PriestTables.spellProgression` agora soma `bonusSpellTotals(forScore:
+  wisdom)[circle]` em cima do valor da Tabela 24, pra cada círculo que a
+  tabela já concede nesse nível (bônus nunca destrava um círculo novo
+  sozinho — só reforça um que a classe já tem, exatamente como a regra do
+  livro diz).
+- `SpellSheetView.CircleBlock` (rótulo "Level N - X Slots (base+bônus)")
+  trocou de ler o texto livre pra calcular direto de
+  `WisdomTable.bonusSpellTotals`, usando `sheet.wisdomAtCreation` (a
+  Sabedoria congelada no dia em que aquela folha foi criada) — bate com a
+  mesma Sabedoria que gerou `slots.count` daquela folha específica.
+
+Conferido programaticamente fora do Xcode: clérigo nível 11, Sabedoria 19
+→ `[8, 6, 6, 4, 2, 1, 0]` (1º círculo 8 = 5 base + 3 bônus, exatamente o
+relatado pelo usuário).
+
+**Nota pro jogador:** uma folha de magia (`SpellSheet`) já criada antes
+desta versão mantém a contagem antiga até você criar um "novo dia" (o "+"
+ao lado das abas de dia) — é aí que a grade é remontada do zero a partir
+de `computedSpellSlotAllotments`. Não precisa mexer na Sabedoria nem
+editar texto nenhum à mão desta vez.
+
+`Package.swift`: `displayVersion` "1.68"→"1.69", `bundleVersion`
+"171"→"172".
+
+## LOTE 9 (v1.70, 2026-09-27) — 5 ajustes na Priest Spell Sheet
+
+1. **Magic Item Spells — "Item" era só texto livre.** `MagicItemPickerSheet`
+   (usado desde 2026-09-24 só pro bloco "Magic Items" da página 2) deixou
+   de tomar um `QuantifiedItem` inteiro e passou a tomar `name`/
+   `matchedItemID` separados — reaproveitado agora também no cartão de
+   item mágico da Priest Spell Sheet (`MagicItemCard`, `SpellSheetView.
+   swift`). Tocar no nome abre a descrição do catálogo (`MagicItemDetailSheet`,
+   com "change") quando já está ligado a um item de lá, ou o buscador
+   (com busca por nome + "usar como digitado", nunca obriga escolher um
+   item existente) quando não está. `SpellSheet.MagicItem` ganhou o campo
+   `matchedItemID: String?` (opcional, fichas antigas continuam
+   decodificando como item caseiro/`nil`).
+
+2. **Magia de item mágico — "Unnamed Spell" + "change" obrigatório pra
+   escolher.** `ItemSpellRow`: tocar numa magia AINDA SEM NOME agora vai
+   direto pro buscador (`SpellWritingSheet`), pulando a tela de descrição
+   vazia ("Unnamed spell") que só servia pra abrigar o botão "change" —
+   igual ao padrão dos outros lugares (slot de memorização, Additional
+   Spells). Uma magia JÁ escolhida continua abrindo a descrição normal (com
+   "change" lá dentro, ver item 4). `SpellWritingSheet` também ganhou uma
+   listagem inicial (`allSpells`, base inteira em ordem alfabética) — antes
+   só mostrava alguma coisa depois de começar a digitar; agora já lista as
+   magias disponíveis de cara, igual o `SlotEditorSheet` já fazia com
+   `levelList` — sem restrição de círculo aqui, porque um item mágico pode
+   conjurar qualquer magia do jogo.
+
+3. **Additional Spells — 7 linhas fixas, nenhuma forma de adicionar mais.**
+   As linhas em branco embaixo da folha eram 100% decorativas (`Color.
+   clear` + `DottedRule`, sem `HandwritingField` nenhum) — só a linha ativa
+   de cima (`writingLine`) realmente escrevia, mas via de 6-a-7 linhas
+   visuais dava a impressão de um teto. Reduzido o padrão pra 3 linhas
+   decorativas, com um botão "+ add line" que soma mais sob demanda —
+   `writingLine` continua sendo a única forma de REGISTRAR uma magia (nunca
+   teve teto de verdade), as linhas de baixo são só a régua da folha.
+
+4. **Slots de magia — depois de escolher, não dava pra trocar.** A bolinha
+   do slot já abria `SlotEditorSheet` (trocar/limpar/marcar usado) desde
+   sempre, mas só isso — tocar na PRÓPRIA linha memorizada abria
+   `SpellDetailSheet` sem nenhum botão de ação (`onChangeSpell` só vinha
+   preenchido nas magias de item mágico, nunca no círculo de magia). Agora
+   o círculo de magia também passa `onChangeSpell`, reabrindo o mesmo
+   `SlotEditorSheet` completo.
+
+5. **Slots de magia — riscar marca usado, mas não dava pra desmarcar.** O
+   gesto de riscar de novo já era um `toggle` (`CircleBlock.toggle`), e a
+   bolinha do slot já tinha "mark as used"/"unmark as used" dentro do
+   editor — mas de novo só alcançável pela bolinha, não pela linha. Mesmo
+   conserto do item 4: `SpellDetailSheet` ganhou um botão opcional "mark as
+   used"/"unmark as used" (`isSpent`/`onToggleSpent`), ligado no círculo de
+   magia junto do "change".
+
+`Package.swift`: `displayVersion` "1.69"→"1.70", `bundleVersion`
+"172"→"173".
+
+## AJUSTE v1.71 (2026-09-27) — feedback do usuário testando o Lote 9
+
+Usuário testou v1.70: itens 1, 3 e 4 confirmados ("Boa!"); dois ajustes
+finos pendentes.
+
+- **Item 2 ainda sem "usar como digitado" de verdade.** O botão já
+  existia (`SpellWritingSheet`), mas vivia DENTRO da lista rolável de
+  candidatos, em texto itálico pequeno e apagado — com até 8 sugestões
+  por aproximação na frente dele, fácil de nunca chegar lá rolando, e sem
+  cara de botão. Usuário reportou só ter "fechar a tela" como opção
+  visível. Movido pra FORA do `ScrollView`, fixo logo abaixo do campo de
+  escrita (aparece assim que se digita algo, sem precisar rolar nada), com
+  o mesmo estilo "pill" preenchido que `MagicItemPickerSheet.useAsTyped`
+  já usa — texto branco em fundo escuro, não dá mais pra confundir com
+  legenda.
+- **Item 4 — "mark as used"/"unmark as used" pequeno demais.** O botão
+  novo (`SpellDetailSheet`, adicionado no Lote 9) estava em 13pt itálico;
+  igualado aos 16pt do "change"/"close" ao lado, no mesmo cabeçalho.
+
+`Package.swift`: `displayVersion` "1.70"→"1.71", `bundleVersion`
+"173"→"174".
+
+## AJUSTE v1.72 (2026-09-28) — crash ao criar página "Freeform" (desenho livre) no caderno
+
+Usuário reportou: "Ao tentar criar uma nova página de notebook do tipo
+Escrita Livre o app trava e fecha, sem nenhuma mensagem." Só a folha de
+desenho travava — a transcrita (texto) nunca deu problema.
+
+**Causa raiz:** o caderno usa o mesmo `UIPageViewController` com curl de
+página (`.pageCurl`) que a Priest Spell Sheet já usa (`DayPagerView`) — ver
+`NotebookPagerView`. Criar uma folha nova pede pro pager virar a página
+com animação (`setViewControllers(..., animated: true)`), e é DENTRO
+dessa mesma passada de `updateUIViewController`/`didFinishAnimating` que
+`DrawingCanvas.updateUIView` anexa o `PKToolPicker` e chama
+`uiView.becomeFirstResponder()` pela primeira vez. `becomeFirstResponder()`
+sobe uma janela de sistema (o `PKToolPicker`) e mexe na cadeia de first
+responder — mutação que colide com a transação de animação do curl ainda
+em andamento, e é isso que travava o app (só ao NASCER a folha, quando o
+anexo do picker acontece pela primeira vez). A folha transcrita
+(`NotebookTextArea`, um `UITextView` comum) nunca chama
+`becomeFirstResponder()` sozinha — só responde a um toque do jogador,
+bem depois de qualquer animação ter terminado — por isso nunca crashava.
+
+**Correção:** `DrawingCanvas.updateUIView` (`Views/NotebookView.swift`)
+adia todo o bloco de anexar o `PKToolPicker`/`becomeFirstResponder()` pra
+`DispatchQueue.main.async` — roda no próximo ciclo do run loop, depois que
+a transação de animação da virada de página já terminou, em vez de no
+meio dela. Reordenar chamadas ou reafirmar cor não resolveria nada aqui —
+o problema nunca foi O QUE se chama, e sim QUANDO.
+
+`Package.swift`: `displayVersion` "1.71"→"1.72", `bundleVersion`
+"174"→"175".
+
+## AJUSTE v1.73 (2026-09-28) — v1.72 não resolveu; segunda tentativa no crash do "Freeform"
+
+Usuário testou a v1.72 e reportou "O problema está exatamente igual" —
+com um detalhe novo, importante: a PRIMEIRA folha do caderno (criada a
+partir do estado vazio, sem nenhuma folha antes) funciona em "Freeform"
+sem problema nenhum. Só trava quando já existe pelo menos uma folha e o
+jogador toca no "+" pra adicionar uma nova "Freeform page".
+
+Isso aponta pra causa raiz mais precisa: a primeira folha nasce dentro de
+`makeUIViewController`, com `setViewControllers(..., animated: false)` —
+sem NENHUMA animação de curl rolando. Toda folha seguinte nasce dentro de
+`updateUIViewController`, com `animated: true` — com a animação de curl de
+verdade em andamento. `DrawingCanvas` é a única das duas folhas que chama
+`becomeFirstResponder()` sozinha (liga o `PKToolPicker`) assim que a view
+entra numa janela — e a v1.72 só adiava essa chamada com
+`DispatchQueue.main.async`, ou seja, pro PRÓXIMO CICLO do run loop. Um
+ciclo não é tempo nenhum perto da duração da animação de curl (várias
+dezenas de ciclos) — o anexo continuava caindo bem no meio da transação de
+animação, só um instante depois. Por isso "exatamente igual": a mudança
+não tocava na janela de tempo real do problema.
+
+**Segunda causa, encontrada na mesma revisão:** a comparação que decide
+recarregar o traço em `updateUIView` também estava errada, de um jeito
+que pode sozinho travar o app (não só no Freeform recém-criado, mas em
+qualquer passada de render dessa folha): comparava
+`uiView.drawing.dataRepresentation()` contra `drawingData ?? Data()` — mas
+um `PKDrawing` vazio de verdade NÃO serializa como bytes vazios (o formato
+tem cabeçalho próprio mesmo sem traço nenhum). Numa folha nova
+(`drawingData == nil`), essa comparação batia "diferente" em TODA passada
+de `updateUIView`, reatribuindo `uiView.drawing = PKDrawing()` de novo a
+cada vez — reatribuição que o próprio `PKCanvasViewDelegate` pode
+enxergar como mudança e devolver pro binding, disparando outra passada de
+`updateUIView` (possivelmente ainda no meio da animação de curl) — o tipo
+de laço de atualização de estado que trava o app.
+
+**Correção de verdade desta vez — duas partes:**
+1. **Sinal real de "terminou de aparecer", não uma estimativa de tempo.**
+   Novo `PageReadiness` (`Views/NotebookView.swift`): um disparo único por
+   folha, criado em `Coordinator.makePage` e guardado tanto no
+   `NotebookPageController` (que o completa no `viewDidAppear` — o aviso
+   que o próprio UIKit dá quando a folha terminou de aparecer, curl
+   incluso, tanto pra troca animada quanto pra primeira folha sem
+   animação) quanto na `DrawingCanvas` correspondente (que só liga o
+   `PKToolPicker`/chama `becomeFirstResponder()` de dentro de
+   `readiness.onReady { ... }`, nunca mais amarrado a `window != nil` ou a
+   `DispatchQueue.main.async`).
+2. **Comparação de dados corrigida.** `DrawingCanvas.Coordinator` ganhou
+   `lastSyncedData: Data?` — o último valor que O PRÓPRIO coordinator
+   colocou no canvas ou leu de volta dele. `updateUIView` agora compara
+   `drawingData` (o binding de fora) contra esse valor, não contra uma
+   reserialização do canvas nem contra `Data()` — só recarrega o traço
+   quando o valor de fora mudou de verdade (folheou pra outra página).
+
+`Package.swift`: `displayVersion` "1.72"→"1.73", `bundleVersion`
+"175"→"176".
+
+## AJUSTE v1.74 (2026-09-28) — ordem das magias embaralhava ao criar folha nova
+
+Usuário reportou: ao criar uma nova Priest Spell Sheet, ela herda as
+magias certas do dia anterior (correto), mas em ordem aleatória — magia A
+no slot 1 e B no slot 2 viravam B no slot 1 e A no slot 3, por exemplo.
+
+**Causa raiz:** `SpellSlotBoard.sortSlots()` (`Models/Character.swift`)
+ordena os slots por conjurador, depois por círculo, e usava `id.uuidString`
+como critério de desempate ENTRE slots do mesmo círculo — de propósito,
+pra ter uma ordem determinística mesmo se o array físico virasse por causa
+de alguma reconstrução em outro lugar do código. O problema: `SpellSheet.
+nextDay()` dá um `id` NOVO E ALEATÓRIO pra cada slot ao criar a folha do
+dia seguinte (de propósito — dois dias não podem ter slots com a mesma
+identidade, ou uma busca por id casaria na folha errada). Como o
+desempate do sort usava justamente esse id, a ordem visual do círculo
+virava loteria toda vez que uma folha nova nascia, mesmo com os MESMOS
+feitiços memorizados — e isso disparava sempre, porque `CharacterSheetView.
+newSheet()` chama `reconciled(...)`, que chama `SpellSlotBoard.setCount`
+pra cada círculo (mesmo sem mudar a quantidade), e `setCount` sempre
+termina chamando `sortSlots()`.
+
+**Correção:** novo campo `SpellSlot.orderKey: Int` — a posição do slot
+dentro do próprio círculo, um critério de desempate separado do `id` que
+`nextDay()` NUNCA toca (só o `id` muda de um dia pro outro; `orderKey`
+segue junto no mesmo slot). `sortSlots()` passou a desempatar por
+`orderKey` em vez de `id.uuidString`; `setCount` atribui `orderKey`
+sequencial (a partir do maior já usado naquele círculo) só aos slots
+NOVOS que ele cria, nunca reatribuindo os que já existiam. Folha salva
+antes desta versão decodifica `orderKey` como `0` pra todo mundo — inofensivo,
+porque nesse caso o desempate empata e o sort (garantidamente estável a
+partir do Swift 5) preserva a ordem física que o array já tinha, que já é
+a ordem certa pra quem nunca rodou esse código antes.
+
+`Package.swift`: `displayVersion` "1.73"→"1.74", `bundleVersion`
+"176"→"177".
+
+## AJUSTE v1.75 (2026-09-28) — fundo escuro nos campos de contagem por traço
+
+Pedido do usuário: os campos de contagem por risco (`TallyBoard` — Turn
+Undead, cargas de item mágico, conjurações extras em Additional Spells)
+não sinalizavam bem onde riscar. Pedido: fundo mais escuro em TODOS os
+contextos, com os traços claros o bastante pra continuar legíveis em cima
+dele.
+
+Os quatro lugares que usam contagem por traço (`CharacterSheetView.
+QuantityControls`, e três em `SpellSheetView`: Turn Undead, cargas de
+item mágico, Casts de Additional Spells) já passavam pelo mesmo
+componente compartilhado, `TallyBoard`/`TallyMarks` — então a mudança
+centralizada ali cobre os quatro de uma vez, sem precisar tocar em cada
+chamador.
+
+**Mudança:**
+- `Paper.tallyWell` (`Views/PaperTheme.swift`): novo fundo escuro — a
+  mesma cor de `Paper.ink`, só que preenchendo um retângulo de verdade em
+  vez de só escrever por cima. Aplicado como `.background` de
+  `TallyBoard`, com cantos arredondados e um contorno bem sutil (mesma
+  cor dos traços, bem apagada) pra marcar a área sem virar um bloco preto
+  chapado.
+- `Paper.tallyMark` (= `Paper.sheet`, o tom claro do pergaminho) e
+  `Paper.tallyMarkExhausted` (um vermelho claro novo, `#EC7660`) — os
+  traços e o "risco em andamento" (o arrasto ainda não solto) trocaram de
+  `Paper.ink`/`Paper.redInk` (escuros, sumiriam no fundo novo) pra essas
+  duas cores claras. Mesma cena de sempre nos comentários do código — um
+  risco claro na parede escura da cela — só que agora a parede é de
+  verdade, não só o pergaminho por baixo.
+
+`Package.swift`: `displayVersion` "1.74"→"1.75", `bundleVersion`
+"177"→"178".
+
+## AJUSTE v1.76 (2026-09-28) — "clear slot" direto na linha memorizada
+
+Pedido do usuário: escolhida uma magia num slot de memorização, só dava
+pra marcar como usada ou trocar por outra — não tinha como esvaziar o
+slot de volta.
+
+A ação já existia — `SlotEditorSheet` (aberto pela bolinha do círculo)
+sempre teve "clear slot" — só não estava alcançável do jeito mais óbvio:
+tocar na PRÓPRIA linha memorizada abre `SpellDetailSheet`, que já tinha
+"change" (reabre o `SlotEditorSheet` completo) e "mark/unmark as used",
+mas nenhum botão de limpar direto.
+
+**Correção:** `SpellDetailSheet` (`Views/SpellSheetView.swift`) ganhou um
+parâmetro opcional `onClearSlot`, escondido por padrão (`nil`) — só o
+chamador de slot de memorização (`SpellSheetView`'s `detailSlot`) passa
+ele, e só quando o slot não está vazio (`slot.isEmpty ? nil : ...`); os
+outros dois chamadores (magia de item mágico, Additional Spells) não têm
+um "slot" pra esvaziar, então continuam sem o botão, igual sempre foi com
+`onToggleSpent`. O botão "clear slot" aparece em vermelho ao lado de
+"mark as used", e fecha a folha ao usar — depois de limpo não sobra nada
+pra ver naquela descrição.
+
+`Package.swift`: `displayVersion` "1.75"→"1.76", `bundleVersion`
+"178"→"179".
+
+## AJUSTE v1.77 (2026-09-28) — "Efeitos Ativos": magias/itens com duração finita
+
+Pedido do usuário: um jeito de anotar efeitos temporários (buffs/
+debuffs com duração finita) direto na ficha, cobrindo cinco mecânicas
+bem diferentes entre si:
+(a) Regenerate — uma reserva de cura (ex.: 3d4+6) que só começa a curar
+1/round quando o personagem toma o PRÓXIMO dano, dentro de uma janela de
+X horas;
+(b) Stone Skin — anula os próximos X ataques físicos recebidos, com
+duração;
+(c) Recitation — +3 fixo em To Hit e em TODOS os Saving Throws por N
+rounds;
+(d) poção de Fire Giant Strength — SUBSTITUI (não soma) a Força por um
+valor fixo (22) por N rounds;
+(e) uma magia que dá 10 PV temporários por X tempo, sendo que dano
+sofrido enquanto ela está ativa nunca pode ser curado de volta.
+
+Antes de implementar, propus duas abordagens e discuti com o usuário:
+(A) só um quadro de "post-its" com contadores genéricos, sem o app saber
+nada sobre a mecânica de cada um; (B) um modelo tipado por mecânica, com
+os campos de combate ganhando valores calculados automaticamente. Fomos
+pro meio-termo: modelo tipado (sabe o que cada efeito FAZ), mas sem
+inventar um motor de fórmulas novo — cada efeito escreve (e desfaz) nos
+campos que a ficha já tem pra isso.
+
+**Modelo novo:** `Models/ActiveEffect.swift` — `ActiveEffect` com um
+`kind`:
+- `.flatBonus` — soma um bônus onde a ficha já tem lugar pra isso: uma
+  linha nova em To Hit/Damage/AC Modifiers (mesma tabela de sempre,
+  `EquipmentItem`), ou +N no campo "Mod" de todos os cinco Saving
+  Throws (`SavingThrows.setModifier`, que já existia — "posso aplicar
+  manualmente um ajuste temporário" era literalmente o motivo desse
+  campo). `toHitAndSaves` cobre os dois de uma vez (caso do Recitation).
+- `.statOverride` — SUBSTITUI um atributo (Força, Destreza... CA,
+  THAC0), guardando o valor anterior pra devolver quando o efeito
+  encerrar (caso da poção de Fire Giant Strength).
+- `.attackNegation` / `.bankedHeal` / `.tempHP` — reaproveitam o mesmo
+  contador "X de Y" que os itens mágicos e o Turn Undead já usam com o
+  `TallyBoard` (traço com a Apple Pencil), só com significados
+  diferentes: ataques anulados, HP já curado do banco, ou PV temporário
+  já consumido.
+- `.note` — só uma anotação livre, sem mecânica nenhuma.
+
+`PlayerCharacter` ganhou `activeEffects: [ActiveEffect]?` e os métodos
+que escrevem/desfazem na ficha de verdade: `applyActiveEffect` (uma vez,
+na criação de um `.flatBonus`/`.statOverride`),
+`revertActiveEffectApplication`/`endActiveEffect` (desfaz exatamente o
+que foi aplicado, nunca deixa um bônus "grudado"), e `applyDamage` — um
+ponto único de dano (chamado agora por `WoundsBlock.commit`, em vez de
+mexer direto em `hitPointsCurrent`) que:
+- desconta primeiro de qualquer `.tempHP` ativo (o que se perde ali
+  nunca cura, mesmo depois do efeito acabar — regra do item (e));
+- dispara um `.bankedHeal` ainda pendente no primeiro dano recebido
+  (regra do Regenerate, item (a)).
+
+Todo campo tocado automaticamente (Força, THAC0, CA, Saving Throws)
+chama `markRecentAutoChange`, reaproveitando o `ChangeFlash` que já
+existia (a mesma piscada verde de quando a Raça mexe em atributo
+sozinha) — `armorClass` já tinha o `.changeFlash`; `thac0` ganhou um
+novo, só faltava.
+
+**Tela nova:** `Views/ActiveEffectsView.swift` — aba própria "✨" na
+fileira de cima da Ficha (`CharacterSheetView.SheetPage.effects`),
+disponível pra QUALQUER classe (ao contrário de Sessions/Spellbook, só
+de quem tem ficha de magia). Um cartão por efeito, com "End" (desfaz e
+remove) e o corpo certo pro `kind`; "+ Add effect" abre um formulário
+(sem `Form`/`List` nativo — os mesmos componentes de sempre, `SheetBlock`/
+`InlineTextField`/`EditableNumber`/`Menu`, pra não destoar visualmente
+do resto da ficha).
+
+Também: selo "+N temp" ao lado da caixa de Hit Points quando há PV
+temporário ativo (`CombatForm`), só leitura.
+
+`Package.swift`: `displayVersion` "1.76"→"1.77", `bundleVersion`
+"179"→"180".
+
+## AJUSTE v1.78 (2026-09-29) — "Efeitos Ativos": 12 ajustes de feedback
+
+Depois de testar a v1.77, o usuário mandou uma lista de 12 pontos.
+Reestruturei o recurso pra resolver todos numa passada só:
+
+**Item/componente separados** — `ActiveEffect` (o "item", ex.
+"Recitation") virou só nome/duração/notas + uma lista dinâmica de
+`EffectComponent` (o mecanismo em si). Antes um item só podia ter UM
+efeito mecânico; agora pode ter quantos precisar — resolve os itens
+**(2)** e **(3)**: a combinação "To Hit + Saving Throws" que vinha junto
+virou dois `EffectComponent`s separados (um bônus de To Hit, outro de
+Saves), escolhidos e adicionados um por vez com o botão "+ add another"
+na tela de criação.
+
+**(1) Editar efeito salvo** — cada cartão ganhou um botão de lápis
+("Edit") ao lado do "End", que abre o mesmo formulário de criação já
+preenchido. Salvar uma edição não é só "desfaz tudo, aplica tudo de
+novo" — `PlayerCharacter.saveEditedActiveEffect` compara componente por
+componente (pelo `id`, estável entre uma edição e outra) pra nunca
+"curar de volta" PV temporário que já tinha sido perdido pra dano só
+por trocar o nome do item, por exemplo.
+
+**(4) Ícone da aba brilhando** — `PlayerCharacter.hasActiveEffects`
+(true enquanto a lista de efeitos não estiver vazia) liga o brilho
+contínuo do ícone "✨" na fileira de abas, igual ao brilho de aba
+selecionada, mas persistente.
+
+**(5) Bônus de To Hit não refletia** — a v1.77 só inseria uma linha
+descritiva numa tabela cosmética (sem nenhum campo numérico
+dependente). Agora um `.flatBonus` em "To Hit" escreve direto no THAC0
+de verdade (THAC0 menor = mais fácil de acertar, então "+N To Hit" vira
+"-N no THAC0"), e Armor Class faz o mesmo com o campo de CA — os dois
+com bookkeeping pra devolver o valor certinho quando o efeito acabar.
+
+**(6) Cor verde/vermelha persistente** — novo
+`PlayerCharacter.activeEffectPolarity(for:)`, consultado a cada
+redesenho (diferente do `ChangeFlash`, que só pisca uma vez e apaga).
+Enquanto um Efeito Ativo estiver mexendo em Força/Destreza/Constituição/
+Inteligência/Sabedoria/Carisma, THAC0, Armor Class ou Saving Throws
+(Total), o campo fica tingido de verde (bom) ou vermelho (ruim)
+continuamente, não só num flash.
+
+**(7) e (8) Janela pequena / pula ao escrever** — as duas reclamações
+tinham a MESMA causa: `.presentationDetents([.medium, .large])` troca a
+apresentação padrão do iPad (um cartão de formulário de tamanho fixo,
+centralizado) por um bottom sheet redimensionável que o UIKit expande
+sozinho pra `.large` no instante em que qualquer campo ganha foco —
+mesmo sem nenhum teclado de software aparecer (não é o painel do
+Scribble; é o próprio sheet reagindo a "um campo pegou foco"). Removi o
+modifier e adotei o mesmo padrão de cartão fixo já usado em
+`NewSessionSheet` (`CampaignIndexView.swift`): `.sheet()` simples, sem
+detents, `VStack` com `.frame(width: 460)`. Resolve os dois de uma vez.
+
+**(9) e (10) PV temporário** — removi o contador separado de "+N temp"
+que existia ao lado da caixa de Hit Points. Agora um efeito `.tempHP`
+soma direto em Current HP na hora de ativar (ex.: 30/30 + 10 temp =
+40/30, exatamente como pedido) — sem número duplicado em lugar nenhum.
+`PlayerCharacter.applyDamage` (chamado por `WoundsBlock.commit` em vez
+de mexer direto em `hitPointsCurrent`) desconta o dano do PV temporário
+primeiro só pra fins de contabilidade interna (saber quanto ainda não
+foi perdido, pra devolver certo se o efeito acabar antes de consumido) —
+mas o desconto em Current HP é sempre o dano INTEIRO, nunca só a
+diferença (bug que eu mesmo encontrei revisando o código antes de
+entregar: a primeira versão dessa conta descontava de menos).
+
+**(11) Limite de 48 horas no Regenerate** — não tinha motivo pra
+existir; o campo "window to trigger" do `.bankedHeal` (e a duração do
+item como um todo) virou texto livre (`healWindowLabel`/
+`durationLabel`), sem limite numérico nenhum — pode escrever "6 hours",
+"3 rounds" ou "2000 hours", o app só guarda a anotação (não tem relógio
+de rounds/turnos em lugar nenhum do app, então nunca fingiu contar isso
+sozinho).
+
+**(12) Botão Salvar não habilitava** — o formulário agora sempre nasce
+com pelo menos um `EffectComponent` totalmente preenchido com valores
+padrão válidos (nunca um estado "vazio" onde não fica claro o que
+falta); o único requisito real pra salvar passou a ser só o nome do
+item, então nenhum tipo de efeito fica com o botão travado sem
+explicação.
+
+`Package.swift`: `displayVersion` "1.77"→"1.78", `bundleVersion`
+"180"→"181".
+
+## AJUSTE v1.79 (2026-09-29) — item (8) de novo: causa era outra
+
+O usuário testou a v1.78 e o pulo ao escrever o nome do efeito
+continuava exatamente igual. O primeiro reparo (remover
+`.presentationDetents`) estava certo, mas resolvia só o item (7)
+("janela pequena") — o pulo do item (8) é causado por outra coisa que eu
+não tinha visto: o `ScrollView` que envolve o formulário.
+
+`NewSessionSheet` (que o usuário apontou como referência de solução) não
+tem `ScrollView` — é só um `VStack` direto. O formulário de Efeitos
+Ativos precisa de `ScrollView` porque a lista de efeitos pode crescer
+sem limite ("+ add another") e não cabe sempre no cartão fixo. E é
+justamente isso: o `ScrollView` do SwiftUI tem um desvio automático de
+teclado embutido — quando QUALQUER campo de texto ganha foco, ele
+reserva/rola espaço achando que um teclado vai aparecer. Isso acontece
+mesmo com `allowsSoftwareKeyboard: false` (o campo usa um `UIView()`
+vazio como `inputView`, sem teclado nenhum de verdade) — pro UIKit, ter
+QUALQUER `inputView` já dispara a notificação de "teclado apareceu", e o
+`ScrollView` reage a essa notificação de qualquer forma, mesmo sem
+software keyboard nenhum na tela.
+
+Correção: `.ignoresSafeArea(.keyboard, edges: .bottom)` no `ScrollView`
+do formulário — desliga esse desvio automático. Como o teclado de
+verdade nunca aparece, não existe altura nenhuma real pra reservar.
+
+`Package.swift`: `displayVersion` "1.78"→"1.79", `bundleVersion`
+"181"→"182".
+
+## AJUSTE v1.80 (2026-09-29) — 4 ajustes finos nos Efeitos Ativos
+
+**(A) Verde ilegível** — `Ember.mintGlow` (o verde usado pra marcar um
+ajuste "bom" nos itens 6/da v1.78) foi pensado pra texto/gradiente em
+cima de fundo ESCURO (`ConsequenceSignalBadge`), não pra tinta sobre
+pergaminho claro — por isso quase sumia. Criei `Paper.greenInk`, um
+verde-tinta escuro pareado em peso/contraste com o `Paper.redInk` já
+usado pro "ruim", e troquei o uso em `polarityColor`.
+
+**(B) Fontes pequenas demais** — "+ add another" (12→14) e as frases de
+explicação dentro de cada bloco de efeito (11–11.5→12.5–13): o hint do
+tipo escolhido, a nota de "Damage não tem campo único", a explicação do
+Banked Heal e a do Temporary HP.
+
+**(C) Escolher quais Saving Throws** — antes um `.flatBonus` em "Saving
+Throws" só podia valer pra todos os cinco de uma vez (Paralyzation/
+Poison/Death, Rod/Staff/Wand, Petrification/Polymorph, Breath Weapon,
+Spell). `EffectComponent` ganhou `savingThrowIDs: Set<String>?` (`nil` =
+todos, mesmo comportamento de sempre — fichas salvas antes desta versão
+continuam idênticas) e a tela de criação/edição ganhou uma fileira de
+chips ("All" + um por save) pra marcar só os que interessam — ex.: um
+anel que só protege contra Breath Weapon. `applyComponent`/
+`revertComponent` agora só tocam nos saves marcados.
+
+**(D) Contador de ataque negado na Ficha** — `Stone Skin` e afins
+(`.attackNegation`) ganharam uma janelinha flutuante fixa no canto
+superior direito da Ficha (`AttackNegationFloatingBadge`), visível em
+QUALQUER aba, não só dentro de "✨ Efeitos Ativos" — mesmo `TallyBoard`
+de sempre, riscando/apagando direto dali. Some sozinha quando não há
+nenhum `.attackNegation` ativo.
+
+`Package.swift`: `displayVersion` "1.79"→"1.80", `bundleVersion`
+"182"→"183".

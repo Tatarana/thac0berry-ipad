@@ -1,15 +1,31 @@
 import Foundation
 
-/// Base de divindades embutida (*Faiths & Avatars* + *Powers & Pantheons*,
-/// 79 entradas) — vem de `EmbeddedDeities.entries`, literais Swift de
-/// verdade, mesmo padrão de `KitDatabase`/`RulesDatabase`: nada de
-/// `Bundle`/`JSONDecoder` em runtime.
+/// Base de divindades (*Faiths & Avatars* + *Powers & Pantheons*, 79
+/// entradas) — lida de `Resources/deities.json` em runtime (ver o
+/// comentário em `KitDatabase.swift`/`Rule.swift` pro porquê da volta ao
+/// JSON, 2026-09-25).
 final class DeityDatabase: ObservableObject {
     @Published private(set) var entries: [Deity] = []
     @Published private(set) var loadError: String? = nil
 
     init() {
-        entries = EmbeddedDeities.entries.sorted { $0.name < $1.name }
+        load()
+    }
+
+    private func load() {
+        guard let resourceURL = Bundle.main.resourceURL,
+              let fileURL = try? FileManager.default.contentsOfDirectory(at: resourceURL, includingPropertiesForKeys: nil)
+                  .first(where: { $0.lastPathComponent == "deities.json" })
+        else {
+            loadError = "Couldn't find deities.json in the app bundle."
+            return
+        }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            entries = try JSONDecoder().decode([Deity].self, from: data).sorted { $0.name < $1.name }
+        } catch {
+            loadError = "Couldn't read deities.json: \(error.localizedDescription)"
+        }
     }
 
     func deity(id: String) -> Deity? {

@@ -1,19 +1,32 @@
 import Foundation
 
-/// Base de proficiências não-de-arma — vem de `EmbeddedProficiencies.
-/// entries`, literais Swift de verdade, SEM bundle/`Data`/`JSONDecoder`
-/// nenhum em runtime. Mesmo motivo/mesmo padrão de `KitDatabase.swift` —
-/// ver o comentário lá pro histórico completo de por que ler isso de JSON
-/// de bundle não é confiável neste toolchain.
+/// Base de proficiências não-de-arma — lida de `Resources/proficiencies.json`
+/// em runtime (ver `KitDatabase.swift` pro histórico completo: o bug de
+/// decode que motivou embutir isso como literal Swift já foi corrigido, e
+/// o literal gigante virou o problema novo — travava o archive de
+/// distribuição do Swift Playgrounds).
 final class ProficiencyDatabase: ObservableObject {
     @Published private(set) var proficiencies: [Proficiency] = []
-    /// Mantido só pra bater com o padrão das outras bases (`spellbook.
-    /// loadError`/`kits.loadError`) — sempre `nil` agora que não há
-    /// leitura de bundle nenhuma pra falhar.
     @Published private(set) var loadError: String? = nil
 
     init() {
-        proficiencies = EmbeddedProficiencies.entries.sorted { $0.name < $1.name }
+        load()
+    }
+
+    private func load() {
+        guard let resourceURL = Bundle.main.resourceURL,
+              let fileURL = try? FileManager.default.contentsOfDirectory(at: resourceURL, includingPropertiesForKeys: nil)
+                  .first(where: { $0.lastPathComponent == "proficiencies.json" })
+        else {
+            loadError = "Couldn't find proficiencies.json in the app bundle."
+            return
+        }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            proficiencies = try JSONDecoder().decode([Proficiency].self, from: data).sorted { $0.name < $1.name }
+        } catch {
+            loadError = "Couldn't read proficiencies.json: \(error.localizedDescription)"
+        }
     }
 
     func proficiency(id: String) -> Proficiency? {

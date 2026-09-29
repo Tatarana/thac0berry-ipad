@@ -99,7 +99,17 @@ struct SpellSheet: Codable, Identifiable, Hashable {
 struct MagicItem: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var name: String = ""
-    /// Texto livre — o que o item faz, propriedades, aparência.
+    /// Item 1 do pedido do usuário (2026-09-27): "Item" passou a também
+    /// listar os itens do catálogo (`MagicItemDatabase`, mesma base da aba
+    /// Equipment/página 2), sem obrigar a escolha de um existente — igual
+    /// ao padrão já usado em `MagicItemQuantifiedRow`. `nil` quando o nome
+    /// foi digitado à mão (item caseiro) ou numa ficha salva antes desta
+    /// versão.
+    var matchedItemID: String? = nil
+    /// Texto livre — o que o item faz, propriedades, aparência. Só
+    /// relevante quando `matchedItemID` é `nil`: um item ligado ao
+    /// catálogo mostra a descrição de lá (`MagicItemDetailSheet`), não
+    /// esta.
     var itemDescription: String = ""
     var spells: [ItemSpellUse] = []
 }

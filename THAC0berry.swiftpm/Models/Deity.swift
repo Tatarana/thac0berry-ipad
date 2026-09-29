@@ -8,12 +8,13 @@ import Foundation
 /// (ex. divindades "mortas"/"adormecidas" ou poderes conceituais demais
 /// pra ter forma física, como Ao).
 ///
-/// Mesmo padrão de `Kit`/`RuleEntry`: literais Swift de verdade em
-/// `Store/EmbeddedDeities_PartN.swift`, sem `Bundle`/`JSONDecoder` em
-/// runtime. JSON de origem convertido por um pipeline externo (mesmo
-/// espírito de sempre) — não editar à mão, regenerar a partir da fonte se
-/// os dados mudarem.
-struct Deity: Identifiable, Hashable {
+/// AJUSTE (2026-09-25): voltou a carregar de `Resources/deities.json` via
+/// `Codable` (ver o comentário equivalente e mais detalhado em
+/// `Rule.swift`/`RuleEntry` pro porquê) — o literal Swift gigante estava
+/// entre os suspeitos de travar o archive de distribuição do Swift
+/// Playgrounds. Continua vindo de um pipeline de extração externo — não
+/// editar à mão, regenerar a partir da fonte se os dados mudarem.
+struct Deity: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let book: String       // "Faiths & Avatars" ou "Powers & Pantheons"
