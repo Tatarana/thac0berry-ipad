@@ -42,6 +42,7 @@ enum ConsequenceEngine {
             character.saves = newSaves
         }),
         TrackedRule(key: "priestSpellSlots", kind: .alreadyAutomatic, apply: nil),
+        TrackedRule(key: "wizardSpellSlots", kind: .alreadyAutomatic, apply: nil),
 
         // MARK: Ajustes de atributo (Tabelas 1-6) — cada um escreve num
         // campo de texto livre pré-existente em `AbilityDetails` (a mesma

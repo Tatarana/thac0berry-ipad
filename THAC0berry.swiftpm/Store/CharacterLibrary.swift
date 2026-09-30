@@ -268,7 +268,7 @@ final class CharacterLibrary: ObservableObject {
         var sheet = SpellSheet()
         sheet.sessionID = session.id
         sheet.title = "First day"
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         sheet.slotBoard = character.freshSlotBoard()
         character.spellSheets = [sheet]
     }

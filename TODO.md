@@ -5311,3 +5311,872 @@ nenhum `.attackNegation` ativo.
 
 `Package.swift`: `displayVersion` "1.79"→"1.80", `bundleVersion`
 "182"→"183".
+
+## AJUSTE v1.81 (2026-09-29) — Grimório do Mago
+
+O ladrilho "Mage Grimoire" na tela de Compêndio já existia desde a
+entrega da Priest Grimoire, só que desligado ("Coming soon") — hoje ele
+entra no ar, a partir da base de magias de mago que o usuário mandou
+(`wizard_spells.zip`, 2.608 magias, mesmo formato de scrape da wiki que
+gerou a base de Priest, só que numa versão mais nova/rica do scraper).
+
+`Scripts/convert_wizard_spells.py` — irmão de `convert_spells.py` (que já
+convertia a base de Priest), adaptado pro formato de origem desta base:
+aqui `school` chega como objeto (`{"primary": [...], "subSchool": ...}`)
+em vez de texto pronto, então o script junta em `school` (texto, mesmo
+formato "Escola, Escola" que o Priest já usa) e também grava a lista
+solta em `schools` — campo NOVO em `Spell` (`Models/Spell.swift`),
+equivalente ao `spheres` do Priest, só que pro eixo que faz sentido pro
+Mago (Abjuration, Alteration, Conjuration/Summoning, Divination,
+Enchantment/Charm, Illusion/Phantasm, Invocation/Evocation, Necromancy,
+Chronomancy...).
+
+11 arquivos gerados em `Resources/wizard_level_0_cantrips.json` até
+`wizard_level_9.json` mais `wizard_high_level_epic.json` (tier 10 —
+10th Level/Netherese e True Dweomer, equivalente ao "High-Level/Epic" do
+Priest) — mesmo padrão de arquivo por nível que o Priest já usa, pelo
+mesmo motivo (carregar mais rápido, um erro de leitura não derruba os
+outros). `SpellDatabase.load()` generalizado: a varredura que só pegava
+`priest_*.json` do bundle agora pega `priest_` E `wizard_` (helper
+renomeado de `priestFiles()` pra `bundleFiles(withPrefix:)`).
+
+`SpellbookView` — a tela do Grimório em si — ganhou um parâmetro
+`caster: CasterType = .divine` e virou genérica: título ("Priest
+Spellbook" vs "Mage Grimoire"), o filtro de eixo (Sphere vs. School,
+lendo `spheres`/`schools` conforme o caster) e os rótulos de círculo
+(Orisons/Quest Spells no Priest, Cantrips no Mago, os dois com
+High-Level/Epic no topo) mudam sozinhos; busca, favoritos e filtro de
+cenário continuam idênticos pros dois. `CompendiumHubView` ganhou uma
+`MageGrimoireScreen` (mesma moldura da `SpellbookScreen` do Priest, só
+passando `caster: .arcane`) e o ladrilho virou `NavigationLink` habilitado.
+
+A ficha do personagem (aba "Sheet" com slot de magia) continua só pra
+Clérigo (`CharacterClass.hasSpellSheet`) — este ajuste é só o livro de
+CONSULTA (procurar, favoritar, ler a descrição), igual o Priest
+Grimoire já era; memorizar magia de mago num slot de verdade é um
+recurso maior, fora do que foi pedido aqui.
+
+`Package.swift`: `displayVersion` "1.80"→"1.81", `bundleVersion`
+"183"→"184".
+
+## AJUSTE v1.82 (2026-09-29) — erro "priest_*.json ... is missing" na tela inicial
+
+O usuário testou a v1.81 e a tela inicial mostrou um aviso listando TODOS
+os `priest_*.json` como "The data couldn't be read because it is
+missing" — mas os 11 arquivos `wizard_*.json` novos (Grimório do Mago)
+carregaram normalmente, sem erro nenhum.
+
+Causa: depois que o Grimório do Mago somou ~5 MB de JSON a mais ao
+bundle de recursos, a PRIMEIRA leva de arquivos lidos por
+`SpellDatabase.load()` — os de Priest, escaneados antes por ordem
+alfabética ("priest\_" < "wizard\_") — passou a falhar na primeira
+tentativa de leitura, enquanto os de Wizard, lidos segundos depois na
+mesma chamada, sempre funcionavam. Isso é a marca registrada de uma
+corrida no primeiro acesso ao bundle de recursos logo na inicialização
+do app (algo ainda não "pronto" bem no início, mas já pronto pouco
+depois) — não corrupção nem arquivo realmente ausente do bundle.
+
+Correção: `load()` agora faz uma segunda passada, só para os arquivos
+que falharam na primeira — com uma pausa curta (0,35s, só uma vez, na
+inicialização) antes de tentar de novo. Só sobra erro na tela inicial se
+um arquivo falhar nas DUAS tentativas.
+
+`Package.swift`: `displayVersion` "1.81"→"1.82", `bundleVersion`
+"184"→"185".
+
+## AJUSTE v1.83 (2026-09-29) — o erro dos priest_*.json continuava (a correção anterior não resolveu)
+
+O usuário testou a v1.82 e o mesmo aviso continuou aparecendo — só que
+agora com "(after retry)" no final de cada linha, confirmando que a
+segunda tentativa (a pausa de 0,35s da v1.82) rodou, mas não resolveu
+nada: os mesmos 10 arquivos de Priest, sempre os mesmos, falhando do
+mesmo jeito.
+
+Isso descarta a hipótese da v1.82 (corrida de timing simples no primeiro
+acesso ao bundle): uma corrida de verdade teria sumido, ou pelo menos
+mudado de arquivo, entre uma tentativa e outra. Falhar sempre exatamente
+igual, nos mesmos arquivos, mesmo depois de esperar e tentar de novo, é
+cara de outra coisa.
+
+Suspeito novo: o `Package.swift` descrevia a pasta `Resources` com
+`.process("Resources")` — essa opção manda cada recurso pelo pipeline de
+PROCESSAMENTO/compilação de assets do compilador on-device do Swift
+Playgrounds (pensado pra `.xcassets`, `.strings`, storyboard etc.), não
+pra arquivos de dados crus como JSON. Um bug nesse pipeline de
+processamento (por exemplo ao lidar com uma leva grande de arquivos
+JSON com nomes parecidos, ~4 MB de Priest processados antes dos ~5,5 MB
+de Wizard) explicaria uma falha determinística e sempre no mesmo grupo
+de arquivos — diferente de uma corrida de timing, que seria
+inconsistente.
+
+Correção: `Package.swift` trocou `.process("Resources")` por
+`.copy("Resources")`, que pula esse pipeline de processamento inteiro e
+só copia os bytes dos arquivos pro bundle final como estão — o jeito
+correto de embutir dado bruto (JSON, e qualquer arquivo de dados
+parecido no futuro).
+
+Como rede de segurança pra essa troca (`.copy` pode ou não preservar
+"Resources/" como subpasta dentro do bundle final, diferente de
+`.process`), `SpellDatabase.bundleFiles(withPrefix:)` passou a varrer o
+bundle RECURSIVAMENTE em vez de só a raiz — funciona nos dois layouts
+possíveis.
+
+Também: `load()` agora tenta até 4 vezes (era 2), re-varrendo o bundle a
+cada tentativa em vez de reusar as URLs da primeira varredura (a v1.82
+reusava a mesma URL na segunda tentativa — se a URL capturada é que
+estivesse errada, esperar não ajudaria nunca, só re-escanear ajuda); e
+`readBatch` agora guarda o erro de verdade (domínio+código do `NSError`,
+e se o arquivo existe/tamanho em bytes quando falha) em vez de só "sim/
+não" — se isso ainda não resolver, a mensagem de erro na tela inicial já
+vem com pista de verdade pra próxima rodada, em vez de precisar
+adivinhar de novo.
+
+`Package.swift`: `displayVersion` "1.82"→"1.83", `bundleVersion`
+"185"→"186".
+
+## AJUSTE v1.84 (2026-09-29) — v1.83 nem compilava ("Type 'String' does not conform to protocol 'Error'")
+
+Erro de compilação de verdade dessa vez, não bug de runtime: `readBatch`
+tinha voltado a assinatura `-> Result<[Spell], String>`. O `Result` da
+biblioteca padrão do Swift exige que o segundo parâmetro de tipo
+(o caso de erro) obedeça ao protocolo `Error` — e `String` não obedece.
+O Playgrounds acusou isso na hora de compilar, antes mesmo de instalar
+o app.
+
+Correção: troquei o `Result<[Spell], String>` por um enum bem simples e
+só meu (`SpellDatabase.ReadResult`, com casos `.success([Spell])` e
+`.failure(String)`) que não depende do protocolo `Error` nenhum — resolve
+o mesmo problema (devolver o motivo real da falha pra tentativa de
+diagnóstico da v1.83) sem esbarrar na exigência do `Result` de verdade.
+Nada mais mudou da v1.83 (o `.copy("Resources")` no `Package.swift`, a
+varredura recursiva, as 4 tentativas re-varrendo o bundle) — só esse
+enum.
+
+`Package.swift`: `displayVersion` "1.83"→"1.84", `bundleVersion`
+"186"→"187".
+
+## AJUSTE v1.85 (2026-09-29) — v1.84 quebrou a INSTALAÇÃO (code signing) — a troca de `.process` pra `.copy` foi revertida
+
+O usuário testou a v1.84 e nem chegou a abrir: erro
+`Error Domain=NSOSStatusErrorDomain Code=-67072 "(null)"
+UserInfo={SecComponentPath=file:///.../THAC0berry.app/wizard_level_7.json}`
+na tela inicial do app THAC0berry (fora do app, no launcher do
+Playgrounds) — isso é erro de CODE SIGNING na hora de instalar o app no
+iPad, nem chega a rodar código Swift nenhum.
+
+Causa: a v1.83 trocou `Package.swift` de `.process("Resources")` pra
+`.copy("Resources")`, apostando que o pipeline de processamento de
+recursos do compilador fosse o culpado pelo bug original (priest_*.json
+"missing"). Errado, e essa troca criou um problema NOVO e pior: o Swift
+Playgrounds precisa que os recursos passem pelo `.process` pra montar
+corretamente o envelope de assinatura do app nesse tipo de build
+(.iOSApplication / App Playground) — pulando esse pipeline com `.copy`
+quebra a assinatura e o app nem instala.
+
+Correção: revertido — `Package.swift` voltou pra
+`.process("Resources")`, exatamente como era até a v1.82. A mudança de
+empacotamento de recursos foi abandonada por completo como estratégia
+pro bug original.
+
+O que fica pro bug original (priest_*.json "missing") é só o lado da
+LEITURA em `SpellDatabase.load()`, que segue melhorado: até 4 tentativas
+re-escaneando o bundle (recursivamente) a cada uma em vez de reusar uma
+URL antiga, e a mensagem de erro agora traz o motivo REAL da falha
+(domínio+código do erro do sistema, e se o arquivo existe/tamanho em
+disco) em vez de só "missing". Se o erro original voltar a aparecer
+nessa build, a mensagem vai trazer a pista que faltava pra achar a causa
+de verdade — sem arriscar quebrar o build de novo.
+
+`Package.swift`: `displayVersion` "1.84"→"1.85", `bundleVersion`
+"187"→"188".
+
+## AJUSTE v1.86 (2026-09-29) — a causa REAL do bug "priest_*.json não lê", achada por fim
+
+A v1.85 instalou certinho (o revert do code signing funcionou), mas o
+erro de sempre voltou — só que dessa vez com o diagnóstico melhorado da
+v1.83 mostrando a mensagem de verdade pela primeira vez:
+
+```
+Failed to read priest_level_1.json after 4 tries (decode error, 427649
+bytes read: The data couldn't be read because it is missing.)
+```
+
+Reparem: "427649 bytes read" bate EXATAMENTE com o tamanho de verdade do
+arquivo no disco. Ou seja, a leitura do arquivo sempre funcionou, 100%
+das vezes, em toda essa novela desde a v1.82 — o problema NUNCA foi o
+arquivo "sumir" do bundle. Era a DECODIFICAÇÃO do JSON que falhava, e o
+Swift/Foundation tem um bug de UX conhecido: quando um decode falha (por
+exemplo por uma chave faltando) e você pega a mensagem de erro genérica
+(`error.localizedDescription`), ele devolve "The data couldn't be read
+because it is missing." — a MESMA frase de um arquivo genuinamente
+ausente do disco, mesmo o arquivo tendo sido lido inteiro e correto.
+Essa coincidência de mensagem é a razão de quatro rodadas seguidas (timing
+de bundle, `.process` vs `.copy`, code signing, cache do Playgrounds)
+terem mirado no lugar errado.
+
+Causa raiz de verdade: quando o Grimório do Mago foi criado (v1.81),
+`Models/Spell.swift` ganhou um campo novo, `var schools: [String] = []`.
+Um valor padrão em Swift NÃO faz o `Codable` sintetizado aceitar a chave
+ausente no JSON — o decoder automático continua exigindo a chave
+`schools` em TODO arquivo, com ou sem valor padrão. Os `wizard_*.json`
+(convertidos por um script escrito já sabendo desse campo) sempre
+tiveram a chave `schools`. Os `priest_*.json` (convertidos por
+`convert_spells.py`, escrito antes do campo existir) NUNCA tiveram — a
+decodificação de cada um deles falhava com `DecodingError.keyNotFound`
+pra chave `schools`, todo santo lançamento desde a v1.81.
+
+Correção: `Spell` ganhou um `init(from decoder:)` próprio, trocando
+`decode` por `decodeIfPresent(...) ?? valorPadrão` pros campos aditivos
+(`spheres`, `schools`, `fullDescription`, `setting`) — agora uma chave
+nova no formato pode faltar num arquivo JSON antigo sem quebrar a
+decodificação, do jeito que já devia ter sido desde a primeira vez que um
+campo opcional foi adicionado. (Precisou também declarar de novo, à mão,
+o inicializador "normal" que os 62 exemplos do Kelmon usam — assim que a
+struct ganha QUALQUER inicializador próprio, o Swift para de gerar o
+memberwise init automático sozinho.)
+
+Nada em `Package.swift`/`SpellDatabase.swift` precisou mudar por causa
+disso — as 4 tentativas com re-varredura e o diagnóstico com erro real
+(que foi o que finalmente expôs esse bug) continuam do jeito que
+ficaram na v1.85, e são úteis de qualquer forma pra qualquer bug parecido
+no futuro.
+
+`Package.swift`: `displayVersion` "1.85"→"1.86", `bundleVersion`
+"188"→"191" (pulei alguns números usados só nos builds de diagnóstico
+que não chegaram a ser uma versão de verdade).
+
+## AJUSTE v1.87 (2026-09-29) — Wizard Kits (fase 1 de paridade Priest/Wizard)
+
+Usuário pediu (após o `wild_mage`/`kits.json` de Priest já funcionando):
+"Hoje só temos as regras de personagens Priests. Vamos fazer o mesmo pra
+Wizard e tudo que é específico desta classe." Começando pelo mais
+contido: 41 kits de mago (`wizard_kits.json` anexado, 49 brutos, 8
+"Create Your Own" excluídos — mesma exclusão já feita pros 6 "Create
+Your Own" de sacerdote).
+
+Decisão de arquitetura: em vez de um arquivo/model/tela separados pra
+kit de mago, ele entra no MESMO array que os 91 kits de sacerdote já
+usam (`Resources/kits.json`, `Models/Kit.swift`, `Store/KitDatabase.swift`)
+— a wiki de origem já trata os dois como a mesma categoria (Character
+Kit), e `KitDatabase.kits(allowedFor:)` já filtra por
+`classEligibility.allowedClasses` de forma totalmente genérica, sem nada
+hardcoded pra sacerdote. Resultado: zero mudança em `KitDatabase.swift`.
+
+Novo script `Scripts/convert_wizard_kits.py` normaliza as diferenças de
+esquema entre o `wizard_kits.json` bruto e o formato que `Kit.swift`
+espera (`allowedClasses: ["Wizard"]` → `["Mage"]` pra bater com
+`CharacterClass.mage`; `alignment` singular → `alignments` lista;
+`weapons.forbidden` ausente → sempre `[]`; `armor`/`turnUndead`
+sintetizados com valores neutros, já que kit de mago não tem restrição
+de armadura própria nem Turn Undead; um kit sem `mechanics` nenhuma
+— `wild_mage` — ganha uma vazia do zero) — mesma filosofia de
+`convert_spells.py`/`convert_wizard_spells.py`: tratar a diferença de
+esquema no script Python, não deixar o decoder Swift mais defensivo.
+Ficou registrado explicitamente no comentário do script (item 4) que
+esse é o MESMO tipo de bug que derrubou `Spell.schools` na v1.81-1.86 —
+chave nova ausente quebrando o decode inteiro com mensagem enganosa —
+pra não repetir.
+
+`Models/Kit.swift`: `KitMechanics` ganhou `weaponSlots:
+KitWeaponSlotRules?` (Optional de verdade, não um array com valor
+padrão) — justamente pra aproveitar que `Codable` sintetizado trata tipo
+opcional como `decodeIfPresent` automático, sem precisar de `init(from:)`
+próprio, do jeito que `schools` deveria ter sido desde o início.
+
+`Views/KitCompendiumView.swift`: generalizada com `classGroup: String =
+"Priest"` (mesma ideia de `SpellbookView(caster:)` quando o Grimório do
+Mago foi criado) — filtra `kitDatabase.kits` por
+`classEligibility.classGroup`, esconde o campo "Turn Undead" (só faz
+sentido pra sacerdote) e mostra "Weapon Slots" quando presente.
+
+`Views/CompendiumHubView.swift`: `KitCompendiumScreen` ganhou o mesmo
+parâmetro `classGroup` repassado; novo tile "Wizard Kits" (41 kits) ao
+lado do "Priest Kits" existente, mesmo padrão de "Mage Grimoire" ao lado
+de "Priest Grimoire".
+
+Ainda faltam (fases seguintes, "tudo que é específico desta classe"):
+especialização de escola / escolas opostas (equivalente de Sphere Access
+pra Wizard) e Ficha de Magias do Mago (paridade com a Ficha de Magias de
+Clérigo, `hasSpellSheet`). Sequenciamento a confirmar com o usuário.
+
+`Package.swift`: `displayVersion` "1.86"→"1.87", `bundleVersion`
+"191"→"192".
+
+## AJUSTE v1.88 (2026-09-29) — Wizard Spell Sheet (fase 2 de paridade Priest/Wizard)
+
+Segunda fase do pedido "Vamos fazer o mesmo pra Wizard e tudo que é
+específico desta classe" — depois dos Kits (v1.87), agora a própria Ficha
+de Magias. Pedido explícito do usuário: "baseado nas Priest Spell Sheets,
+crie a Wizard Spell Sheet."
+
+Achado bom: o modelo de dados (`SpellSlot`/`SpellSlotBoard`/`SpellSheet`)
+já era genérico por `CasterType` (`.divine`/`.arcane`) desde que o Grimório
+do Mago existe — não precisou mudar NADA lá. `SpellSheetView.swift`
+(a tela em si) também já escondia sozinho tudo que só faz sentido pra
+sacerdote (bônus de Sabedoria, bloco de Turn Undead, selo de esfera) atrás
+de checagens `caster == .divine`/campos opcionais — bastou trocar os dois
+textos fixos do cabeçalho ("Priest Spell Sheet — Game Day" e "Wisdom") por
+uma versão condicional (`isWizard`).
+
+O que precisou de verdade:
+- **Tabela de progressão de magia do Mago** (Tabela 21 do PHB — "Wizard
+  Spell Progression"), `WizardTables` em `Models/Character.swift`,
+  espelhando `PriestTables`. Conferida contra duas transcrições
+  independentes da tabela antes de codificar (não é o tipo de dado pra
+  arriscar de memória). Diferença importante da tabela do sacerdote: o
+  mago NÃO ganha slot bônus por Inteligência alta — Inteligência entra só
+  como TETO de círculo alcançável (Tabela 4, coluna "Max Spell Level"),
+  reaproveitando o `IntelligenceTable` que já existia em `AbilityTables.swift`
+  (usado pelo campo de texto "Max Spell Level" da ficha) em vez de duplicar
+  os números — só ganhou um `maxSpellLevelInt(forScore:)` que lê o "9th"/
+  "4th" existente como `Int`.
+- `PlayerCharacter.computedSpellSlotAllotments` passou a ramificar por
+  classe (Clérigo → `PriestTables`, Mago → `WizardTables`, resto → vazio)
+  em vez de só checar `hasSpellSheet`.
+- `CharacterClass.hasSpellSheet` agora inclui `.mage` — e todo lugar que
+  usava esse booleano pra decidir "mostra bloco de esfera" (o botão
+  "Spheres" no cabeçalho da ficha) precisou virar uma checagem explícita
+  de `== .cleric`, porque esferas de acesso não existem pra mago (isso é
+  escola/oposição de escola, fase ainda não implementada).
+- `PriestSpellSlotsProvider` (Motor de Consequências) também estava
+  checando `hasSpellSheet` — trocado por `== .cleric` explícito, e um
+  `WizardSpellSlotsProvider` novo cobre `.mage` do lado, registrado em
+  `CoreRuleset.swift` e `ConsequenceEngine.trackedRules`.
+- `SpellSheet.wisdomAtCreation` — o campo continua se chamando isso (mudar
+  o NOME da propriedade mudaria a chave que o `Codable` sintetizado espera,
+  quebrando fichas de Clérigo já salvas, exatamente a classe de bug já
+  documentada em `Spell.init(from:)`) mas agora guarda Sabedoria OU
+  Inteligência conforme a classe, via `PlayerCharacter.
+  spellSheetAbilityScoreAtCreation` — os 6 lugares que criavam folha nova
+  passaram a usar esse getter em vez de ler `abilities.wisdom` direto.
+- 4ª página da aba Sheet (tabelas de referência) — `RecordSheetPagerView`
+  agora escolhe entre `ClericReferencePage` (já existia) e a nova
+  `WizardReferencePage` (Wizard Spell Progression + Intelligence) conforme
+  a classe. `RefTableTitle`/`RefCell`/`RefFootnotes` deixaram de ser
+  `private` em `ClericReferenceView.swift` pra serem reaproveitadas em vez
+  de duplicadas.
+- Menu ☰ da ficha: "Priest Spellbook" virou "Mage Grimoire" quando a
+  classe é Mago, e `SpellbookView` (aberta a partir dali) passa a receber
+  `caster: .arcane`/`.divine` conforme a classe, em vez de sempre `.divine`.
+
+Ainda faltam (fases seguintes, "tudo que é específico desta classe"):
+especialização de escola / escolas opostas (o equivalente de Sphere Access
+pro Mago). Sequenciamento a confirmar com o usuário.
+
+`Package.swift`: `displayVersion` "1.87"→"1.88", `bundleVersion`
+"192"→"193".
+
+## AJUSTE v1.89 (2026-09-29) — Livro de magias do Mago (fase 3 de paridade Priest/Wizard)
+
+Pedido do usuário: diferente do Clérigo (que tem acesso a QUALQUER magia
+das esferas liberadas — `sphereAccess` é só sinal, nunca filtro, decisão
+de design já documentada), o Mago no AD&D 2e precisa ter aprendido a
+magia antes de poder memorizá-la num slot. O Grimório (`SpellbookView`)
+continua sendo a base de referência inteira (milhares de magias arcanas);
+o "livro de magias" é um subconjunto PESSOAL de cada personagem Mago.
+
+Três decisões confirmadas com o usuário via pergunta de esclarecimento
+antes de implementar:
+- **Bloqueio de verdade**, não só sinal visual — magia fora do livro não
+  aparece pra escolher/memorizar num slot da Wizard Spell Sheet (ao
+  contrário de Sphere Access).
+- **Lista editável simples** — sem simular "chance to learn" da Tabela 4
+  (rolagem de dado): o jogador decide o que entra no livro, mesma
+  filosofia de nunca rolar dado sozinho já documentada pra Hit Points.
+- **Começa com Read Magic** — Mago nível 1 novo já nasce com essa magia
+  no livro (regra do PHB 2e), via `seedWizardSpellbookIfNeeded`.
+
+Implementação:
+- `WizardSpellbookEntry` (novo struct, `Models/Character.swift`) — `id`,
+  `name`, `matchedSpellID` (opcional — casa com uma magia real do
+  Grimório) e `level` (só usado por entradas "free entry", sem match no
+  Grimório — magia homebrew ou achada em jogo).
+- `PlayerCharacter.wizardSpellbook: [WizardSpellbookEntry]` + helpers
+  (`wizardSpellbookMatchedIDs`, `wizardKnows(spellID:)`,
+  `wizardSpellbookSpells(level:in:)`, `wizardSpellbookFreeNames(level:)`)
+  e `seedWizardSpellbookIfNeeded(in:)` — só age se `characterClass == .mage`
+  e o livro ainda está vazio (nunca sobrescreve edição do jogador), chamado
+  a partir de `ClassPicker.select(_:)` (`CharacterSheetView.swift`) toda
+  vez que a classe muda pra Mago.
+- `SpellDatabase.matches(...)` ganhou parâmetro `restrictToIDs: Set<String>?`
+  — filtra a base antes de pontuar, reaproveitado pelo restante do fluxo
+  de busca fuzzy já existente.
+- `SpellSheetView.swift` — `MemorizedRow` e `SlotEditorSheet` (edição de
+  slot da Wizard Spell Sheet) agora restringem `candidates`/`levelList` ao
+  livro pessoal quando `slot.caster == .arcane`, com mensagens diferentes
+  conforme o caso: nome bate com uma entrada "free entry" do livro → botão
+  "use as-is"; nome não está no livro → aviso vermelho "Not in your
+  spellbook — add it from 'My Spellbook' on the character sheet."; lista
+  vazia pro círculo → mesmo aviso adaptado. Clérigo continua sem nenhuma
+  restrição (só esfera como sinal, como já era).
+- `WizardSpellbookEditorSheet.swift` (nova tela) — "My Spellbook", aberta
+  pelo novo botão "Spellbook" no cabeçalho da ficha (visível só pra Mago,
+  ao lado de onde "Spheres" aparece só pro Clérigo): busca no Grimório
+  (mesma técnica de duas etapas — substring primeiro, fuzzy se não achar
+  nada — de `SpellbookView.filtered`) com botão add/"in book ✓" por
+  resultado, fallback pra adicionar entrada livre (nome digitado + círculo
+  1-9) quando a busca não bate com nada da base, e lista do livro atual
+  agrupada por círculo com botão remover por entrada. Vive fora da Folha
+  de Magias do dia de propósito — é traço PERMANENTE do personagem, mesmo
+  raciocínio já usado pra Sphere Access.
+
+Ainda faltam (fases seguintes, "tudo que é específico desta classe"):
+especialização de escola / escolas opostas. Sequenciamento a confirmar
+com o usuário.
+
+`Package.swift`: `displayVersion` "1.88"→"1.89", `bundleVersion`
+"193"→"194".
+
+## AJUSTE v1.90 (2026-09-30) — Ajustes no Livro de Magias do Mago (feedback pós-v1.89)
+
+Três pedidos do usuário depois de testar a v1.89:
+
+1. **"My Spellbook" virou folha de verdade, não janela.** Era uma `.sheet`
+   modal aberta por um botão no cabeçalho — mesmo raciocínio já usado pro
+   Grimório (`SpellbookView`/`.spellbook`, que sempre foi folha, nunca
+   modal): virou `SheetPage.mySpellbook`, acessível pelo menu ☰ (só pra
+   Mago, ao lado de "Mage Grimoire"), embutida no `ScrollView` da ficha
+   igual às outras páginas. `WizardSpellbookEditorSheet` perdeu o botão
+   "close"/`dismiss()` e o `PaperBackground`/`ZStack` próprios (a página já
+   fornece isso) e as duas `ScrollView` internas de altura fixa viraram
+   conteúdo comum, deixando a rolagem inteira pro `ScrollView` externo. O
+   antigo botão "Spellbook"/`isWizardSpellbookPresented` no cabeçalho saiu;
+   trocar de classe pra algo que não seja Mago (mesmo Clérigo, que tem
+   ficha de magia mas não livro pessoal) redireciona pra Ficha se "My
+   Spellbook" estiver aberta.
+2. **Círculos oferecidos pra aprender agora têm teto.** Novo
+   `PlayerCharacter.wizardMaxKnowableCircle` (maior círculo com pelo menos
+   1 slot em `computedSpellSlotAllotments`, ou seja: Wizard Spell
+   Progression Tabela 21 + teto de Inteligência Tabela 4, o mesmo cálculo
+   que já decide os slots da Spell Sheet) passou a restringir tanto a
+   busca de "My Spellbook" (resultado de círculo maior desaparece, com um
+   aviso explicando que existe resultado mas está fora de alcance) quanto
+   o seletor de círculo da entrada livre (1 até o teto, não mais sempre
+   1-9) quanto o novo botão do Grimório (item 3) — não faz sentido
+   oferecer aprender um círculo que ainda nem dá pra lançar.
+3. **Adicionar direto do Grimório.** `SpellbookView`/`SpellPaperRow`
+   ganharam um botão "+"/"✓" por magia (mesmo padrão da estrela de
+   favorito, botão próprio que não abre o detalhe) — só aparece quando o
+   Grimório está aberto num personagem Mago E a magia está dentro do
+   círculo alcançável (item 2); fora do alcance a magia continua visível
+   pra consulta, só sem o botão. Escreve no mesmo
+   `character.wizardSpellbook` que "My Spellbook" — as duas telas ficam
+   sincronizadas.
+
+`SpellDatabase.matches(restrictToIDs:)`, os dados de
+`WizardSpellbookEntry`/`PlayerCharacter.wizardSpellbook` e a restrição de
+verdade na Wizard Spell Sheet (`SlotEditorSheet`/`MemorizedRow`) da v1.89
+continuam exatamente como estavam — este ajuste só mexeu em ONDE e COMO
+o jogador edita o livro.
+
+`Package.swift`: `displayVersion` "1.89"→"1.90", `bundleVersion`
+"194"→"195".
+
+## AJUSTE v1.91 (2026-09-30) — Especialização de Escola do Mago (PHB Table 22)
+
+Correção de um pedido anterior: onde o usuário tinha dito "círculos do
+mago" (implementado na v1.90 como teto de círculo pra aprender magia),
+ele quis dizer "escolas de magia" — pediu a regra completa do PHB antes de
+implementar. Pesquisada e conferida em duas fontes independentes (a wiki
+AD&D 2e e a página de Escolas Opostas do Complete Wizard's Handbook, que
+documenta a mesma mecânica do PHB) antes de escrever qualquer código —
+mesmo cuidado já tomado com a Wizard Spell Progression (v1.88).
+
+**A regra (PHB Table 22):** especializar é OPCIONAL — um Mago pode
+continuar generalista (sem bônus, sem restrição, comportamento de
+sempre) ou escolher uma das oito escolas (Abjuration, Alteration,
+Conjuration/Summoning, Divination, Enchantment/Charm, Illusion/Phantasm,
+Invocation/Evocation, Necromancy — "Lesser Divination" é universal, não
+entra nessa lista). Quem especializa ganha +1 slot por círculo onde já
+tem magia, e passa a ter escolas OPOSTAS bloqueadas de verdade — lista
+FIXA por escola (não é "a oposta + as duas vizinhas, à escolha do
+jogador" como se pensou antes de perguntar), com contagem variando pela
+força da escola (fraca = 1, moderada = 2, forte = 3):
+
+- Abjuration ↔ Alteration, Illusion
+- Alteration ↔ Abjuration, Necromancy
+- Conjuration/Summoning ↔ Divination, Invocation/Evocation
+- Divination ↔ Conjuration/Summoning
+- Enchantment/Charm ↔ Invocation/Evocation, Necromancy
+- Illusion/Phantasm ↔ Necromancy, Invocation/Evocation, Abjuration
+- Invocation/Evocation ↔ Enchantment/Charm, Conjuration/Summoning
+- Necromancy ↔ Illusion/Phantasm, Enchantment/Charm
+
+O bônus de aprendizado (+15%/-15%) e o de teste de resistência (±1) do
+PHB ficam só documentados, não implementados — não existe rolagem de
+"chance to learn" nem resolução de salvamento por magia no app, mesma
+linha de nunca simular dado que já vale pra Hit Points e pro próprio
+livro de magias.
+
+Implementação:
+- `WizardSchool` (novo enum, `Models/Character.swift`) — as oito escolas,
+  `oppositionSchools` (a tabela fixa acima) e `specialistTitle` (Abjurer,
+  Transmuter, etc., só pra exibição).
+- `PlayerCharacter.wizardSchool: WizardSchool? = nil` — `nil` é
+  generalista, seguro pra fichas antigas.
+- `PlayerCharacter.isSpellOpposedBySchool(_:)` — bloqueio de verdade
+  (mesma filosofia do livro em si), `false` sempre pra generalista e pra
+  magias marcadas "All"/"All Schools" na base (universais, tipo Read
+  Magic/Detect Magic).
+- `computedSpellSlotAllotments` (Mago) — +1 slot em todo círculo com
+  count > 0 quando especializado.
+- "My Spellbook" ganhou uma seção "Specialization" (Menu: Generalist ou
+  uma das 8 escolas) — trocar de escola já REMOVE do livro qualquer magia
+  batida com a base que fica oposta pela troca (`setSchool(_:)`); a busca
+  da própria tela também passou a filtrar por escola oposta, com aviso
+  separado de "fora do círculo" vs. "de escola oposta" quando a busca não
+  acha nada usável.
+- `SpellbookView` — o botão "+"/"✓" (item 3 da v1.90) agora checa círculo
+  E escola (`isEligibleForWizardSpellbook`, substituiu o `wizardSpellbookMaxCircle`
+  passado direto pra `LevelSection`, que virou um closure `(Spell) -> Bool`).
+
+`Package.swift`: `displayVersion` "1.90"→"1.91", `bundleVersion`
+"195"→"196".
+
+## AJUSTE v1.92 (2026-09-30) — Warrior: merge de regras + Weapon Specialization (Fighter)
+
+Início da implementação do grupo Warrior (Fighter/Paladin/Ranger + Kit
+Barbarian), a partir do zip `warrior_rules.zip` fornecido pelo usuário com
+os quatro sourcebooks: Complete Fighter's Handbook (CFH), Complete
+Paladin's Handbook (CPaH), Complete Ranger's Handbook (CRH) e Complete
+Barbarian's Handbook (CBarbH). Antes de codar, 4 perguntas foram
+esclarecidas com o usuário: (1) escopo = tudo, incluindo Kits; (2) dados
+de Kits = o usuário fornece um JSON estruturado depois (o zip só tem os
+NOMES dos kits em prosa, sem stat block, então o compêndio de Warrior
+Kits fica pendente até lá); (3) Barbarian é Kit de Fighter, não uma nova
+`CharacterClass` (regra oficial); (4) prioridade desta rodada = Weapon
+Specialization do Fighter.
+
+**1) Rules Reference — merge dos 4 livros.** Mesma mecânica já usada pro
+CPrH: `Resources/rules.json` ganhou 249 entradas novas (CBarbH:51,
+CFH:81, CPaH:65, CRH:52), sem nenhuma colisão de ID — total agora é 634
+entradas (era 385). Atualizado em todo lugar que citava a lista/contagem
+antiga: `CompendiumHubView` (subtítulo do tile "Rules Reference"),
+`RulesCompendiumView` (cabeçalho, e a fileira de chips de filtro por
+livro, que agora rola na horizontal pra caber os 7 códigos: PHB, DMG,
+CPrH, CFH, CPaH, CRH, CBarbH) e o doc-comment de `RulesDatabase`.
+
+**2) Weapon Specialization (Fighter) — `Models/Character.swift` +
+`Views/CharacterSheetView.swift`.** Regra conferida direto no texto do
+Complete Fighter's Handbook cap. 4 ("Single-Weapon Proficiency, Weapon
+Specialization") que o próprio usuário enviou: só Fighter especializa
+(nunca Paladin/Ranger, mesmo sendo do grupo Warrior); corpo-a-corpo custa
+1 slot extra de proficiência e dá +1 pra acertar / +2 de dano; arco/besta
+custa 2 slots extras e, em vez de bônus de dano, ganha uma faixa de
+alcance "point-blank" (besta 6–30ft, arco 6–60ft) com +2 pra acertar
+dentro dela, podendo atirar antes da iniciativa se a arma já estiver
+pronta e o alvo à vista; só uma especialização na criação do personagem,
+outras depois conforme novos slots são ganhos.
+
+Implementação: `WeaponEntry.isSpecialized: Bool? = nil` (novo campo —
+`Optional`, não `Bool = false`, pela mesma razão de sempre: ficha salva
+antes desta versão não tem essa chave no JSON e o decode síntese exige a
+chave presente mesmo havendo default). Na tabela "Weapon Combat"
+(`WeaponFormRow`), um botão "☆ spec"/"★ spec" aparece só quando
+`character.characterClass == .fighter`, ao lado do nome da arma. Ligar a
+especialização semeia os campos "Hit/Dmg Adj" — mas SÓ se estiverem
+vazios, nunca sobrescrevendo o que o jogador já tiver digitado à mão
+(mesmo padrão de "semear sem atropelar" já usado em `freshSlotBoard()` e
+`seedWizardSpellbookIfNeeded`): corpo-a-corpo ganha "+1"/"+2"; arco/besta
+(detectado por substring "bow"/"crossbow" no nome da arma — não há campo
+estruturado de categoria em `WeaponEntry`) ganha "+2*" no Hit Adj, sem
+mexer no Dmg Adj, com o asterisco explicado num rodapé que só aparece pro
+Fighter, abaixo da tabela.
+
+Pendente pras próximas rodadas (não esquecer, mas não foi pedido agora):
+habilidades de Paladin (Detect Evil, Lay on Hands, Cure Diseases, Turn
+Undead, montaria especial, magias de Clérigo a partir do nível 9) e de
+Ranger (Tracking, Hide in Shadows/Move Silently, Animal Empathy, Species
+Enemy, Nature Lore, Survival, Followers); o compêndio de Warrior Kits
+continua bloqueado até o usuário mandar o JSON estruturado dos kits.
+
+## AJUSTE v1.93 (2026-09-30) — 6 correções do feedback pós-v1.92 (Warrior)
+
+Feedback do usuário testando a v1.92, com 2 screenshots anexados:
+
+**1. Mensagem errada no seletor de Kit.** "Choose a Kit" mostrava, pra
+qualquer classe sem kit disponível, "\(classe) has no priest kits — priest
+kits only apply to Cleric and Druid" — já estava desatualizada antes do
+Warrior (Mago tem 41 kits desde a v1.87) e ficava simplesmente errada pro
+grupo Warrior. `KitCompendiumView.swift`/`emptyMessage` agora diferencia:
+grupo Warrior (Fighter/Paladin/Ranger) ganha uma mensagem específica
+explicando que os kits ainda não estão na base — só o texto de regras
+veio no zip, o JSON estruturado dos kits (incluindo Barbarian) é o
+usuário quem vai mandar — as outras classes sem kit ganham uma mensagem
+genérica só "sem kits ainda", sem citar Cleric/Druid feito regra fixa.
+
+**2. Fonte ilegível no rodapé de Weapon Combat.** O parágrafo inteiro de
+Weapon Specialization (adicionado na v1.92) virou uma linha curta em fonte
+10 + o botão "?" de sempre (`RuleLinkButton`), que abre o texto completo
+do Complete Fighter's Handbook em `RuleDetailSheet` — sheet de leitura,
+fonte normal, exatamente o padrão já usado nos "?" de outras seções da
+ficha (Level Changes, Patron Deity, Proficiencies).
+
+**3. Non-proficiency penalty não era preenchido sozinho.** Ficava sempre
+vazio até o jogador digitar, mesmo a Tabela 34 do PHB já dizendo o valor
+certo só pela classe (Fighter/Paladin/Ranger -2, Cleric/Druid -3, Thief/
+Bard -3, Mago -5). Criada `ProficiencySlotsTable`
+(`Store/RuleEngine/CoreRuleset/ProficiencySlotsTable.swift`, dados
+conferidos contra `phb_ch05_proficiencies`/`phb_ch05_weapon_proficiencies`
+em `rules.json`) — `CombatModifiersForm.onAppear` agora semeia o campo com
+ela na primeira vez que a linha "Non-proficiency penalty" é criada, sem
+nunca sobrescrever o que o jogador já tiver editado.
+
+**4. "Onde eu adiciono as Weapon Proficiencies?"** Resposta: não existe
+(nunca existiu) uma lista separada de slots de proficiência de arma — cada
+arma na tabela "Weapon Combat" JÁ É a proficiência (ver doc de
+`WeaponEntry`/`Weapon` no histórico do projeto). Isso nunca ficava
+explícito na tela. Duas linhas curtas resolvem: uma logo abaixo do título
+"Weapon Combat" dizendo isso, e outra logo abaixo do título "Proficiencies"
+lembrando que aquela lista é só Nonweapon.
+
+**5. "Não consegui escolher o kit de Barbarian".** Mesma causa do item 1 —
+a lista de kits do Fighter está mesmo vazia (Warrior Kits pendente do JSON
+que o usuário vai fornecer), só a mensagem de erro escondia isso. Resolvido
+junto com o item 1; nenhum kit foi inventado/homebrewado pra preencher a
+lacuna — o usuário pediu explicitamente pra fornecer os dados estruturados
+depois, e inventar um Barbarian agora arriscaria divergir do que ele vai
+mandar.
+
+**6. Sem página de tabelas úteis pro Warrior.** `CharacterClass` ganhou
+`hasReferencePage` (generaliza o antigo `hasSpellSheet` que controlava
+sozinho a 4ª página da aba Sheet) — agora também true pro grupo Warrior.
+Nova `Views/WarriorReferenceView.swift`/`WarriorReferencePage`: Tabela 34
+completa (Proficiency Slots, com a linha da classe do personagem
+destacada) + um resumo consultável de Weapon Specialization, ambos com
+botão "?" linkando pro texto fonte no compêndio. THAC0 e Saving Throws NÃO
+entraram nessa página — já são calculados automaticamente pra qualquer
+classe em "Level Changes" (página 2), não é exclusividade de quem tem
+ficha de magia.
+
+## AJUSTE v1.94 (2026-09-30) — Rogue: merge de regras + Ninja (classe nova) + Thieving Skills/Backstab/Bardic Abilities
+
+Segunda rodada de grupo completo, igual o Warrior — zip `rougue_rules.zip`
+com 3 sourcebooks: Complete Bard's Handbook (CBH), Complete Ninja's
+Handbook (CNH), Complete Thief's Handbook (CTH). Antes de codar, 3
+perguntas foram esclarecidas com o usuário: (1) Ninja = nova
+`CharacterClass` (não Kit de Thief, ao contrário do Barbarian) — o próprio
+CNH trata ninja como classe própria do grupo Rogue, com Table 1 (XP/Hit
+Dice) igual à Table 25 do PHB mas requisitos/restrição racial/thieving
+skills todos próprios; (2) prioridade desta rodada = "Todas" (Thieving
+Skills + Backstab + Bardic Abilities, já que o app não tinha NENHUMA
+mecânica de Rogue implementada até agora); (3) Kits (Bard/Thief/Ninja)
+ficam pendentes do JSON estruturado que o usuário vai fornecer — mesmo
+acordo do Warrior, nenhum kit foi inventado.
+
+**1) Rules Reference.** 149 entradas novas (CBH:43, CNH:42, CTH:64), zero
+colisão de ID — total 634 → 783. Book codes CBH/CNH/CTH somados aos 7 que
+já existiam (agora 10 ao todo); `CompendiumHubView`/`RulesCompendiumView`/
+`RulesDatabase` atualizados, mesma mecânica de sempre.
+
+**2) Ninja — nova `CharacterClass`.** `CharacterClass.ninja`, grupo
+"Rogue" (`proficiencyGroup`), Hit Die d6 (Table 1 do CNH = Table 25 do
+PHB). `ExperienceProgressionTable`/`CoreClassGroup` ganharam a entrada
+(conferida linha a linha contra a tabela do CNH — bate exatamente com
+Thief/Bard, já que o PHB Table 53/60 de THAC0/Saves são por GRUPO, não por
+classe específica). `Race.swift`: Dwarf e Halfling marcados `.unlimited`
+pro Ninja (CNH: "Races Allowed: Human, Dwarf, Halfling" — sem tabela
+numérica de limite de nível no texto-fonte, então não inventei um teto;
+Elf/Gnome/Half-Elf continuam proibidos pelo `default` de sempre, CNH:
+"There are no demihuman ninja clans").
+
+**3) Thieving Skills — Thief, Bard e Ninja.** Nova seção "Thieving Skills"
+na página 1 da ficha (`ThievingSkillsForm`), só pro grupo Rogue
+(`CharacterClass.hasThievingSkills`). Uma linha editável de % por
+habilidade (8 pro Thief/Ninja, 4 pro Bard), semeada uma vez com Base +
+Raça + Destreza — TODOS os números vêm das Tables 26-28 do PHB
+(`phb_ch03_rogue_tables`, já tabeladas no `rules.json`) e, pro Ninja, das
+Tables 2/3 do CNH (Table 3 é a própria Table 28 "reproduzida", conferido
+número a número; a Table de raça do CNH pra Dwarf/Halfling também bate
+exatamente com a Table 27 do PHB — daí o Ninja reaproveitar as duas
+tabelas do Thief em vez de duplicar dado). O ajuste de ARMADURA (Table
+29/Table 5 do CNH) ficou de FORA do cálculo automático — o campo "Armor"
+da ficha só guarda o valor de AC, nunca o tipo de armadura vestida, então
+não dá pra saber com segurança qual coluna aplicar; fica como tabela de
+consulta na página de referência, pro jogador aplicar à mão (mesma
+decisão já tomada pra o Non-proficiency Penalty do Warrior). Pontos de
+distribuição por nível (60 iniciais / 30 por nível, PHB e CNH) também
+ficam manuais — é escolha do jogador, não dado fixo. Criada
+`Store/RuleEngine/CoreRuleset/ThievingSkillsTable.swift` com todas as
+tabelas-fonte.
+
+**4) Backstab — Thief e Ninja.** O CNH diz explicitamente "the ninja has
+the same backstab ability as the thief" (a Table 4 dele é cópia idêntica
+da Table 30 do PHB). Mostrado como referência (multiplicador atual
+destacado pelo nível do personagem) na seção Thieving Skills e na nova
+página de referência — sem multiplicar dano sozinho, mesma filosofia de
+nunca auto-simular resultado de combate que já vale pro resto da ficha.
+
+**5) Bardic Abilities.** As 4 habilidades do bardo (Climb Walls, Detect
+Noise, Pick Pockets, Read Languages — Table 33 do PHB) entram pela MESMA
+seção Thieving Skills (`ThievingSkillsTable.skills(for: .bard)`), já que
+mecanicamente são tratadas como thieving skills "do jeito do ladrão"
+(PHB: "Bard abilities are subject to modifiers... as per the thief"). O
+resto das habilidades de bardo (Legend Lore, Charming Music, Countersong,
+influência de reação em grupo etc., do próprio capítulo "Bard" do PHB e
+do CBH cap. 5/7) fica como texto consultável na Rules Reference, como
+prometido — não virou mecânica ativa nesta rodada (nem a progressão de
+magia do bardo, Table 32, que só está na página de referência como
+consulta, sem ficha de magia própria ainda).
+
+**6) Nova página "Rogue Reference Tables".** `CharacterClass.hasReferencePage`
+estendido pro grupo Rogue — `Views/RogueReferenceView.swift` mostra: Base
+Score por classe, Armor Adjustment completo (Table 29 ou Table 5 do CNH,
+conforme a classe), Backstab (Thief/Ninja) e Bard Spell Progression
+(Bard), todos com botão "?" linkando pro texto fonte.
+
+Pendente pras próximas rodadas: Kits de Bard/Thief/Ninja (bloqueado no
+JSON que o usuário vai mandar); resto das habilidades de Bardo como
+mecânica ativa (hoje só consulta); ficha de magia do Bardo (Table 32
+funcionando de verdade, como a do Clérigo/Mago).
+
+## AJUSTE v1.95 (2026-09-30) — Bard Spell Sheet de verdade (fase 4 de paridade Priest/Wizard/Bard)
+
+Usuário, depois de ver a v1.94 ("Rogue: Thieving Skills/Backstab/Bardic
+Abilities"): "Boa! Mas não encontrei nada para controlar as magias de
+bardo. Onde estão?" — correto: a v1.94 só tinha colocado a Bard Spell
+Progression (Table 32) como TABELA DE CONSULTA na página de referência,
+sem ficha de magia de verdade por trás, e o changelog daquela versão já
+dizia isso explicitamente. Perguntado (1) se implementar agora ou
+deixar pra depois, e (2) como tratar a regra do PHB de que o bardo não
+escolhe magia livremente (ganha 1-4 ao acaso/critério do mestre no 2º
+nível, nunca mais automaticamente) — usuário escolheu "Implementar
+agora" e "Grimório manual, igual o do Mago" (o jogador anota à mão o que
+o personagem encontra em jogo, sem simular rolagem de "chance to learn").
+
+Achado bom, igual ao que já tinha acontecido com a v1.88 (Wizard Spell
+Sheet): quase toda a infraestrutura do livro de magias do Mago
+(`PlayerCharacter.wizardSpellbook`/`wizardKnows`/`wizardSpellbookSpells`/
+`wizardSpellbookFreeNames`/`wizardMaxKnowableCircle`, e a restrição real
+de memorização em `SpellSheetView.SlotEditorSheet`) já era genérica por
+`CasterType.arcane`, nunca travada em `characterClass == .mage` por
+dentro — só a CAMADA DE UI é que checava `== .mage` em vários lugares.
+Como um personagem só tem uma classe por vez, reaproveitar os mesmos
+campos pro Bardo (em vez de duplicar em `bardSpellbook`/`bardSchool`) é
+seguro: eles já significam "as magias arcanas que este personagem
+conhece", não "as magias do Mago especificamente".
+
+O que precisou de verdade:
+- **`CharacterClass.isArcaneCaster`** (novo, `Models/Character.swift`) —
+  `true` pra `.mage` e `.bard`, centraliza o que antes era `== .mage`
+  espalhado pelas views.
+- **`CharacterClass.hasSpellSheet`** passou a incluir `.bard`.
+- **`BardTables`** (novo enum, espelhando `WizardTables`) — Tabela 32 do
+  PHB ("Bard Spell Progression"), teto natural de 6º círculo (a própria
+  tabela já para ali, ao contrário do Mago que vai até o 9º), SEM bônus
+  de especialização (PHB: "In no case can a bard choose to specialize in
+  a school of magic" — por isso `computedSpellSlotAllotments` não soma
+  bônus nenhum no novo `case .bard`, diferente do `case .mage`). Os
+  números já tinham sido transcritos uma vez em `RogueReferenceView.swift`
+  (v1.94, só consulta) — viraram a cópia CANÔNICA aqui, e a view de
+  referência foi ajustada pra ler de `BardTables.spellProgressionRows`
+  em vez de manter uma segunda cópia que um dia poderia divergir.
+- **`PlayerCharacter.computedSpellSlotAllotments`** ganhou `case .bard:`
+  (usa `BardTables.spellProgression(level:intelligence:)`, `.arcane`).
+- **`PlayerCharacter.spellSheetAbilityScoreAtCreation`** trocou o teste
+  `== .mage` por `characterClass.isArcaneCaster` — Bardo também usa
+  Inteligência (PHB: bardo lança magia de mago, mesmo atributo-chave).
+- **`WizardSpellbookEditorSheet.swift`** ("My Spellbook"): a seção
+  "Specialization" (Table 22, escolas opostas) agora só aparece pra
+  `== .mage` — regra do PHB citada acima. O rodapé ("add spells straight
+  from the Mage Grimoire") virou dinâmico (`grimoireLabel`), mostrando
+  "Bard Grimoire" quando for o caso.
+- **`SpellbookView.swift`** (o Grimório, tela de navegar a base inteira):
+  `wizardSpellbookMaxCircle` (o que decide se aparece o botão "+"/"✓" de
+  livro pessoal numa magia) trocou `== .mage` por `.isArcaneCaster`; o
+  título do cabeçalho virou "Mage Grimoire"/"Bard Grimoire"/"Priest
+  Spellbook" conforme a classe (`grimoireTitle`).
+- **`SpellSheetView.swift`** (a folha de "Game Day" em si): o cabeçalho
+  trocou o antigo `isWizard: Bool` por `isArcane: Bool` (agora
+  `isArcaneCaster`) + `casterTitle: String` (3 vias: "Wizard"/"Bard"/
+  "Priest") — a restrição de memorização em si (`SlotEditorSheet`) já não
+  precisou de NENHUMA mudança: já era `slot.caster == .arcane`, nunca
+  `characterClass == .mage`.
+- **`CharacterSheetView.swift`** (várias checagens de UI, todas trocadas
+  de `== .mage` pra `.isArcaneCaster`): o redirecionamento de
+  `.mySpellbook` ao trocar de classe, o botão "My Spellbook" no menu ☰, e
+  o `caster:` passado pro Grimório ao abrir `.spellbook`. O rótulo do
+  Grimório no menu ☰ virou uma função de três vias (`grimoireMenuLabel`),
+  mesmo padrão do `SpellbookView`. A 4ª página de referência (`.mage` →
+  `WizardReferencePage`, senão Warrior/Rogue) e o botão "Spheres" do
+  cabeçalho (`== .cleric`, já explícito desde a v1.88 por causa exatamente
+  deste tipo de problema) não precisaram de NADA — já estavam corretos.
+- **`BardSpellSlotsProvider`** (novo, Motor de Consequências, espelhando
+  `WizardSpellSlotsProvider`) — registrado em `CoreRuleset.swift`.
+- Criação de personagem/primeira folha (`ClassPicker.select`,
+  `CharacterLibrary.seedFirstSpellSheetIfNeeded`) não precisaram de NADA —
+  já eram genéricos por `hasSpellSheet`/`spellSheetAbilityScoreAtCreation`/
+  `freshSlotBoard()`.
+
+Continua igual ao Mago: sem simular "chance to learn" nenhuma — o jogador
+adiciona à mão o que encontra em jogo (ou, se quiser, direto do Grimório
+já restrito ao círculo alcançável). O bardo nasce com o livro VAZIO (ao
+contrário do mago, que ganha "Read Magic" de graça) — o PHB não garante
+nenhuma magia inicial ao bardo, e `seedWizardSpellbookIfNeeded` continua
+travado em `characterClass == .mage`, de propósito, sem mudança.
+
+Pendente pras próximas rodadas: Kits de Bard/Thief/Ninja (bloqueado no
+JSON que o usuário vai mandar); resto das habilidades de Bardo como
+mecânica ativa fora de Thieving Skills (Legend Lore, Charming Music,
+Countersong, influência de reação em grupo — hoje só consulta na Rules
+Reference).
+
+`Package.swift`: `displayVersion` "1.94"→"1.95", `bundleVersion`
+"199"→"200".
+
+## AJUSTE v1.96 (2026-09-30) — Weapon Proficiency Slots: contador de verdade (Tabela 34 + bônus de Int)
+
+Usuário pediu propostas pra refletir a mecânica de Weapon Proficiencies
+(slots que geram bônus de ataques/acerto/dano) além do que já existia
+(Weapon Specialization, v1.92). No meio da conversa, contra-propôs algo
+melhor do que eu tinha esboçado: em vez de um contador solto e digitado à
+parte, fazer a própria ★ de especialização (que já existe) "gastar" o
+slot de verdade, e mostrar o total batendo contra a Tabela 34.
+
+Implementado exatamente assim — nada novo pra digitar, só leitura do que
+já está na ficha:
+
+- **`IntelligenceTable.bonusLanguages(forScore:)`** (novo,
+  `AbilityTables.swift`) — a coluna "Languages" da Tabela 4 como `Int`.
+- **`ProficiencySlotsTable.totalWeaponSlots(for:level:intelligence:)`**
+  (novo) — fórmula tirada letra por letra do texto do PHB
+  (`phb_ch05_proficiencies`): "A new proficiency slot is gained at every
+  experience level that is evenly divisible by [#Levels]" → `Inicial +
+  nível ÷ #Levels` (divisão inteira). Passando `intelligence`, soma o
+  bônus opcional do Complete Fighter's Handbook cap. 4 ("Intelligence and
+  Proficiencies": os idiomas extras de Inteligência alta, Tabela 4,
+  podem virar proficiências extras "divided as the player chooses
+  between Weapon Proficiencies and Nonweapon Proficiencies" — escolhido
+  pelo usuário nas perguntas de esclarecimento). Esse bônus é de CRIAÇÃO
+  (não escala com nível) e é escolha do jogador — o total calculado
+  assume que TUDO foi pra arma, então é um TETO informativo, não uma
+  trava; se o jogador tiver dividido parte pra proficiência não-marcial,
+  o número real é menor (documentado no código, não escondido).
+- **`WeaponCombatForm`** (`CharacterSheetView.swift`) ganhou o contador
+  "Weapon Proficiency Slots: X/Y used", visível pra QUALQUER classe (toda
+  classe tem Tabela 34, não só Fighter):
+  - **X (gasto)**: soma 1 por arma com nome preenchido na tabela (regra
+    de sempre: toda arma listada JÁ é uma proficiência) + 1 extra por ★
+    especializada em arma corpo-a-corpo/besta, + 2 extra por ★
+    especializada em ARCO (não-besta).
+  - Achado no caminho: o texto do CFH diz que especializar custa 2 slots
+    no total (1 extra) pra "any sort of melee weapon or **crossbow**", e
+    só 3 no total (2 extra) pra "any **bow** (other than a crossbow)" —
+    ou seja, besta custa o MESMO que arma corpo-a-corpo, só arco de
+    verdade custa mais. A checagem de "arma à distância" que já existia
+    (`WeaponFormRow.isRangedWeapon`, usada pro bônus de acerto point-
+    blank) junta besta e arco porque os dois ganham o mesmo bônus ali —
+    mas usar essa MESMA checagem aqui cobraria 2 slots de uma besta que
+    na verdade só custa 1. Por isso o contador tem sua própria checagem
+    (`isTrueBow`, só "bow" sem "crossbow" no nome).
+  - **Y (total)**: `ProficiencySlotsTable.totalWeaponSlots`, acima.
+  - Fica vermelho se X passar de Y — nunca trava nada (mesma filosofia
+    do resto da ficha: avisa, não impede).
+- A nota de Weapon Specialization que já existia (só pro Fighter) ficou
+  mais precisa no mesmo processo — "bow/crossbow point-blank +2 (2
+  slots)" virou "melee/crossbow +1/+2 dmg (1 slot extra) · bow point-
+  blank +2 (2 slots extra)", corrigindo o mesmo erro besta-vira-arco que
+  o contador evita.
+
+`Package.swift`: `displayVersion` "1.95"→"1.96", `bundleVersion`
+"200"→"201".

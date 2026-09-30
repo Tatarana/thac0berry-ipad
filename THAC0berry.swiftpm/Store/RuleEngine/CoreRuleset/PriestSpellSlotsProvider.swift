@@ -20,7 +20,10 @@ struct PriestSpellSlotsProvider: RuleProvider {
     let label = "Priest Spell Slots per Level (Table 24)"
 
     func compute(for context: RuleContext) -> RuleValue? {
-        guard context.characterClass.hasSpellSheet else { return nil }
+        // Restrito ao Clérigo mesmo (não `hasSpellSheet`, que desde
+        // 2026-09-29 também é `true` pro Mago) — a Priest Spell Progression
+        // não se aplica a ele; ver `WizardSpellSlotsProvider` ao lado.
+        guard context.characterClass == .cleric else { return nil }
         let counts = PriestTables.spellProgression(level: context.level, wisdom: context.abilities.wisdom)
         guard counts.contains(where: { $0 > 0 }) else { return nil }
         return .intByCircle(counts)

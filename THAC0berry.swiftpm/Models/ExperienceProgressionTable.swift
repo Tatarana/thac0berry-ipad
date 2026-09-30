@@ -48,6 +48,15 @@ enum ExperienceProgressionTable {
         .bard: [0, 1_250, 2_500, 5_000, 10_000, 20_000, 40_000, 70_000, 110_000, 160_000,
                 220_000, 440_000, 660_000, 880_000, 1_100_000, 1_320_000, 1_540_000,
                 1_760_000, 1_980_000, 2_200_000],
+        // Ninja (2026-09-30, Complete Ninja's Handbook "Table 1: Rogue
+        // Experience Levels") — conferida linha a linha contra a coluna
+        // "Ninja" que o usuário enviou, e batendo exatamente com
+        // Thief/Bard acima: o próprio livro reproduz a Table 25 do PHB
+        // sem alterar nenhum valor, só confirmando que ninja usa a mesma
+        // progressão de todo o grupo Rogue.
+        .ninja: [0, 1_250, 2_500, 5_000, 10_000, 20_000, 40_000, 70_000, 110_000, 160_000,
+                 220_000, 440_000, 660_000, 880_000, 1_100_000, 1_320_000, 1_540_000,
+                 1_760_000, 1_980_000, 2_200_000],
     ]
 
     /// XP total necessário pra alcançar `level` (1 a 20) — `nil` fora

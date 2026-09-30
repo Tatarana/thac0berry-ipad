@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// Tela de consulta da base de regras (PHB + DMG, 274 entradas / 200
-/// tabelas) — mesmo espírito do `KitCompendiumView`/`SpellbookView`:
+/// Tela de consulta da base de regras (PHB, DMG e oito "Complete X's
+/// Handbook" — Priest, Fighter, Paladin, Ranger, Barbarian, Bard, Ninja,
+/// Thief — 783 entradas ao todo, 2026-09-30) — mesmo espírito do
+/// `KitCompendiumView`/`SpellbookView`:
 /// folhear ou buscar a base inteira, sem estar presa a nenhum personagem.
 /// Agrupada por livro e depois por capítulo (ordem do próprio livro, não
 /// alfabética) — é como qualquer jogador já folheia o PHB/DMG físico.
@@ -63,7 +65,7 @@ struct RulesCompendiumView: View {
             Text("Rules Reference")
                 .font(Paper.hand(30))
                 .foregroundStyle(Paper.penInk)
-            Text("\(rulesDatabase.entries.count) rules · Player's Handbook, Dungeon Master's Guide & Complete Priest's Handbook")
+            Text("\(rulesDatabase.entries.count) rules · PHB, DMG & 8 Complete Handbooks")
                 .font(Paper.printedItalic(12))
                 .foregroundStyle(Paper.inkSoft)
         }
@@ -73,22 +75,34 @@ struct RulesCompendiumView: View {
         SearchField(text: $query, placeholder: "topic, keyword…")
     }
 
-    /// PHB / DMG / CPrH / todos — a DMG tem conteúdo voltado pro Mestre
-    /// (recompensas, criação de item mágico, diretrizes de campanha) junto
-    /// com regras do PHB, e o CPrH (Complete Priest's Handbook) é ainda
-    /// mais nesse sentido — a maior parte dos seus capítulos (deuses,
-    /// design de fé, role-playing) é material de worldbuilding pro
-    /// Mestre, não regra de jogador; o filtro deixa quem só quer as
-    /// regras de jogador escondê-las sem precisar caçar pelo `book` de
-    /// cada resultado.
+    /// PHB / DMG / CPrH / CFH / CPaH / CRH / CBarbH / CBH / CNH / CTH /
+    /// todos — a DMG tem conteúdo voltado pro Mestre (recompensas, criação
+    /// de item mágico, diretrizes de campanha) junto com regras do PHB, e
+    /// os oito "Complete X's Handbook" (Priest, Fighter, Paladin, Ranger,
+    /// Barbarian, Bard, Ninja, Thief — Rogue completado em 2026-09-30,
+    /// mesmo tratamento do CPrH/grupo Warrior) são ainda mais nesse
+    /// sentido — boa parte dos seus capítulos (cultura, fé, role-playing)
+    /// é material de worldbuilding pro Mestre, não regra de jogador; o
+    /// filtro deixa quem só quer as regras de jogador escondê-las sem
+    /// precisar caçar pelo `book` de cada resultado. Fila horizontal
+    /// rolável — 11 selinhos não cabem numa linha só em largura de iPad em
+    /// Split View.
     private var bookToggle: some View {
-        HStack(spacing: 8) {
-            BookFilterChip(label: "All", isSelected: bookFilter == nil, action: { bookFilter = nil })
-            BookFilterChip(label: "PHB", isSelected: bookFilter == "PHB", action: { bookFilter = "PHB" })
-            BookFilterChip(label: "DMG", isSelected: bookFilter == "DMG", action: { bookFilter = "DMG" })
-            BookFilterChip(label: "CPrH", isSelected: bookFilter == "CPrH", action: { bookFilter = "CPrH" })
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                BookFilterChip(label: "All", isSelected: bookFilter == nil, action: { bookFilter = nil })
+                ForEach(Self.bookOrder, id: \.self) { book in
+                    BookFilterChip(label: book, isSelected: bookFilter == book, action: { bookFilter = book })
+                }
+            }
         }
     }
+
+    /// Ordem de exibição dos selinhos de livro — PHB/DMG primeiro (regra
+    /// central), depois os "Complete X's Handbook" na ordem em que foram
+    /// incorporados (Priest, o grupo Warrior inteiro de uma vez, depois o
+    /// grupo Rogue inteiro de uma vez — Bard, Ninja, Thief, 2026-09-30).
+    private static let bookOrder = ["PHB", "DMG", "CPrH", "CFH", "CPaH", "CRH", "CBarbH", "CBH", "CNH", "CTH"]
 
     private var searchResults: [RuleMatch] {
         rulesDatabase.matches(for: query, limit: 40, book: bookFilter)
@@ -103,7 +117,7 @@ struct RulesCompendiumView: View {
     }
 
     private var chapterGroups: [ChapterGroup] {
-        let books = bookFilter.map { [$0] } ?? ["PHB", "DMG", "CPrH"]
+        let books = bookFilter.map { [$0] } ?? Self.bookOrder
         var groups: [ChapterGroup] = []
         for book in books {
             for chapter in rulesDatabase.chapters(book: book) {

@@ -27,8 +27,11 @@ struct ClericReferencePage: View {
 }
 
 // MARK: - Peças compartilhadas
+//
+// Sem `private` (2026-09-29) — `WizardReferenceView.swift` reaproveita as
+// três daqui em vez de duplicar o mesmo desenho de célula/título/rodapé.
 
-private struct RefTableTitle: View {
+struct RefTableTitle: View {
     let text: String
     var body: some View {
         Text(text.uppercased())
@@ -40,7 +43,7 @@ private struct RefTableTitle: View {
     }
 }
 
-private struct RefCell: View {
+struct RefCell: View {
     let text: String
     var isHeader: Bool = false
     var isHighlighted: Bool = false
@@ -72,7 +75,7 @@ private struct RefCell: View {
     }
 }
 
-private struct RefFootnotes: View {
+struct RefFootnotes: View {
     let lines: [String]
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {

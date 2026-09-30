@@ -19,8 +19,8 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.tatarana.thac0berry",
             teamIdentifier: "",
-            displayVersion: "1.80",
-            bundleVersion: "183",
+            displayVersion: "1.96",
+            bundleVersion: "201",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
@@ -47,6 +47,22 @@ let package = Package(
             name: "AppModule",
             path: ".",
             resources: [
+                // 2026-09-29: a v1.83 tentou `.copy("Resources")` no lugar
+                // de `.process("Resources")`, apostando que o pipeline de
+                // PROCESSAMENTO de recursos fosse o culpado por sumir com
+                // os `priest_*.json`. Errado — `.copy` quebrou o CODE
+                // SIGNING do build (erro `NSOSStatusErrorDomain Code=-67072`
+                // apontando pro `wizard_level_7.json` dentro do
+                // `THAC0berry.app`, na hora de instalar): o Swift
+                // Playgrounds precisa que os recursos passem pelo pipeline
+                // de `.process` pra montar o envelope de assinatura
+                // corretamente nesse tipo de build (.iOSApplication /
+                // App Playground). Voltou pra `.process("Resources")`
+                // (v1.85) — ver `Store/SpellDatabase.swift` pro ataque
+                // atual ao bug original (`priest_*.json` "missing"): agora
+                // é só diagnóstico melhor (erro real + varredura
+                // recursiva + mais tentativas), sem mexer em como os
+                // recursos são empacotados.
                 .process("Resources")
             ]
         )

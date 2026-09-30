@@ -192,18 +192,34 @@ private struct SpellSheetHeader: View {
     @Binding var sheet: SpellSheet
     let character: PlayerCharacter
 
+    /// Título e rótulo do atributo mudam com a classe (2026-09-29) — Mago
+    /// ganhou a própria ficha, espelhando a do Clérigo (ver
+    /// `PlayerCharacter.spellSheetAbilityScoreAtCreation`, o mesmo valor
+    /// que `sheet.wisdomAtCreation` guarda pros dois casos). Estendido pro
+    /// Bardo em 2026-09-30 (`CharacterClass.isArcaneCaster`) — mesma
+    /// Inteligência do Mago, título próprio ("Bard").
+    private var isArcane: Bool { character.characterClass.isArcaneCaster }
+    private var casterTitle: String {
+        switch character.characterClass {
+        case .mage: return "Wizard"
+        case .bard: return "Bard"
+        default: return "Priest"
+        }
+    }
+
     var body: some View {
         let who: String = "\(character.displayTitle) · \(character.characterClass.rawValue) \(character.level)"
 
         VStack(spacing: 6) {
             HStack(alignment: .bottom, spacing: 22) {
                 VStack(alignment: .leading, spacing: 0) {
-                    FieldLabel(text: "Priest Spell Sheet — Game Day")
+                    FieldLabel(text: "\(casterTitle) Spell Sheet — Game Day")
                     EditableText(value: $sheet.title, placeholder: "untitled",
                                  size: 34, tilt: -0.7, underline: false)
                 }
                 // Cresce pra ocupar todo o espaço livre — empurra Character
-                // e Wisdom, os dois de largura fixa, pra ponta direita.
+                // e Wisdom/Intelligence, os dois de largura fixa, pra ponta
+                // direita.
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .trailing, spacing: 0) {
@@ -214,7 +230,7 @@ private struct SpellSheetHeader: View {
                 .fixedSize()
 
                 VStack(alignment: .trailing, spacing: 0) {
-                    FieldLabel(text: "Wisdom")
+                    FieldLabel(text: isArcane ? "Intelligence" : "Wisdom")
                     HandValue(text: "\(sheet.wisdomAtCreation)", size: 19, tilt: -0.3)
                     Rectangle().fill(Paper.hairline).frame(height: 1)
                 }
@@ -505,26 +521,64 @@ private struct MemorizedRow: View {
     /// `matches` continua igual a antes da feature existir.
     private var candidates: [SpellMatch] {
         guard !handwritten.isEmpty else { return [] }
-        let matches = spellbook.matches(for: handwritten, limit: 5, caster: slot.caster, level: slot.level)
+        let matches = spellbook.matches(for: handwritten, limit: 5, caster: slot.caster, level: slot.level,
+                                         restrictToIDs: restrictToWizardBook)
         guard character.hasConfiguredSphereAccess else { return matches }
         return matches.sorted { lhs, rhs in
             character.sphereSortRank(for: lhs.spell) < character.sphereSortRank(for: rhs.spell)
         }
     }
 
+    /// `nil` pro Clérigo (sem restrição — não precisa "aprender" magia).
+    /// Pro Mago, restringe a busca ao próprio livro (2026-09-29, ver
+    /// `PlayerCharacter.wizardSpellbook`).
+    private var restrictToWizardBook: Set<String>? {
+        slot.caster == .arcane ? character.wizardSpellbookMatchedIDs : nil
+    }
+
+    /// Entrada de NOME LIVRE do livro (sem bater com a base) que casa com
+    /// o texto digitado — só existe pro Mago. É o que permite "use as-is"
+    /// continuar funcionando pra uma magia homebrew cadastrada no livro,
+    /// sem abrir a porta pra QUALQUER texto digitado (o que quebraria a
+    /// restrição de verdade).
+    private var matchingFreeBookEntry: WizardSpellbookEntry? {
+        guard slot.caster == .arcane else { return nil }
+        let query = Fuzzy.normalize(handwritten)
+        guard !query.isEmpty else { return nil }
+        return character.wizardSpellbookFreeNames(level: slot.level)
+            .first { Fuzzy.normalize($0.name) == query }
+    }
+
     @ViewBuilder
     private var suggestions: some View {
         VStack(alignment: .leading, spacing: 5) {
             if candidates.isEmpty {
-                Button {
-                    assign(name: handwritten, spell: nil)
-                } label: {
-                    let title: String = "use \"" + handwritten + "\" as-is"
-                    Text(title)
-                        .font(Paper.printedItalic(12))
-                        .foregroundStyle(Paper.inkSoft)
+                if slot.caster == .arcane {
+                    if let freeEntry = matchingFreeBookEntry {
+                        Button {
+                            assign(name: freeEntry.name, spell: nil)
+                        } label: {
+                            Text("use \"" + freeEntry.name + "\" as-is")
+                                .font(Paper.printedItalic(12))
+                                .foregroundStyle(Paper.inkSoft)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text("Not in your spellbook — add it from \"My Spellbook\" on the character sheet.")
+                            .font(Paper.printedItalic(11))
+                            .foregroundStyle(Paper.redInk)
+                    }
+                } else {
+                    Button {
+                        assign(name: handwritten, spell: nil)
+                    } label: {
+                        let title: String = "use \"" + handwritten + "\" as-is"
+                        Text(title)
+                            .font(Paper.printedItalic(12))
+                            .foregroundStyle(Paper.inkSoft)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             } else {
                 ForEach(candidates) { match in
                     SuggestionLine(match: match, sphereSignal: character.sphereSignal(for: match.spell)) {
@@ -1700,13 +1754,28 @@ private struct SlotEditorSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         if !handwritten.isEmpty && candidates.isEmpty {
-                            Button {
-                                assign(name: handwritten, id: nil)
-                            } label: {
-                                let title: String = "use \"" + handwritten + "\" as-is"
-                                HandValue(text: title, size: 21)
+                            if slot.caster == .arcane {
+                                if let freeEntry = matchingFreeBookEntry {
+                                    Button {
+                                        assign(name: freeEntry.name, id: nil)
+                                    } label: {
+                                        HandValue(text: "use \"" + freeEntry.name + "\" as-is", size: 21)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    Text("\"\(handwritten)\" isn't in your spellbook — add it from \"My Spellbook\" on the character sheet.")
+                                        .font(Paper.printedItalic(12))
+                                        .foregroundStyle(Paper.redInk)
+                                }
+                            } else {
+                                Button {
+                                    assign(name: handwritten, id: nil)
+                                } label: {
+                                    let title: String = "use \"" + handwritten + "\" as-is"
+                                    HandValue(text: title, size: 21)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
 
                         ForEach(candidates) { match in
@@ -1727,8 +1796,18 @@ private struct SlotEditorSheet: View {
                                     assign(name: spell.name, id: spell.id)
                                 }
                             }
-                            if levelList.isEmpty {
-                                Text("The built-in spell list doesn't cover this level — write the name by hand.")
+                            ForEach(freeBookEntries) { entry in
+                                Button {
+                                    assign(name: entry.name, id: nil)
+                                } label: {
+                                    HandValue(text: entry.name, size: 21)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            if levelList.isEmpty && freeBookEntries.isEmpty {
+                                Text(slot.caster == .arcane
+                                     ? "Your spellbook has no circle \(slot.level) spells yet — add some from \"My Spellbook\" on the character sheet."
+                                     : "The built-in spell list doesn't cover this level — write the name by hand.")
                                     .font(Paper.printedItalic(12))
                                     .foregroundStyle(Paper.inkSoft)
                             }
@@ -1768,7 +1847,32 @@ private struct SlotEditorSheet: View {
     // `MemorizedRow.candidates` acima: senão as vagas do `limit` podiam ser
     // tomadas por magias de mesmo nome parecido em outro círculo.
     private var candidates: [SpellMatch] {
-        return spellbook.matches(for: handwritten, limit: 8, caster: slot.caster, level: slot.level)
+        return spellbook.matches(for: handwritten, limit: 8, caster: slot.caster, level: slot.level,
+                                  restrictToIDs: restrictToWizardBook)
+    }
+
+    /// `nil` pro Clérigo; restringe a busca ao livro do Mago quando é o
+    /// caso (2026-09-29 — mesmo campo de `MemorizedRow` ao lado).
+    private var restrictToWizardBook: Set<String>? {
+        slot.caster == .arcane ? character.wizardSpellbookMatchedIDs : nil
+    }
+
+    /// Mesma ideia de `MemorizedRow.matchingFreeBookEntry` — permite "use
+    /// as-is" continuar funcionando pra um nome livre já cadastrado no
+    /// livro do Mago, sem abrir pra qualquer texto digitado.
+    private var matchingFreeBookEntry: WizardSpellbookEntry? {
+        guard slot.caster == .arcane else { return nil }
+        let query = Fuzzy.normalize(handwritten)
+        guard !query.isEmpty else { return nil }
+        return character.wizardSpellbookFreeNames(level: slot.level)
+            .first { Fuzzy.normalize($0.name) == query }
+    }
+
+    /// Entradas do livro sem correspondência na base — só listadas quando
+    /// `handwritten` está vazio, junto de `levelList` (2026-09-29).
+    private var freeBookEntries: [WizardSpellbookEntry] {
+        guard slot.caster == .arcane else { return [] }
+        return character.wizardSpellbookFreeNames(level: slot.level)
     }
 
     /// Favoritos do jogador primeiro (globais, não deste personagem —
@@ -1782,7 +1886,12 @@ private struct SlotEditorSheet: View {
     /// quase 1.800 entradas vira procurar agulha no palheiro (ver TODO.md
     /// itens 2 e 3).
     private var levelList: [Spell] {
-        let all = spellbook.spells(caster: slot.caster, level: slot.level)
+        // Mago: só o que está no livro (2026-09-29, ver `PlayerCharacter.
+        // wizardSpellbookSpells`) — Clérigo continua vendo a base inteira
+        // do círculo, sem restrição.
+        let all: [Spell] = slot.caster == .arcane
+            ? character.wizardSpellbookSpells(level: slot.level, in: spellbook)
+            : spellbook.spells(caster: slot.caster, level: slot.level)
         let favorites = library.favoriteSpellIDs
         let counts = character.spellUsageCounts()
         return all.sorted { lhs, rhs in
@@ -2042,6 +2151,15 @@ struct SpellPaperRow: View {
     /// existia no Grimório.
     var isFavorite: Bool? = nil
     var onToggleFavorite: (() -> Void)? = nil
+    /// Botão de adicionar/remover do livro pessoal do Mago (2026-09-30,
+    /// pedido do usuário: "inclua a opção de adicionar uma magia ao
+    /// spellbook pelo grimório") — `nil` esconde por completo (Clérigo não
+    /// tem livro pessoal, esfera é sinal — nunca precisa disso; e sem
+    /// `character` nenhum, como no Grimório aberto solto da Home, também
+    /// não faz sentido). Quando presente, é um botão PRÓPRIO, mesmo
+    /// padrão do favorito — não dispara `action`.
+    var isInWizardSpellbook: Bool? = nil
+    var onToggleWizardSpellbook: (() -> Void)? = nil
     let action: () -> Void
 
     var body: some View {
@@ -2054,6 +2172,17 @@ struct SpellPaperRow: View {
                         .frame(width: 20)
                 }
                 .buttonStyle(.plain)
+            }
+
+            if let isInWizardSpellbook, let onToggleWizardSpellbook {
+                Button(action: onToggleWizardSpellbook) {
+                    Text(isInWizardSpellbook ? "✓" : "+")
+                        .font(Paper.printed(15))
+                        .foregroundStyle(isInWizardSpellbook ? Paper.greenInk : Paper.ink)
+                        .frame(width: 20)
+                }
+                .buttonStyle(.plain)
+                .actionTooltip(isInWizardSpellbook ? "In your spellbook — tap to remove" : "Add to your spellbook")
             }
 
             Button(action: action) {

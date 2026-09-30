@@ -35,7 +35,7 @@ struct CompendiumHubView: View {
                     .buttonStyle(.plain)
 
                     NavigationLink {
-                        KitCompendiumScreen()
+                        KitCompendiumScreen(classGroup: "Priest")
                     } label: {
                         CompendiumTile(
                             imageName: "icon_priest_kits",
@@ -45,6 +45,22 @@ struct CompendiumHubView: View {
                             title: "Priest Kits",
                             subtitle: "91 kits · origins & specialty priests",
                             accent: Ember.brass,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        KitCompendiumScreen(classGroup: "Wizard")
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_wizard_kits",
+                            systemImage: "wand.and.stars",
+                            badgeImage: "star.fill",
+                            badgeColor: Ember.teal,
+                            title: "Wizard Kits",
+                            subtitle: "41 kits · Complete Wizard's Handbook & Tome of Magic",
+                            accent: Ember.teal,
                             isEnabled: true
                         )
                     }
@@ -75,7 +91,7 @@ struct CompendiumHubView: View {
                             badgeImage: "questionmark",
                             badgeColor: Ember.teal,
                             title: "Rules Reference",
-                            subtitle: "385 rules · PHB, DMG & CPrH",
+                            subtitle: "783 rules · PHB, DMG, CPrH, CFH, CPaH, CRH, CBarbH, CBH, CNH & CTH",
                             accent: Ember.teal,
                             isEnabled: true
                         )
@@ -162,16 +178,21 @@ struct CompendiumHubView: View {
                     }
                     .buttonStyle(.plain)
 
-                    CompendiumTile(
-                        imageName: "icon_mage_grimoire",
-                        systemImage: "wand.and.stars",
-                        badgeImage: "sparkles",
-                        badgeColor: Ember.teal,
-                        title: "Mage Grimoire",
-                        subtitle: "Coming soon",
-                        accent: Ember.teal,
-                        isEnabled: false
-                    )
+                    NavigationLink {
+                        MageGrimoireScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_mage_grimoire",
+                            systemImage: "wand.and.stars",
+                            badgeImage: "sparkles",
+                            badgeColor: Ember.teal,
+                            title: "Mage Grimoire",
+                            subtitle: "2,608 spells · search, favorites, schools",
+                            accent: Ember.teal,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(26)
@@ -301,10 +322,11 @@ private struct SpellbookScreen: View {
     }
 }
 
-/// Moldura do Compendium de Kits — mesmo tratamento do `SpellbookScreen`
-/// acima (conteúdo em tinta sobre pergaminho, só a volta com o selo
-/// escuro da estante).
-private struct KitCompendiumScreen: View {
+/// Moldura do Grimório do Mago (2026-09-29) — igual `SpellbookScreen`
+/// acima, só passando `caster: .arcane` pro mesmo `SpellbookView` (ver
+/// comentário lá: a tela inteira foi generalizada pra servir os dois
+/// grimórios em vez de duplicar a implementação).
+private struct MageGrimoireScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -314,7 +336,34 @@ private struct KitCompendiumScreen: View {
                     dismiss()
                 }, accessibilityLabel: "Compendium")
 
-                KitCompendiumView()
+                SpellbookView(caster: .arcane)
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Kits — mesmo tratamento do `SpellbookScreen`
+/// acima (conteúdo em tinta sobre pergaminho, só a volta com o selo
+/// escuro da estante). Generalizada (2026-09-29) com `classGroup`, mesma
+/// ideia de `MageGrimoireScreen`/`SpellbookScreen` acima — um único
+/// `KitCompendiumScreen` serve as duas telas do hub ("Priest Kits" e
+/// "Wizard Kits"), só repassando o parâmetro pro `KitCompendiumView` já
+/// generalizado (ver comentário lá).
+private struct KitCompendiumScreen: View {
+    var classGroup: String = "Priest"
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                KitCompendiumView(classGroup: classGroup)
             }
             .padding(18)
         }

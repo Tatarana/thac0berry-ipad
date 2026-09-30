@@ -153,6 +153,29 @@ enum IntelligenceTable {
         24: Row(languages: "15", maxSpellLevel: "9th", learnChance: "100%", maxSpellsPerLevel: "All"),
         25: Row(languages: "20", maxSpellLevel: "9th", learnChance: "100%", maxSpellsPerLevel: "All"),
     ]
+
+    /// `maxSpellLevel` acima como número puro ("9th" → 9, "—"/score fora da
+    /// tabela → 0) — usado por `WizardTables.spellProgression` (2026-09-29)
+    /// pra travar qualquer círculo acima do que a Inteligência do mago
+    /// permite, em vez de duplicar os mesmos valores como `Int` à parte.
+    static func maxSpellLevelInt(forScore score: Int) -> Int {
+        guard let text = byScore[score]?.maxSpellLevel else { return 0 }
+        let digits = text.filter { $0.isNumber }
+        return Int(digits) ?? 0
+    }
+
+    /// `languages` acima como número puro (2026-09-30) — usado por
+    /// `ProficiencySlotsTable.totalWeaponSlots` pra somar o bônus de
+    /// Inteligência alta às slots de proficiência de arma (regra opcional
+    /// do Complete Fighter's Handbook, "Intelligence and Proficiencies":
+    /// "you may... take extra proficiencies when first created equal to
+    /// the number of extra languages the character gets from high
+    /// Intelligence [Table 4]" — o próprio PHB já usa essa coluna pro caso
+    /// de proficiências NÃO-de-arma, ver `phb_ch05_proficiencies`).
+    static func bonusLanguages(forScore score: Int) -> Int {
+        guard let text = byScore[score]?.languages else { return 0 }
+        return Int(text) ?? 0
+    }
 }
 
 enum WisdomTable {

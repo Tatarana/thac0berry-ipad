@@ -43,6 +43,12 @@ struct CharacterSheetView: View {
         case spells(UUID)
         case campaignIndex
         case spellbook
+        /// "My Spellbook" (2026-09-30) — livro pessoal de quem lança magia
+        /// arcana, mesmo espírito de `.spellbook` (o Grimório inteiro):
+        /// folha própria, não janela modal. Só existe pra quem tem
+        /// `characterClass.isArcaneCaster` (Mago e, desde 2026-09-30,
+        /// Bardo) — ver `WizardSpellbookEditorSheet`.
+        case mySpellbook
         /// Efeitos Ativos (2026-09-28) — magias/itens com duração finita
         /// (Regenerate, Stone Skin, Recitation, poções que sobrescrevem
         /// um atributo, PV temporário não-curável). Ver
@@ -141,7 +147,14 @@ struct CharacterSheetView: View {
                         .transition(.opacity)
                     case .spellbook:
                         ScrollView {
-                            SpellbookView(character: $character)
+                            SpellbookView(character: $character,
+                                         caster: character.characterClass.isArcaneCaster ? .arcane : .divine)
+                                .padding(18)
+                        }
+                        .transition(.opacity)
+                    case .mySpellbook:
+                        ScrollView {
+                            WizardSpellbookEditorSheet(character: $character)
                                 .padding(18)
                         }
                         .transition(.opacity)
@@ -169,15 +182,21 @@ struct CharacterSheetView: View {
         }
         // Se a classe mudou pra uma sem ficha de magia enquanto uma folha ou
         // o índice estavam abertos, volta pra Ficha — nenhuma das duas abas
-        // existe mais.
+        // existe mais. "My Spellbook" some sozinho quando deixa de ser Mago
+        // mesmo virando Clérigo (que tem ficha de magia, mas não livro de
+        // magias pessoal) — por isso essa checagem é separada da de
+        // `hasSpellSheet` abaixo.
         .onChange(of: character.characterClass) { _, newClass in
+            if page == .mySpellbook, !newClass.isArcaneCaster {
+                page = .record
+            }
             guard !newClass.hasSpellSheet else { return }
             // A 3ª página da ficha (tabelas do Clérigo) só existe pra quem
             // tem ficha de magia — se a classe mudou pra outra, volta pra
             // página 1 caso estivesse lá.
             if recordSheetPageIndex > 1 { recordSheetPageIndex = 0 }
             switch page {
-            case .spells, .campaignIndex, .spellbook: page = .record
+            case .spells, .campaignIndex, .spellbook, .mySpellbook: page = .record
             // .effects fica disponível pra qualquer classe (ver comentário
             // em `SheetPage.effects`), então uma troca de classe nunca
             // precisa tirar ninguém de lá.
@@ -350,7 +369,7 @@ private struct SheetTabs: View {
         // O distintivo de sessão fica escondido quando o índice já está
         // aberto — mostrar a mesma sessão duas vezes (na fileira de abas e
         // no corpo do índice) não faz sentido nenhum.
-        let showSessionBadge = hasSpellSheet && page != .campaignIndex && page != .spellbook
+        let showSessionBadge = hasSpellSheet && page != .campaignIndex && page != .spellbook && page != .mySpellbook
 
         HStack(alignment: .center, spacing: 10) {
             // Item 4 do feedback: cada tela tinha um jeito diferente de
@@ -436,7 +455,20 @@ private struct SheetTabs: View {
                     Button {
                         page = .spellbook
                     } label: {
-                        Label("Priest Spellbook", systemImage: "book.closed")
+                        Label(grimoireMenuLabel, systemImage: "book.closed")
+                    }
+                    // "My Spellbook" (2026-09-30) — livro PESSOAL de quem
+                    // lança magia arcana, distinto do Grimório (base
+                    // inteira) acima. Existe pra Mago e, desde 2026-09-30,
+                    // pra Bardo também (mesmo livro reaproveitado — ver
+                    // `CharacterClass.isArcaneCaster`); Clérigo não aprende
+                    // magia, tem acesso direto pela esfera.
+                    if character.characterClass.isArcaneCaster {
+                        Button {
+                            page = .mySpellbook
+                        } label: {
+                            Label("My Spellbook", systemImage: "text.book.closed")
+                        }
                     }
                 }
             } label: {
@@ -456,6 +488,17 @@ private struct SheetTabs: View {
                let sessionID = sheet.sessionID {
                 expandedSessionID = sessionID
             }
+        }
+    }
+
+    /// Rótulo do item "Grimoire" no menu ☰ — três classes, três nomes
+    /// (2026-09-30: Bardo entrou ao lado de Mago/Clérigo, mesma base
+    /// arcana — ver `CharacterClass.isArcaneCaster`).
+    private var grimoireMenuLabel: String {
+        switch character.characterClass {
+        case .mage: return "Mage Grimoire"
+        case .bard: return "Bard Grimoire"
+        default: return "Priest Spellbook"
         }
     }
 
@@ -511,7 +554,7 @@ private struct SheetTabs: View {
         var sheet = SpellSheet()
         sheet.sessionID = session.id
         sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         sheet.slotBoard = character.freshSlotBoard()
         character.spellSheets.append(sheet)
         page = .spells(sheet.id)
@@ -769,9 +812,11 @@ private struct SpellSheetBeadRow: View {
         sheet.sessionID = session.id
         sheet.slotBoard = reconciled(sheet.slotBoard, with: character.computedSpellSlotAllotments)
         sheet.title = "Day \(daySheets.count + 1)"
-        // Congela a Sabedoria de hoje na folha nova — é o valor que vale
-        // pra esse dia, mesmo que o personagem mude depois.
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        // Congela hoje o atributo que decide os slots (Sabedoria/
+        // Inteligência, conforme a classe — ver
+        // `spellSheetAbilityScoreAtCreation`) na folha nova — é o valor que
+        // vale pra esse dia, mesmo que o personagem mude depois.
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         character.spellSheets.append(sheet)
         page = .spells(sheet.id)
     }
@@ -876,6 +921,9 @@ struct OfficialRecordSheet: View {
             CombatModifiersForm(character: $character)
             WeaponCombatForm(character: $character)
             ProficienciesForm(character: $character, campaignBinding: campaignBinding)
+            if character.characterClass.hasThievingSkills {
+                ThievingSkillsForm(character: $character)
+            }
         }
         .padding(16)
         .background(Color.white.opacity(0.4))
@@ -949,6 +997,23 @@ struct RecordSheetPagerView: UIViewControllerRepresentable {
         case 2:
             return AnyView(ScrollView { CharacterDescriptionPage(character: $character).padding(18) })
         default:
+            // A 4ª página muda de conteúdo conforme a classe (2026-09-29,
+            // estendido 2026-09-30 pros grupos Warrior e Rogue) — Mago
+            // ganha as tabelas dele (`WizardReferencePage`), o grupo
+            // Warrior (Fighter/Paladin/Ranger) ganha `WarriorReferencePage`,
+            // o grupo Rogue (Thief/Bard/Ninja) ganha `RogueReferencePage`,
+            // e o resto (Clérigo/Druida) fica com as do Clérigo.
+            // `recordSheetPageCount`/`hasReferencePage` já garantem que só
+            // quem tem alguma das quatro chega até aqui.
+            if character.characterClass == .mage {
+                return AnyView(ScrollView { WizardReferencePage(character: character).padding(18) })
+            }
+            if character.characterClass.proficiencyGroup == "Warrior" {
+                return AnyView(ScrollView { WarriorReferencePage(character: character).padding(18) })
+            }
+            if character.characterClass.proficiencyGroup == "Rogue" {
+                return AnyView(ScrollView { RogueReferencePage(character: character).padding(18) })
+            }
             return AnyView(ScrollView { ClericReferencePage(character: character).padding(18) })
         }
     }
@@ -1881,7 +1946,12 @@ private struct RecordHeaderForm: View {
                     }
                     .frame(maxWidth: .infinity)
 
-                    if character.characterClass.hasSpellSheet {
+                    // Esferas de acesso só fazem sentido pro Clérigo — Mago
+                    // usa escola/oposição de escola (TODO.md, fase ainda não
+                    // implementada), não esfera. `hasSpellSheet` sozinho
+                    // (que desde 2026-09-29 também é `true` pro Mago) já não
+                    // basta mais aqui.
+                    if character.characterClass == .cleric {
                         HeaderLine(label: "Spheres") {
                             Button {
                                 isSphereAccessPresented = true
@@ -1894,6 +1964,11 @@ private struct RecordHeaderForm: View {
                         }
                         .fixedSize()
                     }
+
+                    // 2026-09-30: "My Spellbook" do Mago virou folha própria
+                    // (menu ☰, `SheetPage.mySpellbook`), não mais um botão
+                    // aqui no cabeçalho — mesmo lugar de onde já se chega no
+                    // Grimório (Priest Spellbook/Mage Grimoire).
 
                     HeaderLine(label: "Level") {
                         EditableNumber(value: $character.level, size: 17, lower: 0, upper: 30)
@@ -2177,6 +2252,10 @@ private struct ClassPicker: View {
     /// Item 9 do pedido do usuário (2026-09-24): trocar de classe também
     /// resincroniza "Level Changes" — ver `select(_:)` abaixo.
     @EnvironmentObject private var ruleset: RulesetRegistry
+    /// 2026-09-29: vira Mago pela primeira vez já começa com "Read Magic"
+    /// no livro de magias — ver `PlayerCharacter.seedWizardSpellbookIfNeeded(in:)`
+    /// e o comentário grande em `wizardSpellbook`.
+    @EnvironmentObject private var spellbook: SpellDatabase
 
     var body: some View {
         Menu {
@@ -2204,12 +2283,16 @@ private struct ClassPicker: View {
         // resincroniza com `force: true` — a tabela THAC0/Saves da
         // classe anterior não serve mais pra classe nova.
         ConsequenceEngine.refreshLevelChanges(for: &character, registry: ruleset, force: true)
+        // Só entra em ação a primeira vez que o personagem vira Mago (o
+        // guard dentro do método garante isso: `wizardSpellbook.isEmpty`)
+        // — nunca sobrescreve um livro já editado pelo jogador.
+        character.seedWizardSpellbookIfNeeded(in: spellbook)
         guard option.hasSpellSheet, character.spellSheets.isEmpty, let campaignBinding else { return }
         let session = campaignBinding.wrappedValue.activeSession()
         var sheet = SpellSheet()
         sheet.sessionID = session.id
         sheet.title = "First day"
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         sheet.slotBoard = character.freshSlotBoard()
         character.spellSheets = [sheet]
     }
@@ -2976,7 +3059,15 @@ private struct CombatModifiersForm: View {
             if !toHit.contains(where: { $0.name == "Non-proficiency penalty" }) {
                 var penalty = EquipmentItem()
                 penalty.name = "Non-proficiency penalty"
-                penalty.note = character.nonProficiencyPenalty ?? ""
+                // Antes ficava sempre vazio até o jogador digitar o valor à
+                // mão — mas dá pra saber a penalidade só pela classe
+                // (Tabela 34 do PHB, ver `ProficiencySlotsTable`), então
+                // semeia com ela quando não houver nada migrado do campo
+                // antigo. Continua editável depois — não é recalculado se
+                // a classe mudar, mesma lógica de "semear uma vez só" já
+                // usada nesta função pras outras tabelas.
+                penalty.note = character.nonProficiencyPenalty
+                    ?? ProficiencySlotsTable.nonProficiencyPenalty(for: character.characterClass)
                 toHit.insert(penalty, at: 0)
             }
             if toHit.count < 3 {
@@ -2998,6 +3089,7 @@ private struct CombatModifiersForm: View {
 
 private struct WeaponFormRow: View {
     @Binding var weapon: WeaponEntry
+    var characterClass: CharacterClass
     var onDelete: () -> Void
 
     // Mesmo padrão de "tocar no nome" de `ProficiencyFormRow`: linha já
@@ -3017,22 +3109,66 @@ private struct WeaponFormRow: View {
         return weaponDatabase.weapons.first { $0.name == weapon.name }
     }
 
+    /// Weapon Specialization (PHB, conferido contra o Complete Fighter's
+    /// Handbook cap. 4) é exclusividade do Fighter — nunca aparece pra
+    /// Paladin/Ranger/outras classes, mesmo sendo do grupo Warrior.
+    private var isFighter: Bool { characterClass == .fighter }
+    private var isSpecialized: Bool { weapon.isSpecialized ?? false }
+
+    /// Arco/besta especializa diferente de arma corpo-a-corpo (ver
+    /// `toggleSpecialization`): detectado por substring no nome, já que
+    /// não há campo estruturado de "categoria de arma" em `WeaponEntry`.
+    private var isRangedWeapon: Bool {
+        let name = (matchedWeapon?.name ?? weapon.name).lowercased()
+        return name.contains("bow") || name.contains("crossbow")
+    }
+
+    /// Liga/desliga a especialização e, só ao ligar, semeia os campos de
+    /// "Hit/Dmg Adj" — nunca sobrescrevendo o que o jogador já tiver
+    /// escrito (mesma regra documentada no doc-comment de
+    /// `WeaponEntry.isSpecialized`, Models/Character.swift). Corpo-a-corpo:
+    /// +1 pra acertar / +2 de dano. Arco/besta: sem bônus de dano, e o
+    /// +2 pra acertar só vale dentro do alcance "point-blank" — daí o
+    /// "+2*" com o asterisco explicado no rodapé da seção.
+    private func toggleSpecialization() {
+        weapon.isSpecialized = !isSpecialized
+        guard weapon.isSpecialized == true else { return }
+        if isRangedWeapon {
+            if weapon.thac0.isEmpty { weapon.thac0 = "+2*" }
+        } else {
+            if weapon.thac0.isEmpty { weapon.thac0 = "+1" }
+            if (weapon.dmgAdj ?? "").isEmpty { weapon.dmgAdj = "+2" }
+        }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            Button {
-                if matchedWeapon != nil {
-                    showDetail = true
-                } else {
-                    showPicker = true
+            HStack(spacing: 4) {
+                Button {
+                    if matchedWeapon != nil {
+                        showDetail = true
+                    } else {
+                        showPicker = true
+                    }
+                } label: {
+                    Text(weapon.name.isEmpty ? "…" : weapon.name)
+                        .font(Paper.printed(15))
+                        .foregroundStyle(weapon.name.isEmpty ? Paper.inkSoft : Paper.ink)
+                        .lineLimit(1)
                 }
-            } label: {
-                Text(weapon.name.isEmpty ? "…" : weapon.name)
-                    .font(Paper.printed(15))
-                    .foregroundStyle(weapon.name.isEmpty ? Paper.inkSoft : Paper.ink)
-                    .lineLimit(1)
-                    .frame(width: 220, alignment: .leading)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if isFighter {
+                    Button(action: toggleSpecialization) {
+                        Text(isSpecialized ? "★ spec" : "☆ spec")
+                            .font(Paper.printed(9))
+                            .foregroundStyle(isSpecialized ? Paper.ink : Paper.inkSoft)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.plain)
+            .frame(width: 220, alignment: .leading)
             EditableText(value: $weapon.attacks, placeholder: "1", size: 14, underline: false)
                 .frame(width: 40)
             EditableText(value: $weapon.size.orDefault(""), placeholder: "—", size: 14, underline: false)
@@ -3105,9 +3241,77 @@ private struct WeaponCombatForm: View {
     // rolando normalmente, porque aí a rolagem é o comportamento certo).
     private var needsHorizontalScroll: Bool { availableWidth < Self.minTableWidth }
 
+    // MARK: - Weapon Proficiency Slots (2026-09-30)
+    //
+    // Contra-proposta do usuário no lugar da P2 original (um contador
+    // solto, digitado à parte): em vez disso, o próprio ato de listar uma
+    // arma aqui (1 slot, regra já em vigor desde o item 4 do feedback
+    // v1.93) e de marcar a ★ de especialização (`WeaponFormRow.
+    // toggleSpecialization`) já É o gasto de slot — o contador abaixo só
+    // LÊ essas duas coisas e soma contra o total que `ProficiencySlotsTable`
+    // calcula pro nível atual (Tabela 34 + bônus de Inteligência, CFH cap.
+    // 4). Nunca trava nada (mesma filosofia do resto da ficha) — só avisa
+    // em vermelho se o jogador especializar/adicionar arma além do que
+    // tem slot pra pagar.
+
+    /// `true` só quando o nome do texto (arma matched ou digitada à mão)
+    /// é um ARCO que não seja besta — a única categoria que custa 2 slots
+    /// extras pra especializar (besta e corpo-a-corpo custam só 1, ver
+    /// `cfh_ch04_weapon_proficiency_slots`: "any sort of melee weapon or
+    /// crossbow... two slots... any bow (other than a crossbow)...
+    /// three"). Mesma checagem por substring que `WeaponFormRow.
+    /// isRangedWeapon` já usa pro bônus de "point-blank" (lá bow+crossbow
+    /// andam juntos porque os dois ganham o mesmo bônus de acerto; aqui
+    /// eles têm custo DIFERENTE, por isso a checagem é separada).
+    private func isTrueBow(_ name: String) -> Bool {
+        let normalized = name.lowercased()
+        return normalized.contains("bow") && !normalized.contains("crossbow")
+    }
+
+    /// Quantos slots esta linha consome: 1 pela proficiência básica (toda
+    /// arma listada JÁ É uma proficiência, regra de sempre desta tabela) —
+    /// linha vazia não conta nada ainda, não virou proficiência de
+    /// verdade — mais 1 (corpo-a-corpo/besta) ou 2 (arco) se especializada.
+    private func slotCost(_ weapon: WeaponEntry) -> Int {
+        guard !weapon.name.trimmingCharacters(in: .whitespaces).isEmpty else { return 0 }
+        var cost = 1
+        if weapon.isSpecialized == true {
+            cost += isTrueBow(weapon.name) ? 2 : 1
+        }
+        return cost
+    }
+
+    private var spentWeaponSlots: Int {
+        character.weapons.reduce(0) { $0 + slotCost($1) }
+    }
+
+    /// Teto informativo (ver doc de `ProficiencySlotsTable.
+    /// totalWeaponSlots`) — assume que TODO o bônus de Inteligência foi
+    /// pra proficiência de arma, quando na regra do CFH isso é uma escolha
+    /// do jogador que pode ter ido parte pra não-arma.
+    private var totalWeaponSlots: Int {
+        ProficiencySlotsTable.totalWeaponSlots(for: character.characterClass, level: character.level,
+                                                intelligence: character.abilities.intelligence)
+    }
+
+    private var isOverspent: Bool { spentWeaponSlots > totalWeaponSlots }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            FormSectionTitle(text: "Weapon Combat")
+            FormSectionTitle(text: "Weapon Combat", ruleID: "phb_ch05_weapon_proficiencies")
+
+            // Item 4 do feedback do usuário (2026-09-30): "onde eu
+            // adiciono as Weapon Proficiencies?" — resposta é AQUI: cada
+            // arma listada abaixo já É a proficiência (o app nunca teve
+            // uma lista separada de "slots de proficiência de arma" — só
+            // a seção "Proficiencies", mais abaixo, que é só de
+            // NÃO-armas). Uma linha curta deixa isso explícito, porque a
+            // tabela sozinha não deixava óbvio.
+            Text("Weapons listed here ARE your Weapon Proficiencies — add one per weapon you know. Untrained weapon? Leave it off this table, or use the Non-proficiency penalty below.")
+                .font(Paper.printedItalic(10))
+                .foregroundStyle(Paper.inkSoft)
+                .padding(.horizontal, 4)
+
             ScrollView(.horizontal, showsIndicators: true) {
                 VStack(spacing: 0) {
                     HStack(spacing: 0) {
@@ -3130,7 +3334,7 @@ private struct WeaponCombatForm: View {
                     .overlay(alignment: .bottom) { Rectangle().fill(Paper.ink).frame(height: 1.2) }
 
                     ForEach($character.weapons) { $weapon in
-                        WeaponFormRow(weapon: $weapon, onDelete: {
+                        WeaponFormRow(weapon: $weapon, characterClass: character.characterClass, onDelete: {
                             character.weapons.removeAll { $0.id == weapon.id }
                         })
                     }
@@ -3145,6 +3349,51 @@ private struct WeaponCombatForm: View {
                 character.weapons.append(WeaponEntry())
             }
             .padding(.horizontal, 4)
+
+            // Contador de Weapon Proficiency Slots (2026-09-30) — pra
+            // QUALQUER classe (toda classe tem Tabela 34, não só Fighter):
+            // soma quantos slots as armas listadas acima + as ★ marcadas já
+            // consomem, contra o total que o nível/Inteligência do
+            // personagem já garantem. Fica vermelho se passar do total —
+            // nunca trava nada, só avisa (mesma filosofia do resto da
+            // ficha: a régua existe, ninguém é impedido de escrever o que
+            // quiser nela).
+            HStack(spacing: 4) {
+                Text("Weapon Proficiency Slots: \(spentWeaponSlots)/\(totalWeaponSlots) used")
+                    .font(Paper.printed(10))
+                    .foregroundStyle(isOverspent ? Paper.redInk : Paper.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                RuleLinkButton(ruleID: "phb_ch05_proficiencies")
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 2)
+
+            // Nota de Weapon Specialization (2026-09-30) — só aparece pro
+            // Fighter, já que Paladin/Ranger nunca podem especializar (regra
+            // conferida no Complete Fighter's Handbook cap. 4, "Single-Weapon
+            // Proficiency, Weapon Specialization", enviado pelo usuário).
+            //
+            // Era um parágrafo inteiro em fonte 10 — usuário reclamou que
+            // ficava ilegível (item 2 do feedback, 2026-09-30). Virou uma
+            // linha curta com o essencial, mais o botão "?" de sempre
+            // (`RuleLinkButton`) abrindo o texto completo do CFH em
+            // `RuleDetailSheet` — que já usa fonte de leitura normal, não a
+            // miniatura de rodapé. O custo em slots (1 extra corpo-a-corpo/
+            // besta, 2 extra arco) já está refletido no contador acima —
+            // esta linha só explica O QUE a ★ faz mecanicamente (acerto/dano).
+            if character.characterClass == .fighter {
+                HStack(spacing: 4) {
+                    Text("★ spec: melee/crossbow +1/+2 dmg (1 slot extra) · bow point-blank +2 (2 slots extra)")
+                        .font(Paper.printed(10))
+                        .foregroundStyle(Paper.inkSoft)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                    RuleLinkButton(ruleID: "cfh_ch04_weapon_proficiency_slots")
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+            }
         }
     }
 }
@@ -3285,6 +3534,15 @@ private struct ProficienciesForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             FormSectionTitle(text: "Proficiencies", ruleID: "phb_ch05_proficiencies")
+            // Item 4 do feedback (2026-09-30): reforça, do lado de fora da
+            // tabela, que esta lista é só de Nonweapon Proficiencies — as
+            // de arma vivem na tabela "Weapon Combat" logo acima (ver nota
+            // lá). Sem essa linha o título sozinho ("Proficiencies") não
+            // deixava claro que era só metade da história.
+            Text("Nonweapon only — Weapon Proficiencies are the weapons listed above, in Weapon Combat.")
+                .font(Paper.printedItalic(10))
+                .foregroundStyle(Paper.inkSoft)
+                .padding(.horizontal, 4)
             HStack(alignment: .top, spacing: 10) {
                 ProficiencyColumn(items: items, column: 0, abilities: character.abilities, campaign: campaign,
                                    characterClass: character.characterClass)
@@ -3310,6 +3568,102 @@ private struct ProficienciesForm: View {
             guard character.proficiencies?.isEmpty ?? true else { return }
             character.proficiencies = (0..<6).map { _ in ProficiencyEntry() }
         }
+    }
+}
+
+// MARK: - Thieving Skills (grupo Rogue: Thief/Bard/Ninja)
+
+/// Seção nova (2026-09-30) só pra quem tem `hasThievingSkills` — uma
+/// habilidade por linha, nome fixo (não editável, vem de
+/// `ThievingSkillsTable.skills(for:)`), um único campo de % livre.
+/// Semeada uma vez com Base+Raça+Destreza (`ThievingSkillsTable.seedTotal`)
+/// quando a lista nasce ou quando a classe muda pra uma do grupo Rogue
+/// (ver `onChange` abaixo) — nunca recalculada depois disso, mesmo padrão
+/// de "semear sem atropelar" do resto do app. O ajuste de armadura (Table
+/// 29/Table 5) fica de fora do cálculo — o app não sabe o TIPO de armadura
+/// vestida, só o valor de AC (ver doc de `ThievingSkillsTable`) — e vem
+/// como tabela de consulta na 4ª página (`RogueReferencePage`).
+private struct ThievingSkillsForm: View {
+    @Binding var character: PlayerCharacter
+
+    private var items: Binding<[ThievingSkillEntry]> { $character.thievingSkills.orInit([]) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            FormSectionTitle(text: "Thieving Skills", ruleID: "phb_ch03_thief_skill_explanations")
+            Text("Base + race + Dexterity, seeded once — add your per-level discretionary points and any armor adjustment (see the Rogue Reference page) by hand.")
+                .font(Paper.printedItalic(10))
+                .foregroundStyle(Paper.inkSoft)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Text("Skill").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("%").frame(width: 56)
+                }
+                .font(Paper.printed(11))
+                .lineLimit(1)
+                .foregroundStyle(Paper.ink)
+                .padding(4)
+                .overlay(alignment: .bottom) { Rectangle().fill(Paper.ink).frame(height: 1) }
+
+                ForEach(items) { $entry in
+                    HStack(spacing: 0) {
+                        Text(entry.skill)
+                            .font(Paper.printed(13))
+                            .foregroundStyle(Paper.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        EditableText(value: $entry.value, placeholder: "—", size: 13, underline: false)
+                            .frame(width: 56)
+                    }
+                    .padding(.vertical, 3)
+                    .padding(.horizontal, 4)
+                    .overlay(alignment: .bottom) { DottedRule() }
+                }
+            }
+            .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.1))
+
+            if character.characterClass == .thief || character.characterClass == .ninja {
+                HStack(spacing: 4) {
+                    Text("Backstab at level \(character.level): \(ThievingSkillsTable.backstabMultiplier(level: character.level)) damage")
+                        .font(Paper.printed(10))
+                        .foregroundStyle(Paper.inkSoft)
+                    RuleLinkButton(ruleID: "phb_ch03_rogue_tables")
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        // Semeia quando a lista de skills esperada pra classe atual ainda
+        // não bate com o que está salvo — cobre tanto "ficha nova" quanto
+        // "acabou de trocar pra uma classe do grupo Rogue" (ex. virou
+        // Bard), sem nunca reescrever uma linha que já existe com o mesmo
+        // nome (o jogador pode ter editado `value` à mão).
+        .onAppear { seedIfNeeded() }
+        .onChange(of: character.characterClass) { _, _ in seedIfNeeded() }
+    }
+
+    private func seedIfNeeded() {
+        let expected = ThievingSkillsTable.skills(for: character.characterClass)
+        guard !expected.isEmpty else { return }
+        var current = character.thievingSkills ?? []
+        let existingNames = Set(current.map(\.skill))
+        guard existingNames != Set(expected) else { return }
+        // Troca de classe dentro do grupo Rogue (ex. Thief → Bard): tira
+        // as linhas que não pertencem mais à nova classe e acrescenta as
+        // que faltam, preservando o valor de quem já existia e continua
+        // valendo (ex. "Pick Pockets" existe pras três classes).
+        current.removeAll { !expected.contains($0.skill) }
+        for skill in expected where !current.contains(where: { $0.skill == skill }) {
+            let seeded = ThievingSkillsTable.seedTotal(skill: skill, characterClass: character.characterClass,
+                                                        race: character.race, dexterity: character.abilities.dexterity)
+            current.append(ThievingSkillEntry(skill: skill, value: seeded))
+        }
+        // Mantém a ordem canônica de `expected` em vez da ordem de
+        // inserção (que ficaria com as linhas novas todas no fim).
+        current.sort { (expected.firstIndex(of: $0.skill) ?? 0) < (expected.firstIndex(of: $1.skill) ?? 0) }
+        character.thievingSkills = current
     }
 }
 

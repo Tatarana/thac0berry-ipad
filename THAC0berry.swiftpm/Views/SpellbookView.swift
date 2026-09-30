@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// O Grimório: uma tela própria pra navegar a base inteira de magias de
-/// Priest, sem estar presa ao fluxo de "memorizar num slot" — pra folhear
-/// em busca de opções, tipo consultando o livro na mesa (ver TODO.md
-/// item 6). Agrupada por círculo com títulos recolhíveis (mesmo padrão do
-/// "old sessions" em `CampaignIndexView`), com busca e favoritos.
+/// Priest OU Mago (`caster`, 2026-09-29 — antes só existia o de Priest;
+/// ver `CompendiumHubView`, que agora abre os dois), sem estar presa ao
+/// fluxo de "memorizar num slot" — pra folhear em busca de opções, tipo
+/// consultando o livro na mesa (ver TODO.md item 6). Agrupada por círculo
+/// com títulos recolhíveis (mesmo padrão do "old sessions" em
+/// `CampaignIndexView`), com busca e favoritos.
 struct SpellbookView: View {
     /// `nil` quando o Grimório é aberto direto da tela inicial — sem
     /// personagem nenhum associado, é puro livro de consulta. Favoritar
@@ -13,6 +15,11 @@ struct SpellbookView: View {
     /// por isso a estrela continua aparecendo mesmo sem `character`
     /// nenhum; só serve pra destacar a magia atual quando existe uma.
     var character: Binding<PlayerCharacter>? = nil
+    /// Qual grimório: `.divine` (Priest, padrão de sempre) ou `.arcane`
+    /// (Mago). Muda o título, o rótulo de círculo 0/8/9+, o filtro
+    /// (Esfera vs. Escola) e a lista de base (`spheres` vs. `schools`) —
+    /// o resto da tela (busca, favoritos, cenário) é idêntico pros dois.
+    var caster: CasterType = .divine
     @EnvironmentObject private var spellbook: SpellDatabase
     @EnvironmentObject private var library: CharacterLibrary
 
@@ -62,6 +69,9 @@ struct SpellbookView: View {
                         isFavorite: { library.isFavorite($0) },
                         onToggleExpand: { toggleExpand(group.level) },
                         onToggleFavorite: { library.toggleFavorite($0) },
+                        wizardSpellbookEligible: wizardSpellbookMaxCircle == nil ? nil : isEligibleForWizardSpellbook,
+                        isInWizardSpellbook: wizardSpellbookMaxCircle == nil ? nil : { character?.wrappedValue.wizardKnows(spellID: $0) ?? false },
+                        onToggleWizardSpellbook: wizardSpellbookMaxCircle == nil ? nil : toggleWizardSpellbook,
                         onSelect: { detailSpell = $0 }
                     )
                 }
@@ -80,13 +90,59 @@ struct SpellbookView: View {
     /// porque deixa a intenção clara nos outros lugares que checam isso.
     private var favoritesEnabled: Bool { true }
 
+    private var casterSpells: [Spell] { spellbook.spells.filter { $0.caster == caster } }
+
+    private var grimoireTitle: String {
+        guard caster == .arcane else { return "Priest Spellbook" }
+        return character?.wrappedValue.characterClass == .bard ? "Bard Grimoire" : "Mage Grimoire"
+    }
+
+    /// `nil` esconde o botão "+"/"✓" de livro pessoal por completo — só
+    /// existe quando há um Mago OU Bardo aberto (não faz sentido pro
+    /// Clérigo, cuja esfera nunca bloqueia, nem pro Grimório aberto solto
+    /// da Home sem personagem nenhum). Estendido pro Bardo em 2026-09-30
+    /// (`CharacterClass.isArcaneCaster`) — mesmo livro, mesma restrição.
+    /// Quando existe, é o maior círculo que ele já consegue lançar agora —
+    /// só circles até esse teto ganham o botão (pedido do usuário
+    /// 2026-09-30: "restringe as escolhas de magias"), os de circle maior
+    /// aparecem na lista pra consulta, sem o botão.
+    private var wizardSpellbookMaxCircle: Int? {
+        guard caster == .arcane, let character, character.wrappedValue.characterClass.isArcaneCaster else { return nil }
+        return character.wrappedValue.wizardMaxKnowableCircle
+    }
+
+    /// Igual de verdade ao que decide se a magia entra no livro pessoal:
+    /// dentro do círculo alcançável (`wizardSpellbookMaxCircle`) E não
+    /// oposta pela especialização de escola atual (PHB Table 22,
+    /// 2026-09-30) — `PlayerCharacter.isSpellOpposedBySchool`. Fora
+    /// disso, a magia continua na lista pra consulta, só sem o botão.
+    private func isEligibleForWizardSpellbook(_ spell: Spell) -> Bool {
+        guard let maxCircle = wizardSpellbookMaxCircle, spell.level <= maxCircle else { return false }
+        return !(character?.wrappedValue.isSpellOpposedBySchool(spell) ?? true)
+    }
+
+    private func toggleWizardSpellbook(_ spellID: String) {
+        guard let character else { return }
+        if character.wrappedValue.wizardKnows(spellID: spellID) {
+            character.wrappedValue.wizardSpellbook.removeAll { $0.matchedSpellID == spellID }
+        } else if let spell = spellbook.spell(id: spellID) {
+            character.wrappedValue.wizardSpellbook.append(
+                WizardSpellbookEntry(name: spell.name, matchedSpellID: spell.id, level: nil))
+        }
+    }
+
+    /// "Mage Grimoire"/"Bard Grimoire"/"Priest Spellbook" — o Grimório
+    /// arcano (`caster == .arcane`) é a MESMA base de magias pro Mago e
+    /// pro Bardo (ele lança magia de mago — ver `BardTables`), então o
+    /// título só muda conforme a classe de quem abriu a tela; sem
+    /// personagem (Grimório solto da Home) cai no genérico "Mage Grimoire".
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Priest Spellbook")
+                Text(grimoireTitle)
                     .font(Paper.hand(30))
                     .foregroundStyle(Paper.penInk)
-                Text("\(filtered.count) of \(allDivineSpells.count) spells")
+                Text("\(filtered.count) of \(casterSpells.count) spells")
                     .font(Paper.printedItalic(12))
                     .foregroundStyle(Paper.inkSoft)
             }
@@ -115,8 +171,8 @@ struct SpellbookView: View {
     private var filtersRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                filterMenu(title: "Sphere", selection: $sphereFilter, options: availableSpheres,
-                          allLabel: "All Spheres")
+                filterMenu(title: axisTitle, selection: $sphereFilter, options: availableAxisValues,
+                          allLabel: "All \(axisTitle)s")
 
                 Spacer()
 
@@ -193,22 +249,29 @@ struct SpellbookView: View {
 
     // MARK: - Dados derivados
 
-    /// Toda a base de Priest (não mostra as poucas magias de mago que
-    /// existem na base de exemplo — o Grimório é só de sacerdote).
-    private var allDivineSpells: [Spell] {
-        spellbook.spells.filter { $0.caster == .divine }
+    /// Título do filtro de eixo — "Sphere" pro Priest, "School" pro Mago
+    /// (a mesma ideia mecânica: um jeito de restringir a lista por um
+    /// atributo da magia além de nível/cenário).
+    private var axisTitle: String { caster == .arcane ? "School" : "Sphere" }
+
+    /// Esfera (Priest) ou escola (Mago) de uma magia — os dois eixos
+    /// vivem em campos `Spell` diferentes (`spheres`/`schools`) porque só
+    /// fazem sentido pra um dos dois casters; esta função escolhe o certo
+    /// conforme `caster`.
+    private func axisValues(for spell: Spell) -> [String] {
+        caster == .arcane ? spell.schools : spell.spheres
     }
 
-    /// Lista de esferas/cenários vem sempre da base INTEIRA de Priest, não
-    /// da lista já filtrada — senão o menu de opções ficaria mudando de
-    /// tamanho (ou sumindo opção) conforme outro filtro fosse aplicado,
-    /// o que confunde mais do que ajuda.
-    private var availableSpheres: [String] {
-        Set(allDivineSpells.flatMap(\.spheres)).sorted()
+    /// Lista de esferas/escolas/cenários vem sempre da base INTEIRA do
+    /// caster escolhido, não da lista já filtrada — senão o menu de
+    /// opções ficaria mudando de tamanho (ou sumindo opção) conforme
+    /// outro filtro fosse aplicado, o que confunde mais do que ajuda.
+    private var availableAxisValues: [String] {
+        Set(casterSpells.flatMap(axisValues)).sorted()
     }
 
     private var availableSettings: [String] {
-        Set(allDivineSpells.compactMap(\.setting)).sorted()
+        Set(casterSpells.compactMap(\.setting)).sorted()
     }
 
     /// "Generic" (ver `CampaignSettingCatalog.isGeneric`) nunca some da
@@ -226,14 +289,14 @@ struct SpellbookView: View {
     }
 
     private var filtered: [Spell] {
-        var list = allDivineSpells
+        var list = casterSpells
 
         if favoritesOnly {
             list = list.filter { library.isFavorite($0.id) }
         }
 
         if !sphereFilter.isEmpty {
-            list = list.filter { !Set($0.spheres).isDisjoint(with: sphereFilter) }
+            list = list.filter { !Set(axisValues(for: $0)).isDisjoint(with: sphereFilter) }
         }
 
         if !settingFilter.isEmpty {
@@ -263,7 +326,8 @@ struct SpellbookView: View {
         let substringMatches = list.filter { $0.normalizedName.contains(normalizedQuery) }
         if !substringMatches.isEmpty { return substringMatches }
 
-        let fuzzyIDs = Set(spellbook.matches(for: trimmed, limit: 50, minimumScore: 0.55).map(\.spell.id))
+        let fuzzyIDs = Set(spellbook.matches(for: trimmed, limit: 50, minimumScore: 0.55, caster: caster)
+            .map(\.spell.id))
         return list.filter { fuzzyIDs.contains($0.id) }
     }
 
@@ -276,7 +340,20 @@ struct SpellbookView: View {
         }
     }
 
+    /// Priest usa "Orisons" (nível 0), "Quest Spells" (nível 8, tier
+    /// próprio dos livros de sacerdote) e "High-Level / Epic" a partir do
+    /// 9. Mago usa "Cantrips" (nível 0) e magias padrão até o nível 9 —
+    /// só o tier 10 (a base convertida por `convert_wizard_spells.py`,
+    /// que junta 10th Level/Netherese e True Dweomer num arquivo só) cai
+    /// em "High-Level / Epic".
     private func levelLabel(_ level: Int) -> String {
+        if caster == .arcane {
+            switch level {
+            case 0: return "Cantrips"
+            case 10...: return "High-Level / Epic (tier \(level))"
+            default: return "Level \(level)"
+            }
+        }
         switch level {
         case 0: return "Orisons"
         case 8: return "Quest Spells"
@@ -420,6 +497,14 @@ private struct LevelSection: View {
     let isFavorite: (String) -> Bool
     let onToggleExpand: () -> Void
     let onToggleFavorite: (String) -> Void
+    /// `nil` esconde o botão de livro pessoal pra TODA a seção (Clérigo,
+    /// ou Grimório sem personagem) — ver `SpellbookView.wizardSpellbookMaxCircle`.
+    /// Quando existe, só as magias elegíveis (círculo alcançável E escola
+    /// não oposta — `SpellbookView.isEligibleForWizardSpellbook`) ganham
+    /// o botão; as demais ficam visíveis pra consulta, sem ele.
+    let wizardSpellbookEligible: ((Spell) -> Bool)?
+    let isInWizardSpellbook: ((String) -> Bool)?
+    let onToggleWizardSpellbook: ((String) -> Void)?
     let onSelect: (Spell) -> Void
 
     var body: some View {
@@ -442,9 +527,12 @@ private struct LevelSection: View {
                 // o tempo.
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(spells) { spell in
+                        let reachable = wizardSpellbookEligible?(spell) ?? false
                         SpellPaperRow(spell: spell, style: .compact,
                                       isFavorite: favoritesEnabled ? isFavorite(spell.id) : nil,
-                                      onToggleFavorite: favoritesEnabled ? { onToggleFavorite(spell.id) } : nil) {
+                                      onToggleFavorite: favoritesEnabled ? { onToggleFavorite(spell.id) } : nil,
+                                      isInWizardSpellbook: reachable ? isInWizardSpellbook?(spell.id) : nil,
+                                      onToggleWizardSpellbook: reachable ? { onToggleWizardSpellbook?(spell.id) } : nil) {
                             onSelect(spell)
                         }
                     }

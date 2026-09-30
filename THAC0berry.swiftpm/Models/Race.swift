@@ -145,6 +145,15 @@ enum RaceOption: String, CaseIterable, Identifiable, Hashable {
             case .cleric: return .upTo(10)
             case .fighter: return .upTo(15)
             case .thief: return .upTo(12)
+            // Ninja (Complete Ninja's Handbook, 2026-09-30): "Races
+            // Allowed: Human, Dwarf, Halfling" — sem número de Table 7
+            // pro ninja no texto-fonte enviado pelo usuário (o PHB nunca
+            // teve ninja pra começo de conversa), então `.unlimited` em
+            // vez de inventar um teto — só marca que a raça É permitida,
+            // o mesmo "default: .forbidden" abaixo já cobria Elf/Gnome/
+            // Half-Elf corretamente (CNH: "There are no demihuman ninja
+            // clans").
+            case .ninja: return .unlimited
             default: return .forbidden
             }
         case .elf:
@@ -179,6 +188,10 @@ enum RaceOption: String, CaseIterable, Identifiable, Hashable {
             case .cleric: return .upTo(8)
             case .fighter: return .upTo(9)
             case .thief: return .upTo(15)
+            // Ver comentário no case .ninja de `.dwarf` acima — mesmo
+            // raciocínio, Halfling também está na lista de raças
+            // permitidas do Complete Ninja's Handbook.
+            case .ninja: return .unlimited
             default: return .forbidden
             }
         }

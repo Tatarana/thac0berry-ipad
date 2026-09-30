@@ -15,5 +15,7 @@ struct CoreRuleset: RulesetModule {
         Thac0ByLevelProvider(),
         SavingThrowsByLevelProvider(),
         PriestSpellSlotsProvider(),
+        WizardSpellSlotsProvider(),
+        BardSpellSlotsProvider(),
     ] + AbilityDetailProviders.all
 }

@@ -1,12 +1,23 @@
 import SwiftUI
 
-/// Tela de consulta da base de Kits de sacerdote — mesmo espírito do
-/// `SpellbookView` (ver TODO.md item 9): folhear a base inteira, sem estar
-/// presa a nenhum personagem. Agrupada por `classEligibility.subclass`
-/// ("Cleric"/"Druid"/"Any Priest"/"Specialty Priest") em vez de por
+/// Tela de consulta da base de Kits — mesmo espírito do `SpellbookView`
+/// (ver TODO.md item 9): folhear a base inteira, sem estar presa a nenhum
+/// personagem. Agrupada por `classEligibility.subclass` em vez de por
 /// círculo — é a divisão que já vem pronta nos dados e é a mais útil pra
 /// achar um kit rápido (jogador de Druid não quer folhear os de Cleric).
+///
+/// Generalizada (2026-09-29) com `classGroup` pra também servir os 41
+/// kits de mago (`classEligibility.classGroup == "Wizard"`, ver
+/// `Scripts/convert_wizard_kits.py`) do mesmo jeito que `SpellbookView`
+/// ganhou `caster` quando o Grimório do Mago foi criado — mesmo array
+/// `kitDatabase.kits` (sacerdote + mago juntos, um só arquivo
+/// `kits.json`), só filtrado por classe aqui na view. `classGroup: nil`
+/// (usado só internamente, nunca pelas duas telas públicas) mostraria os
+/// dois grupos misturados — não usado hoje, mas mantido como
+/// possibilidade barata caso um "todos os kits" faça sentido depois.
 struct KitCompendiumView: View {
+    var classGroup: String = "Priest"
+
     @EnvironmentObject private var kitDatabase: KitDatabase
 
     @State private var query: String = ""
@@ -52,10 +63,10 @@ struct KitCompendiumView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Priest Kits")
+            Text("\(classGroup) Kits")
                 .font(Paper.hand(30))
                 .foregroundStyle(Paper.penInk)
-            Text("\(filtered.count) of \(kitDatabase.kits.count) kits")
+            Text("\(filtered.count) of \(classScopedKits.count) kits")
                 .font(Paper.printedItalic(12))
                 .foregroundStyle(Paper.inkSoft)
         }
@@ -67,20 +78,34 @@ struct KitCompendiumView: View {
 
     // MARK: - Dados derivados
 
+    /// `kitDatabase.kits` restrito a este `classGroup` — sacerdote e mago
+    /// compartilham o mesmo array/arquivo (ver comentário no topo do
+    /// arquivo), então toda busca/agrupamento abaixo parte daqui em vez
+    /// da base inteira.
+    private var classScopedKits: [Kit] {
+        kitDatabase.kits.filter { $0.classEligibility.classGroup == classGroup }
+    }
+
     /// Ordem fixa em vez de alfabética — é a leitura mais natural pra
     /// quem já sabe qual grupo procura (Cleric/Druid primeiro, os
     /// sacerdotes especializados por último por serem de longe o grupo
-    /// maior, 57 dos 91 kits).
-    private static let groupOrder = ["Cleric", "Druid", "Any Priest", "Specialty Priest"]
+    /// maior, 57 dos 91 kits de sacerdote). Kit de mago tem um grupo só
+    /// hoje (`"Wizard"` — os dados de origem não distinguem generalista
+    /// de especialista aqui), então essa lista nem entra em jogo pra ele.
+    private static let priestGroupOrder = ["Cleric", "Druid", "Any Priest", "Specialty Priest"]
+
+    private var groupOrder: [String] {
+        classGroup == "Priest" ? Self.priestGroupOrder : ["Wizard"]
+    }
 
     private var filtered: [Kit] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return kitDatabase.kits }
+        guard !trimmed.isEmpty else { return classScopedKits }
 
         let normalizedQuery = Fuzzy.normalize(trimmed)
-        guard !normalizedQuery.isEmpty else { return kitDatabase.kits }
+        guard !normalizedQuery.isEmpty else { return classScopedKits }
 
-        return kitDatabase.kits.filter { kit in
+        return classScopedKits.filter { kit in
             Fuzzy.normalize(kit.name).contains(normalizedQuery)
                 || (kit.deity.map { Fuzzy.normalize($0).contains(normalizedQuery) } ?? false)
                 || (kit.titleInChurch.map { Fuzzy.normalize($0).contains(normalizedQuery) } ?? false)
@@ -91,7 +116,7 @@ struct KitCompendiumView: View {
 
     private var groupedKits: [SubclassGroup] {
         let bySubclass = Dictionary(grouping: filtered, by: { $0.classEligibility.subclass })
-        return Self.groupOrder.compactMap { subclass in
+        return groupOrder.compactMap { subclass in
             guard let kits = bySubclass[subclass], !kits.isEmpty else { return nil }
             return SubclassGroup(subclass: subclass, kits: kits.sorted { $0.name < $1.name })
         }
@@ -257,7 +282,20 @@ struct KitDetailSheet: View {
                             if let races = kit.mechanics.requirements.races {
                                 KitDetailField(label: "Races", value: races)
                             }
-                            KitDetailField(label: "Turn Undead", value: turnUndeadText)
+                            // "Turn Undead" só faz sentido pra kit de
+                            // sacerdote — pros 41 kits de mago
+                            // (2026-09-29), `turnUndead` vem sintetizado
+                            // como "not_applicable" (ver
+                            // `Scripts/convert_wizard_kits.py`) só pra
+                            // manter `Kit.swift` uniforme; a UI esconde o
+                            // campo em vez de mostrar um "Turn Undead: No"
+                            // sem sentido nenhum num kit de mago.
+                            if kit.classEligibility.classGroup == "Priest" {
+                                KitDetailField(label: "Turn Undead", value: turnUndeadText)
+                            }
+                            if let slots = kit.mechanics.weaponSlots, slots.hasContent {
+                                KitDetailField(label: "Weapon Slots", value: weaponSlotsText(slots))
+                            }
                             KitDetailField(label: "Source", value: kit.sourceBook)
                         }
 
@@ -319,6 +357,14 @@ struct KitDetailSheet: View {
 
     private var turnUndeadText: String {
         kit.mechanics.turnUndead.capable ? kit.mechanics.turnUndead.mode.capitalized : "No"
+    }
+
+    private func weaponSlotsText(_ slots: KitWeaponSlotRules) -> String {
+        var parts: [String] = []
+        if let initial = slots.initial { parts.append("\(initial) initial") }
+        if let additional = slots.additional { parts.append("+\(additional) per level") }
+        if let penalty = slots.nonproficiencyPenalty { parts.append("\(penalty) nonproficiency") }
+        return parts.isEmpty ? "—" : parts.joined(separator: ", ")
     }
 
     @ViewBuilder
@@ -461,16 +507,30 @@ struct KitPickerSheet: View {
         }
     }
 
-    /// Diferencia "essa classe não tem kit nenhum" (ex. Fighter/Mage/Thief
-    /// — nenhum kit de sacerdote se aplica) de "sua busca não achou nada" —
-    /// mensagens genéricas de "sem resultado" confundem quando a causa é a
-    /// classe escolhida, não o texto digitado.
+    /// Diferencia "essa classe não tem kit nenhum (ainda)" de "sua busca
+    /// não achou nada" — mensagens genéricas de "sem resultado" confundem
+    /// quando a causa é a classe escolhida, não o texto digitado.
+    ///
+    /// Corrigido em 2026-09-30 (item 1 do feedback do usuário): a mensagem
+    /// antiga ("priest kits only apply to Cleric and Druid") já estava
+    /// desatualizada mesmo antes do Warrior — Mago tem 41 kits próprios
+    /// desde a v1.87 e a frase não mencionava isso. Pior ainda pro grupo
+    /// Warrior (Fighter/Paladin/Ranger): a base não tem NENHUM kit deles
+    /// ainda (só zip de regras em prosa foi entregue — o JSON estruturado
+    /// dos kits fica pro usuário mandar depois, ver TODO.md v1.92), então a
+    /// frase de "só Cleric e Druid" ficava simplesmente errada pra essa
+    /// classe — e foi a causa do item 5 ("não consegui escolher o kit de
+    /// Barbarian"): a lista realmente está vazia, só a explicação estava
+    /// enganosa.
     private var emptyMessage: String {
         let unfilteredByClass = kitDatabase.kits(allowedFor: className)
-        if unfilteredByClass.isEmpty, let className {
-            return "\(className) has no priest kits — priest kits only apply to Cleric and Druid."
+        guard unfilteredByClass.isEmpty, let className else {
+            return "No kits match — try a different search."
         }
-        return "No kits match — try a different search."
+        if let charClass = CharacterClass(rawValue: className), charClass.proficiencyGroup == "Warrior" {
+            return "\(className) kits (including Barbarian) aren't in the compendium yet — the Warrior sourcebooks only came with rules text, not kit stat blocks. They'll show up here once that data is added."
+        }
+        return "\(className) has no kits in the compendium yet."
     }
 }
 

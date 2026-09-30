@@ -12,7 +12,12 @@ enum CoreClassGroup: String, Hashable {
     case rogue = "Rogue"
 
     /// Fighter/Paladin/Ranger → Warrior; Mage → Wizard; Cleric/Druid →
-    /// Priest; Thief/Bard → Rogue — o agrupamento padrão do livro.
+    /// Priest; Thief/Bard/Ninja → Rogue — o agrupamento padrão do livro.
+    /// Ninja entra aqui (2026-09-30) sem risco de dado inventado: Table
+    /// 53/60 do PHB já são organizadas por ESTE agrupamento genérico, não
+    /// por classe específica, e o próprio Complete Ninja's Handbook diz
+    /// que "Ninja earn experience levels as other rogues do" — THAC0/Saves
+    /// do ninja são, por definição, os mesmos do grupo Rogue.
     init(_ characterClass: CharacterClass) {
         switch characterClass {
         case .fighter, .paladin, .ranger:
@@ -21,7 +26,7 @@ enum CoreClassGroup: String, Hashable {
             self = .wizard
         case .cleric, .druid:
             self = .priest
-        case .thief, .bard:
+        case .thief, .bard, .ninja:
             self = .rogue
         }
     }

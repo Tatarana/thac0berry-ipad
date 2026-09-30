@@ -72,7 +72,7 @@ struct CampaignIndexView: View {
         // chronological list of sheets.
         sheet.date = date
         sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         sheet.slotBoard = character.freshSlotBoard()
         character.spellSheets.append(sheet)
 
@@ -164,7 +164,7 @@ struct CampaignIndexView: View {
         var sheet = SpellSheet()
         sheet.sessionID = session.id
         sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.abilities.wisdom
+        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
         sheet.slotBoard = character.freshSlotBoard()
         character.spellSheets.append(sheet)
         page = .spells(sheet.id)

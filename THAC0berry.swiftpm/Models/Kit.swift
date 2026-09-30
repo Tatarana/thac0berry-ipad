@@ -158,6 +158,30 @@ struct KitMechanics: Codable, Hashable {
     /// já vem com o multiplicador embutido (ex.: "3d6x10") em vez de dado +
     /// fator separados, sem padrão fixo o bastante pra valer estruturar.
     let startingCash: String?
+    /// Só preenchido pros 18 dos 41 kits de mago (2026-09-29,
+    /// `Scripts/convert_wizard_kits.py`) que têm progressão de slot de
+    /// arma diferente da tabela padrão da classe — `nil` pro resto (kit
+    /// de sacerdote nunca tem isso, nem a maioria dos de mago). Campo
+    /// `Optional` de verdade (não um array com valor padrão, que foi o
+    /// bug do `Spell.schools` — ver `Store/SpellDatabase.swift`): o
+    /// `Codable` sintetizado já trata `Optional` como `decodeIfPresent`
+    /// sozinho, então uma chave ausente no JSON não quebra o decode.
+    var weaponSlots: KitWeaponSlotRules? = nil
+}
+
+struct KitWeaponSlotRules: Codable, Hashable {
+    let initial: Int?
+    let additional: Int?
+    /// Texto livre porque já vem com o sinal embutido no arquivo de
+    /// origem (ex. "-5"), não um número puro.
+    let nonproficiencyPenalty: String?
+
+    /// `false` pros 23 dos 41 kits de mago cujo `weaponSlots` de origem
+    /// tinha os três campos `null` (sem regra própria) — `convert_wizard_kits.py`
+    /// já filtra a maioria desses na conversão, mas confere nulo de novo
+    /// aqui por segurança, já que exibir um campo "Weapon Slots" vazio na
+    /// UI seria pior que não mostrar nada.
+    var hasContent: Bool { initial != nil || additional != nil || nonproficiencyPenalty != nil }
 }
 
 struct KitRequirements: Codable, Hashable {

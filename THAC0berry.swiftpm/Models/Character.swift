@@ -179,6 +179,24 @@ struct SpellSlotAllotment: Codable, Identifiable, Hashable {
     var count: Int
 }
 
+/// Uma entrada do livro de magias do Mago (2026-09-29 — ver `PlayerCharacter.
+/// wizardSpellbook` pro porquê disso ser um bloqueio de verdade, não um
+/// sinal). Mesma ideia de "nome + id opcional da base" já usada em
+/// `ItemSpellUse`/`SpellLogEntry`: uma magia homebrew ou achada num
+/// pergaminho em jogo, sem entrada na base embutida, também pode entrar no
+/// livro — só fica sem descrição completa disponível.
+struct WizardSpellbookEntry: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var name: String = ""
+    /// Id da base embutida, quando reconhecida — usado pra achar círculo/
+    /// escola/descrição de verdade.
+    var matchedSpellID: String? = nil
+    /// Círculo — só precisa vir preenchido quando `matchedSpellID == nil`
+    /// (sem entrada na base pra ler o círculo de lá); `nil` quando bate
+    /// com a base, o círculo real é sempre `Spell.level`, nunca este campo.
+    var level: Int? = nil
+}
+
 // MARK: - Tabelas de referência do clérigo (PHB 2e — Tabelas 5, 24 e 61)
 //
 // Dados fixos do livro, traduzidos o mais fiel possível das tabelas
@@ -300,6 +318,185 @@ enum PriestTables {
         (24, "+4", "5th, 6th", "0%", "geas, mass suggestion, rod of rulership"),
         (25, "+4", "6th, 7th", "0%", "antipathy/sympathy, death spell, mass charm"),
     ]
+}
+
+// MARK: - Tabela de referência do mago (PHB 2e — Tabela 21)
+//
+// Mesmo espírito de `PriestTables` acima: dado fixo do livro, vivendo aqui
+// (não numa view) porque `PlayerCharacter.computedSpellSlotAllotments`
+// também lê a Wizard Spell Progression pra montar a grade de slots de
+// folhas novas — a tabela na tela do Mago é só a mesma fonte, exibida.
+enum WizardTables {
+    /// Tabela 21: Wizard Spell Progression. Índice 0 = nível 1 do
+    /// personagem; cada linha tem 9 posições (círculos 1–9). `nil` é "—"
+    /// (círculo ainda não disponível nesse nível). Conferida contra duas
+    /// transcrições independentes da tabela do PHB 2e (2026-09-29) — ao
+    /// contrário do sacerdote, o mago NÃO ganha slot bônus por Inteligência
+    /// alta (essa é só a tabela de Sabedoria/Tabela 5); Inteligência entra
+    /// só como TETO de círculo alcançável (ver `spellProgression` abaixo).
+    static let spellProgressionRows: [[Int?]] = [
+        [1, nil, nil, nil, nil, nil, nil, nil, nil],   // 1
+        [2, nil, nil, nil, nil, nil, nil, nil, nil],   // 2
+        [2, 1, nil, nil, nil, nil, nil, nil, nil],     // 3
+        [3, 2, nil, nil, nil, nil, nil, nil, nil],     // 4
+        [4, 2, 1, nil, nil, nil, nil, nil, nil],       // 5
+        [4, 2, 2, nil, nil, nil, nil, nil, nil],       // 6
+        [4, 3, 2, 1, nil, nil, nil, nil, nil],         // 7
+        [4, 3, 3, 2, nil, nil, nil, nil, nil],         // 8
+        [4, 3, 3, 2, 1, nil, nil, nil, nil],           // 9
+        [4, 4, 3, 2, 2, nil, nil, nil, nil],           // 10
+        [4, 4, 4, 3, 3, nil, nil, nil, nil],           // 11
+        [4, 4, 4, 4, 4, 1, nil, nil, nil],             // 12
+        [5, 5, 5, 4, 4, 2, nil, nil, nil],             // 13
+        [5, 5, 5, 4, 4, 2, 1, nil, nil],               // 14
+        [5, 5, 5, 5, 5, 2, 1, nil, nil],               // 15
+        [5, 5, 5, 5, 5, 3, 2, 1, nil],                 // 16
+        [5, 5, 5, 5, 5, 3, 3, 2, nil],                 // 17
+        [5, 5, 5, 5, 5, 3, 3, 2, 1],                   // 18
+        [5, 5, 5, 5, 5, 3, 3, 3, 1],                   // 19
+        [5, 5, 5, 5, 5, 4, 3, 3, 2],                   // 20
+    ]
+
+    /// Slots de cada círculo (1–9) pro nível/Inteligência dados. Diferente
+    /// do sacerdote (que trava só 6º/7º por Sabedoria mínima), a
+    /// Inteligência do mago é um teto que corta QUALQUER círculo acima do
+    /// que a Tabela 4 permite — reaproveita `IntelligenceTable.byScore`
+    /// (a mesma tabela que já preenche o campo "Max Spell Level" da ficha,
+    /// `AbilityDetailProviders`) em vez de duplicar os números aqui.
+    static func spellProgression(level: Int, intelligence: Int) -> [Int] {
+        let row = spellProgressionRows[max(0, min(level, spellProgressionRows.count) - 1)]
+        let cap = IntelligenceTable.maxSpellLevelInt(forScore: intelligence)
+        return row.enumerated().map { index, count in
+            let circle = index + 1
+            guard let count, circle <= cap else { return 0 }
+            return count
+        }
+    }
+}
+
+// MARK: - Tabela de referência do bardo (PHB 2e — Tabela 32, 2026-09-30)
+//
+// Mesmo espírito de `WizardTables` acima — dado fixo do livro, vivendo
+// aqui porque `PlayerCharacter.computedSpellSlotAllotments` também lê a
+// Bard Spell Progression. Os números já tinham sido transcritos uma vez
+// em `RogueReferenceView.swift` (tabela de consulta pura, sem ficha por
+// trás) — esta é a cópia CANÔNICA; a view foi ajustada pra ler daqui em
+// vez de manter os números duplicados (risco de um dia divergir).
+//
+// Bardo lança magia de Mago (mesma base arcana, mesmo atributo-chave —
+// Inteligência), mas com teto natural de 6º círculo (não 9º) e SEM o
+// bônus de especialização de escola do Table 22 (PHB, descrição do
+// Bardo: "In no case can a bard choose to specialize in a school of
+// magic") — por isso `computedSpellSlotAllotments` não soma bônus
+// nenhum no `case .bard`, ao contrário do `case .mage`.
+enum BardTables {
+    /// Tabela 32: Bard Spell Progression. Índice 0 = nível 1 do
+    /// personagem; cada linha tem 6 posições (círculos 1–6). `nil` é "—".
+    static let spellProgressionRows: [[Int?]] = [
+        [nil, nil, nil, nil, nil, nil],   // 1
+        [1, nil, nil, nil, nil, nil],     // 2
+        [2, nil, nil, nil, nil, nil],     // 3
+        [2, 1, nil, nil, nil, nil],       // 4
+        [3, 1, nil, nil, nil, nil],       // 5
+        [3, 2, nil, nil, nil, nil],       // 6
+        [3, 2, 1, nil, nil, nil],         // 7
+        [3, 3, 1, nil, nil, nil],         // 8
+        [3, 3, 2, nil, nil, nil],         // 9
+        [3, 3, 2, 1, nil, nil],           // 10
+        [3, 3, 3, 1, nil, nil],           // 11
+        [3, 3, 3, 2, nil, nil],           // 12
+        [3, 3, 3, 2, 1, nil],             // 13
+        [3, 3, 3, 3, 1, nil],             // 14
+        [3, 3, 3, 3, 2, nil],             // 15
+        [4, 3, 3, 3, 2, 1],               // 16
+        [4, 4, 3, 3, 3, 1],               // 17
+        [4, 4, 4, 3, 3, 2],               // 18
+        [4, 4, 4, 4, 3, 2],               // 19
+        [4, 4, 4, 4, 4, 3],               // 20
+    ]
+
+    /// Slots de cada círculo (1–6) pro nível/Inteligência dados — mesmo
+    /// mecanismo de teto de `WizardTables.spellProgression` (Inteligência
+    /// corta qualquer círculo acima do que a Tabela 4 permite), só que a
+    /// própria Tabela 32 já para no 6º círculo sozinha.
+    static func spellProgression(level: Int, intelligence: Int) -> [Int] {
+        let row = spellProgressionRows[max(0, min(level, spellProgressionRows.count) - 1)]
+        let cap = IntelligenceTable.maxSpellLevelInt(forScore: intelligence)
+        return row.enumerated().map { index, count in
+            let circle = index + 1
+            guard let count, circle <= cap else { return 0 }
+            return count
+        }
+    }
+}
+
+// MARK: - Especialização de escola do Mago (PHB 2e — Table 22, 2026-09-30)
+//
+// Pedido do usuário: "escolas de magia", não "círculos" (correção do que
+// tinha sido pedido antes). Especializar é OPCIONAL — um Mago pode
+// continuar generalista (`PlayerCharacter.wizardSchool == nil`, sem bônus
+// e sem restrição nenhuma, comportamento de sempre). Quem escolhe uma das
+// oito escolas ganha +1 slot por círculo onde já tem magia (Table 22) e
+// passa a ter escolas OPOSTAS bloqueadas de verdade — mesma filosofia de
+// bloqueio real já usada pro livro de magias (`wizardSpellbook`), ao
+// contrário da esfera do Clérigo (que só sinaliza). O bônus de aprendizado
+// (+15%/-15%) e o bônus de teste de resistência (±1) do PHB não têm onde
+// morar no app (não existe rolagem de "chance to learn" nem resolução de
+// combate/salvamento por magia aqui) — de propósito, ficam só como regra
+// documentada, não implementada, mesma linha de nunca simular dado que o
+// app já segue.
+//
+// A tabela de oposição (verificada em duas fontes independentes — a wiki
+// AD&D 2e e a página de Escolas Opostas do Complete Wizard's Handbook,
+// que documenta a mesma mecânica do PHB) NÃO é um "oposto + os dois
+// vizinhos, à escolha do jogador" como se pensou antes de perguntar ao
+// usuário — é uma lista FIXA por escola, com contagem variando pela
+// "força" da escola (fraca = 1, moderada = 2, forte = 3):
+enum WizardSchool: String, Codable, CaseIterable, Identifiable, Hashable {
+    case abjuration = "Abjuration"
+    case alteration = "Alteration"
+    case conjuration = "Conjuration/Summoning"
+    case divination = "Divination"
+    case enchantment = "Enchantment/Charm"
+    case illusion = "Illusion/Phantasm"
+    case invocation = "Invocation/Evocation"
+    case necromancy = "Necromancy"
+
+    var id: String { rawValue }
+
+    /// Escolas opostas fixas (Table 22) — não é escolha do jogador, e a
+    /// contagem não é simétrica entre as duas pontas (ex.: Illusion lista
+    /// Invocation como oposta, mas Invocation não lista Illusion de volta
+    /// — cada escola tem sua própria contagem por "força", conferido
+    /// contra a fonte, não um erro de digitação).
+    var oppositionSchools: [WizardSchool] {
+        switch self {
+        case .abjuration: return [.alteration, .illusion]
+        case .alteration: return [.abjuration, .necromancy]
+        case .conjuration: return [.divination, .invocation]
+        case .divination: return [.conjuration]
+        case .enchantment: return [.invocation, .necromancy]
+        case .illusion: return [.necromancy, .invocation, .abjuration]
+        case .invocation: return [.enchantment, .conjuration]
+        case .necromancy: return [.illusion, .enchantment]
+        }
+    }
+
+    /// Título de quem se especializa nesta escola — só pra exibição (ex.:
+    /// cabeçalho de "My Spellbook"). Os nomes vêm do PHB (Table 4 lista
+    /// "Diviner" pra Greater Divination, não "Divinationist").
+    var specialistTitle: String {
+        switch self {
+        case .abjuration: return "Abjurer"
+        case .alteration: return "Transmuter"
+        case .conjuration: return "Conjurer"
+        case .divination: return "Diviner"
+        case .enchantment: return "Enchanter"
+        case .illusion: return "Illusionist"
+        case .invocation: return "Invoker"
+        case .necromancy: return "Necromancer"
+        }
+    }
 }
 
 /// A grade inteira de slots de um personagem, agrupada por nível de círculo.
@@ -449,6 +646,16 @@ struct WeaponEntry: Codable, Identifiable, Hashable {
     /// depender do nome bater exatamente. `nil` numa linha digitada à mão
     /// (fichas antigas, ou arma caseira fora da base de 69 armas do PHB).
     var matchedWeaponID: String? = nil
+
+    /// Weapon Specialization (2026-09-30, regra do PHB conferida contra o
+    /// resumo do Complete Fighter's Handbook cap. 4 — "Single-Weapon
+    /// Proficiency, Weapon Specialization"): só Fighter (nunca Paladin ou
+    /// Ranger) pode especializar. `Bool?` pela mesma razão de `hitAdj`
+    /// acima — ficha antiga não tem essa chave. A UI (`WeaponFormRow`)
+    /// semeia `thac0`("+1")/`dmgAdj`("+2") na primeira vez que liga isto,
+    /// sem nunca sobrescrever o que o jogador já tiver escrito — o
+    /// jogador continua livre pra editar os campos à mão depois.
+    var isSpecialized: Bool? = nil
 }
 
 /// Uma linha da tabela de Proficiências da ficha oficial (nome + espaços
@@ -516,6 +723,22 @@ struct ProficiencyEntry: Codable, Identifiable, Hashable {
             slots = 1
         }
     }
+}
+
+/// Uma linha da tabela "Thieving Skills" (2026-09-30, grupo Rogue —
+/// Thief/Bard/Ninja, ver `CharacterClass.hasThievingSkills`) — nome fixo
+/// (vem de `ThievingSkillsTable.skills(for:)`, não editável) + um único
+/// campo de texto livre pra porcentagem final. Mesma filosofia de
+/// `WeaponEntry`/`ProficiencyEntry`: nada aqui é recalculado ao vivo —
+/// `value` só é SEMEADO uma vez (base + raça + Destreza, ver
+/// `ThievingSkillsTable.seedTotal`) quando a linha nasce, e o jogador é
+/// quem soma os pontos de distribuição por nível e o ajuste de armadura
+/// (que o app não tem como calcular sozinho — ver doc de
+/// `ThievingSkillsTable`) por cima, à mão.
+struct ThievingSkillEntry: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var skill: String = ""
+    var value: String = ""
 }
 
 /// Os detalhes de combate da ficha oficial que não têm campo próprio ainda
@@ -702,9 +925,10 @@ struct AbilityDetails: Codable, Hashable {
 }
 
 /// As classes de personagem de AD&D 2e (livro do jogador). A classe decide
-/// que ficha de magia a pasta abre — por ora só o Clérigo tem uma, a
-/// Priest Spell Sheet; as outras classes conjuradoras (Mago, Druida) ganham
-/// a delas mais pra frente.
+/// que ficha de magia a pasta abre — Clérigo (Priest Spell Sheet), Mago
+/// (Wizard Spell Sheet, 2026-09-29) e Bardo (2026-09-30, reaproveitando a
+/// mesma folha/livro do Mago — ver `isArcaneCaster`) têm a sua; Druida
+/// (também conjurador divino) ainda não ganhou a dele.
 enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
     case fighter = "Fighter"
     case paladin = "Paladin"
@@ -714,22 +938,66 @@ enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
     case druid = "Druid"
     case thief = "Thief"
     case bard = "Bard"
+    // Ninja (2026-09-30, Complete Ninja's Handbook) — diferente do
+    // Barbarian (Kit de Fighter), o próprio livro trata ninja como CLASSE
+    // própria do grupo Rogue: "The ninja character class, like the thief
+    // and the bard classes, belongs to the rogue group", com Table 1
+    // (XP/Hit Dice) idêntica à Table 25 do PHB (Rogue), mas requisitos de
+    // habilidade, restrição racial e progressão de thieving skills
+    // próprios. Usuário confirmou essa escolha (nova `CharacterClass` em
+    // vez de forçar como Kit de Thief) antes de codar.
+    case ninja = "Ninja"
 
     var id: String { rawValue }
 
-    /// Só o Clérigo tem folha de magias por enquanto.
-    var hasSpellSheet: Bool { self == .cleric }
+    /// Clérigo, Mago e Bardo têm folha de magias (2026-09-29: Mago ganhou a
+    /// dele, espelhando o do Clérigo — ver `WizardTables`/`SpellSheetView`;
+    /// 2026-09-30: Bardo entrou também, reaproveitando TUDO que já existia
+    /// pro Mago — `wizardSpellbook`/`wizardSchool`/`WizardSpellbookEditorSheet`
+    /// — em vez de duplicar, porque um personagem só tem uma classe de cada
+    /// vez, então esses campos já significam "as magias arcanas que este
+    /// personagem conhece", não "as magias do Mago especificamente". Ver
+    /// `isArcaneCaster` e `BardTables`.)
+    var hasSpellSheet: Bool { self == .cleric || self == .mage || self == .bard }
+
+    /// `true` pra Mago e Bardo — as duas classes que lançam magia arcana
+    /// (Inteligência, livro pessoal bloqueando o que pode ser memorizado).
+    /// Centraliza o que antes era escrito como `== .mage` espalhado pelas
+    /// views (`CharacterSheetView`, `SpellbookView`, `SpellSheetView`) — só
+    /// o Bardo NÃO pode especializar em escola (`WizardSpellbookEditorSheet`
+    /// esconde essa seção fora de `.mage`) nem ganha a semente de "Read
+    /// Magic" (`seedWizardSpellbookIfNeeded` continua travada em `.mage`,
+    /// de propósito: o PHB não garante nenhuma magia inicial pro bardo).
+    var isArcaneCaster: Bool { self == .mage || self == .bard }
+
+    /// Item 6 do feedback do usuário (2026-09-30): "não tem página de
+    /// tabelas úteis pro Warrior". Generaliza a 4ª página (antes só pra
+    /// quem tinha ficha de magia) pro grupo Warrior também — Fighter,
+    /// Paladin e Ranger ganham `WarriorReferencePage` (Tabela 34 de slots
+    /// de proficiência + Weapon Specialization) no lugar das tabelas de
+    /// magia. Estendida no mesmo dia pro grupo Rogue (Thief/Bard/Ninja),
+    /// que ganha `RogueReferencePage` (Thieving Skills + Backstab). Ver
+    /// `proficiencyGroup` pra que classes entram em cada grupo.
+    var hasReferencePage: Bool {
+        hasSpellSheet || proficiencyGroup == "Warrior" || proficiencyGroup == "Rogue"
+    }
+
+    /// Thief, Bard e Ninja têm a seção "Thieving Skills" na página 1 da
+    /// ficha (2026-09-30) — cada um com sua própria lista de habilidades e
+    /// tabela-base (ver `ThievingSkillsTable`), mas a UI é compartilhada.
+    var hasThievingSkills: Bool { proficiencyGroup == "Rogue" }
 
     /// Quantas páginas fixas a aba "Sheet" da ficha de personagem tem pra
     /// essa classe (`RecordSheetPagerView`/`RecordSheetBeadRow` em
     /// `CharacterSheetView.swift`) — Ficha + Equipment/Movement/Experience
     /// + Character Description pra todo mundo, mais uma 4ª página de
-    /// tabelas de referência do Clérigo só pra quem tem ficha de magia.
-    /// Centralizado aqui (2026-09-20) porque as duas views antes tinham
-    /// cada uma sua própria conta solta — divergiram (`RecordSheetBeadRow`
-    /// ficou um a menos que `RecordSheetPagerView`), e a página extra do
-    /// Clérigo nunca ganhava bolinha própria por causa disso.
-    var recordSheetPageCount: Int { hasSpellSheet ? 4 : 3 }
+    /// tabelas de referência (do Clérigo, do Mago ou do Warrior, conforme a
+    /// classe) só pra quem tem `hasReferencePage`. Centralizado aqui
+    /// (2026-09-20) porque as duas views antes tinham cada uma sua própria
+    /// conta solta — divergiram (`RecordSheetBeadRow` ficou um a menos que
+    /// `RecordSheetPagerView`), e a página extra nunca ganhava bolinha
+    /// própria por causa disso.
+    var recordSheetPageCount: Int { hasReferencePage ? 4 : 3 }
 
     /// O grupo (Warrior/Wizard/Priest/Rogue) que esta classe pertence —
     /// mesmo rótulo de `Proficiency.primaryGroup` (2026-09-22, pedido do
@@ -741,7 +1009,7 @@ enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
         case .fighter, .paladin, .ranger: return "Warrior"
         case .mage: return "Wizard"
         case .cleric, .druid: return "Priest"
-        case .thief, .bard: return "Rogue"
+        case .thief, .bard, .ninja: return "Rogue"
         }
     }
 
@@ -759,7 +1027,7 @@ enum CharacterClass: String, Codable, CaseIterable, Identifiable, Hashable {
         case .fighter, .paladin, .ranger: return "d10"
         case .mage: return "d4"
         case .cleric, .druid: return "d8"
-        case .thief, .bard: return "d6"
+        case .thief, .bard, .ninja: return "d6"
         }
     }
 
@@ -987,6 +1255,10 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     var placeOfOrigin: String? = nil
     var combat: CombatDetails? = nil
     var proficiencies: [ProficiencyEntry]? = nil
+    /// Thieving Skills (2026-09-30, grupo Rogue) — ver `ThievingSkillEntry`
+    /// e `CharacterClass.hasThievingSkills`. `nil`/vazio pra qualquer ficha
+    /// de classe fora do grupo Rogue, ou salva antes desta versão.
+    var thievingSkills: [ThievingSkillEntry]? = nil
     var toHitModifiers: [EquipmentItem]? = nil
     var damageModifiers: [EquipmentItem]? = nil
     var acModifiers: [EquipmentItem]? = nil
@@ -1688,17 +1960,58 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     var favoriteSpellIDs: Set<String> = []
 
     /// Quantos slots de cada círculo o personagem tem por descanso, calculado
-    /// pela Priest Spell Progression (Tabela 24 do PHB) a partir do nível e
-    /// da Sabedoria atuais — substitui a antiga entrada manual
+    /// pela Priest Spell Progression (Tabela 24) pro Clérigo ou pela Wizard
+    /// Spell Progression (Tabela 21) pro Mago, a partir do nível e da
+    /// Sabedoria/Inteligência atuais — substitui a antiga entrada manual
     /// (`spellSlotAllotments`, mantida só pra fichas salvas antigas
     /// continuarem decodificando) que morava na aba Equipment.
     var computedSpellSlotAllotments: [SpellSlotAllotment] {
-        guard characterClass.hasSpellSheet else { return [] }
-        let counts = PriestTables.spellProgression(level: level, wisdom: abilities.wisdom)
-        return counts.enumerated().compactMap { index, count in
-            guard count > 0 else { return nil }
-            return SpellSlotAllotment(caster: .divine, level: index + 1, count: count)
+        switch characterClass {
+        case .cleric:
+            let counts = PriestTables.spellProgression(level: level, wisdom: abilities.wisdom)
+            return counts.enumerated().compactMap { index, count in
+                guard count > 0 else { return nil }
+                return SpellSlotAllotment(caster: .divine, level: index + 1, count: count)
+            }
+        case .mage:
+            let counts = WizardTables.spellProgression(level: level, intelligence: abilities.intelligence)
+            // Table 22: quem se especializou numa escola ganha +1 slot em
+            // todo círculo onde já tem magia (não cria círculo novo do
+            // nada) — o PHB pede que esse slot extra seja preenchido com
+            // magia da própria escola, mas o app não tem como forçar isso
+            // no board de slots (genérico por círculo, não por escola);
+            // fica como lembrete pro jogador, não uma trava.
+            let bonus = wizardSchool == nil ? 0 : 1
+            return counts.enumerated().compactMap { index, count in
+                guard count > 0 else { return nil }
+                return SpellSlotAllotment(caster: .arcane, level: index + 1, count: count + bonus)
+            }
+        case .bard:
+            // Table 32, sem bônus de especialização — o bardo nunca pode
+            // especializar em escola (ver doc de `BardTables` acima).
+            let counts = BardTables.spellProgression(level: level, intelligence: abilities.intelligence)
+            return counts.enumerated().compactMap { index, count in
+                guard count > 0 else { return nil }
+                return SpellSlotAllotment(caster: .arcane, level: index + 1, count: count)
+            }
+        default:
+            return []
         }
+    }
+
+    /// A pontuação de atributo que decide os slots de magia desta classe —
+    /// Sabedoria pro Clérigo, Inteligência pro Mago e pro Bardo (os dois
+    /// lançam magia arcana — ver `CharacterClass.isArcaneCaster`). Usada só
+    /// pra congelar o valor certo em `SpellSheet.wisdomAtCreation` na hora
+    /// de criar uma folha nova (o nome do campo ficou o de sempre,
+    /// "wisdomAtCreation" — trocar o NOME da propriedade mudaria a chave
+    /// usada pelo `Codable` sintetizado, e uma folha de Clérigo salva antes
+    /// desta versão pararia de decodificar por causa exatamente do mesmo
+    /// tipo de bug documentado em `Spell.init(from:)`; então o campo
+    /// continua se chamando Wisdom, só passa a guardar Inteligência quando
+    /// a classe lança magia arcana).
+    var spellSheetAbilityScoreAtCreation: Int {
+        characterClass.isArcaneCaster ? abilities.intelligence : abilities.wisdom
     }
 
     /// Uma grade de slots em branco (sem nada preparado ainda), do
@@ -1788,6 +2101,111 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
         guard hasConfiguredSphereAccess else { return 1 }
         if hasMajorSphereAccess(to: spell.spheres) { return 0 }
         return sphereSignal(for: spell) == nil ? 1 : 2
+    }
+
+    // MARK: - Livro de magias do Mago (2026-09-29)
+    //
+    // Diferente do Clérigo (que conjura qualquer magia da esfera que tem
+    // acesso, sem precisar "aprender" nada — `sphereAccess` acima é só um
+    // SINAL, nunca bloqueia), o Mago só pode memorizar magias que estão no
+    // PRÓPRIO livro. Decisão do usuário (2026-09-29): bloqueio de verdade
+    // (não só aviso), lista editável simples (sem simular rolagem de
+    // "chance to learn" — mesma filosofia de nunca rolar dado sozinho que
+    // o app já segue pra Hit Points), e um Mago novo nasce com "Read
+    // Magic" no livro (regra do PHB: todo mago começa com essa magia).
+
+    /// `wizardSpellbook` fica no `PlayerCharacter` (não na Folha de
+    /// Magias) pelo mesmo motivo de `sphereAccess`: é um traço PERMANENTE
+    /// do personagem, não algo que só existe enquanto o dia de jogo dura.
+    var wizardSpellbook: [WizardSpellbookEntry] = []
+
+    /// Especialização de escola (2026-09-30, Table 22) — `nil` é
+    /// generalista (comportamento de sempre: nenhum bônus, nenhuma
+    /// restrição). Fica opcional/`nil` de propósito pra fichas antigas
+    /// (Mago criado antes desta versão) continuarem decodificando sem
+    /// ficar preso a uma escola que nunca escolheu.
+    var wizardSchool: WizardSchool? = nil
+
+    /// `true` quando a magia tem uma escola LISTADA em `spell.schools`
+    /// que está na lista de oposição da especialização atual — bloqueio
+    /// de verdade (mesma filosofia do livro de magias em si), não sinal.
+    /// Generalista (`wizardSchool == nil`) nunca bloqueia nada. Magias
+    /// marcadas "All"/"All Schools" na base (ex.: Read Magic, Detect
+    /// Magic) são universais — nunca ficam de fora, mesmo se a lista de
+    /// oposição citar a escola que também aparece nelas.
+    func isSpellOpposedBySchool(_ spell: Spell) -> Bool {
+        guard let wizardSchool else { return false }
+        guard !spell.schools.contains("All") && !spell.schools.contains("All Schools") else { return false }
+        let opposed = Set(wizardSchool.oppositionSchools.map(\.rawValue))
+        return !opposed.isDisjoint(with: Set(spell.schools))
+    }
+
+    /// Ids da base que estão no livro — usado pra restringir de verdade a
+    /// Folha de Magias (`SlotEditorSheet`/`MemorizedRow` em
+    /// `SpellSheetView.swift`) e pra `SpellDatabase.matches(restrictToIDs:)`.
+    var wizardSpellbookMatchedIDs: Set<String> {
+        Set(wizardSpellbook.compactMap { $0.matchedSpellID })
+    }
+
+    /// `true` quando esta magia está no livro (por id da base) — usado
+    /// pelo Grimório pra mostrar o selo de "no seu livro" e decidir se o
+    /// botão ali é "add" ou "remove".
+    func wizardKnows(spellID: String) -> Bool {
+        wizardSpellbookMatchedIDs.contains(spellID)
+    }
+
+    /// Magias do círculo dado que estão no livro E batem com a base — a
+    /// lista que a Folha de Magias mostra pra escolher, em vez da base
+    /// inteira (~2.600 magias) que o Clérigo vê. `in spellbook:` é a
+    /// mesma instância de `SpellDatabase` injetada como `@EnvironmentObject`
+    /// nas views — fica de fora do `PlayerCharacter` (que não tem acesso a
+    /// ela) só recebida como parâmetro.
+    func wizardSpellbookSpells(level: Int, in spellbook: SpellDatabase) -> [Spell] {
+        let ids = wizardSpellbookMatchedIDs
+        guard !ids.isEmpty else { return [] }
+        return spellbook.spells(caster: .arcane, level: level).filter { ids.contains($0.id) }
+    }
+
+    /// Entradas do livro que NÃO batem com a base (magia homebrew, ou
+    /// achada num pergaminho/livro em jogo sem entrada na base embutida) —
+    /// mostradas por nome livre, sem descrição completa disponível. O
+    /// círculo vem do campo `level` da própria entrada (só existe pra
+    /// quem não bate com a base — ver `WizardSpellbookEntry`).
+    func wizardSpellbookFreeNames(level: Int) -> [WizardSpellbookEntry] {
+        wizardSpellbook
+            .filter { $0.matchedSpellID == nil && $0.level == level }
+            .sorted { $0.name < $1.name }
+    }
+
+    /// Semeia "Read Magic" a primeira vez que o personagem vira Mago —
+    /// nunca sobrescreve um livro que já tem algo (nem repete a entrada se
+    /// já tiver sido removida de propósito e o jogador trocar de classe e
+    /// voltar pra Mago — checagem é só "vazio", não "nunca chamado antes").
+    /// Chamado do mesmo lugar que já semeava a primeira Folha de Magias
+    /// (`CharacterSheetView.ClassPicker`, ao escolher Mago no cabeçalho).
+    /// `in spellbook:` deixa a entrada casada com a base de verdade quando
+    /// "Read Magic" existir lá (descrição completa disponível), em vez de
+    /// sempre cair no nome livre.
+    mutating func seedWizardSpellbookIfNeeded(in spellbook: SpellDatabase) {
+        guard characterClass == .mage, wizardSpellbook.isEmpty else { return }
+        let matched = spellbook.spells(caster: .arcane, level: 1)
+            .first { Fuzzy.normalize($0.name) == Fuzzy.normalize("Read Magic") }
+        wizardSpellbook = [WizardSpellbookEntry(name: matched?.name ?? "Read Magic",
+                                                matchedSpellID: matched?.id,
+                                                level: matched == nil ? 1 : nil)]
+    }
+
+    /// O maior círculo que o Mago já consegue LANÇAR agora, nível e
+    /// Inteligência atuais (mesma tabela de `computedSpellSlotAllotments` —
+    /// um círculo só entra aqui se tiver pelo menos 1 slot). Pedido do
+    /// usuário (2026-09-30): restringe quais círculos aparecem pra
+    /// ADICIONAR magia ao livro — tanto na busca da folha "My Spellbook"
+    /// quanto no botão de adicionar direto do Grimório (`SpellbookView`) —
+    /// não faz sentido oferecer aprender um círculo que ainda nem dá pra
+    /// lançar. `0` pra quem não é Mago, ou pro Mago que ainda não tem
+    /// slot nenhum (nível 1 sem Inteligência suficiente, por exemplo).
+    var wizardMaxKnowableCircle: Int {
+        computedSpellSlotAllotments.filter { $0.caster == .arcane }.map(\.level).max() ?? 0
     }
 
     /// Folhas em ordem, da mais recente para a mais antiga.
