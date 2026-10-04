@@ -15,7 +15,7 @@ import Foundation
 /// tabulado aqui) — por isso só o seletor de "Armor" da ficha sugere AC;
 /// Elmo e Escudo ficam só como referência de consulta no Compendium por
 /// enquanto, sem inventar um número que não está na fonte.
-struct ArmorPiece: Identifiable, Hashable {
+struct ArmorPiece: Codable, Identifiable, Hashable {
     let id: String
     let name: String
     let kind: ArmorPieceKind
@@ -24,7 +24,7 @@ struct ArmorPiece: Identifiable, Hashable {
     let weight: String?
 }
 
-enum ArmorPieceKind: String, Hashable {
+enum ArmorPieceKind: String, Codable, Hashable {
     case armor
     case helmet
     case shield

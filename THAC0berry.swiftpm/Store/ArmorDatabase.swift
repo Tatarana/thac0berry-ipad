@@ -11,7 +11,9 @@ final class ArmorDatabase: ObservableObject {
     @Published private(set) var loadError: String? = nil
 
     init() {
-        pieces = EmbeddedArmor.entries.sorted { $0.name < $1.name }
+        let result = BundleJSON.load([ArmorPiece].self, file: "armor.json")
+        pieces = result.items.sorted { $0.name < $1.name }
+        loadError = result.error
     }
 
     func piece(id: String) -> ArmorPiece? {

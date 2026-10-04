@@ -17,7 +17,7 @@ import Foundation
 /// long bow" já usavam no corpus original (não é dado inventado — é a
 /// munição real reaplicada a outro arco que a usa, confirmado contra a
 /// Table 45 do PHB). Ver `Store/EmbeddedWeapons.swift`.
-struct Weapon: Identifiable, Hashable {
+struct Weapon: Codable, Identifiable, Hashable {
     let id: String
     let name: String
 
@@ -80,7 +80,7 @@ struct Weapon: Identifiable, Hashable {
 /// tem" ("—") na mesma coluna (ex. Staff sling) — confirmado contra a
 /// Table 45 (Missile Weapon Ranges) do livro, não é inconsistência de
 /// extração.
-struct WeaponRange: Hashable {
+struct WeaponRange: Codable, Hashable {
     let short: String?
     let medium: String?
     let long: String?

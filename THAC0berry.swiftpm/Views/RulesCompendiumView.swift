@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Tela de consulta da base de regras (PHB, DMG e oito "Complete X's
+/// Tela de consulta da base de regras (PHB, DMG, oito "Complete X's
 /// Handbook" — Priest, Fighter, Paladin, Ranger, Barbarian, Bard, Ninja,
-/// Thief — 783 entradas ao todo, 2026-09-30) — mesmo espírito do
-/// `KitCompendiumView`/`SpellbookView`:
+/// Thief — e, desde 2026-10-01, os quatro livros de Psiônicos — Complete
+/// Psionics Handbook, Dark Sun Campaign Setting, Dragon Kings, The Will
+/// and the Way — 888 entradas ao todo, `Scripts/convert_psionics_rules.py`)
+/// — mesmo espírito do `KitCompendiumView`/`SpellbookView`:
 /// folhear ou buscar a base inteira, sem estar presa a nenhum personagem.
 /// Agrupada por livro e depois por capítulo (ordem do próprio livro, não
 /// alfabética) — é como qualquer jogador já folheia o PHB/DMG físico.
@@ -65,7 +67,7 @@ struct RulesCompendiumView: View {
             Text("Rules Reference")
                 .font(Paper.hand(30))
                 .foregroundStyle(Paper.penInk)
-            Text("\(rulesDatabase.entries.count) rules · PHB, DMG & 8 Complete Handbooks")
+            Text("\(rulesDatabase.entries.count) rules · PHB, DMG, 8 Complete Handbooks & Psionics (4 books)")
                 .font(Paper.printedItalic(12))
                 .foregroundStyle(Paper.inkSoft)
         }
@@ -76,17 +78,18 @@ struct RulesCompendiumView: View {
     }
 
     /// PHB / DMG / CPrH / CFH / CPaH / CRH / CBarbH / CBH / CNH / CTH /
-    /// todos — a DMG tem conteúdo voltado pro Mestre (recompensas, criação
-    /// de item mágico, diretrizes de campanha) junto com regras do PHB, e
-    /// os oito "Complete X's Handbook" (Priest, Fighter, Paladin, Ranger,
-    /// Barbarian, Bard, Ninja, Thief — Rogue completado em 2026-09-30,
-    /// mesmo tratamento do CPrH/grupo Warrior) são ainda mais nesse
-    /// sentido — boa parte dos seus capítulos (cultura, fé, role-playing)
-    /// é material de worldbuilding pro Mestre, não regra de jogador; o
-    /// filtro deixa quem só quer as regras de jogador escondê-las sem
-    /// precisar caçar pelo `book` de cada resultado. Fila horizontal
-    /// rolável — 11 selinhos não cabem numa linha só em largura de iPad em
-    /// Split View.
+    /// CPsiH / DSC / DK / WatW / todos — a DMG tem conteúdo voltado pro
+    /// Mestre (recompensas, criação de item mágico, diretrizes de
+    /// campanha) junto com regras do PHB, e os oito "Complete X's
+    /// Handbook" (Priest, Fighter, Paladin, Ranger, Barbarian, Bard,
+    /// Ninja, Thief) são ainda mais nesse sentido — boa parte dos seus
+    /// capítulos (cultura, fé, role-playing) é material de worldbuilding
+    /// pro Mestre, não regra de jogador. Os quatro livros de Psiônicos
+    /// (2026-10-01) somam o mesmo problema: DSC/DK/WatW são sourcebook de
+    /// campanha (Dark Sun), não regra genérica — o filtro deixa quem só
+    /// quer as regras de jogador escondê-las sem precisar caçar pelo
+    /// `book` de cada resultado. Fila horizontal rolável — 15 selinhos não
+    /// cabem numa linha só em largura de iPad em Split View.
     private var bookToggle: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -101,8 +104,11 @@ struct RulesCompendiumView: View {
     /// Ordem de exibição dos selinhos de livro — PHB/DMG primeiro (regra
     /// central), depois os "Complete X's Handbook" na ordem em que foram
     /// incorporados (Priest, o grupo Warrior inteiro de uma vez, depois o
-    /// grupo Rogue inteiro de uma vez — Bard, Ninja, Thief, 2026-09-30).
-    private static let bookOrder = ["PHB", "DMG", "CPrH", "CFH", "CPaH", "CRH", "CBarbH", "CBH", "CNH", "CTH"]
+    /// grupo Rogue inteiro de uma vez — Bard, Ninja, Thief, 2026-09-30),
+    /// por último os quatro livros de Psiônicos na ordem de "quanto é
+    /// regra geral vs. específica de Dark Sun" (CPsiH é o livro-base,
+    /// jogável em qualquer campanha; DSC/DK/WatW são todos Dark Sun).
+    private static let bookOrder = ["PHB", "DMG", "CPrH", "CFH", "CPaH", "CRH", "CBarbH", "CBH", "CNH", "CTH", "CPsiH", "DSC", "DK", "WatW"]
 
     private var searchResults: [RuleMatch] {
         rulesDatabase.matches(for: query, limit: 40, book: bookFilter)

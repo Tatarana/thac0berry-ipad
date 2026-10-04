@@ -18,6 +18,19 @@ import Foundation
 /// `mechanics.armor.allowedTypes`, o que derrubava o decode do array
 /// inteiro — mas isso já foi corrigido em `KitArmorRules.init(from:)`
 /// abaixo, então voltar a ler JSON em runtime é seguro de novo).
+///
+/// 2026-09-29/2026-09-30: o mesmo array ganhou mais 187 kits de outros
+/// três grupos — 41 de Mago (`Scripts/convert_wizard_kits.py`), 114 de
+/// Warrior (Fighter/Paladin/Ranger + Barbarian, dobrado dentro de
+/// Fighter) e 73 de Rogue (Thief/Bard/Ninja), os dois últimos via
+/// `Scripts/convert_warrior_rogue_kits.py` — pelo mesmo motivo: a wiki de
+/// origem já trata kit de qualquer classe como "Character Kit", então um
+/// `classEligibility.classGroup`/`allowedClasses` por kit (já genérico,
+/// sem nada hardcoded pra sacerdote) é o bastante pra `KitDatabase`/
+/// `KitField`/`KitPickerSheet` filtrarem certo, sem precisar de um
+/// array/arquivo por classe. `deity`/`pantheon`/`setting`/`titleInChurch`
+/// continuam exclusivos do sacerdote especializado — `nil` em todo o
+/// resto, Warrior/Rogue/Mago incluídos.
 struct Kit: Codable, Identifiable, Hashable {
     let id: String
     let name: String

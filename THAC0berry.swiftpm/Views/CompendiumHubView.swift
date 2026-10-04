@@ -67,6 +67,38 @@ struct CompendiumHubView: View {
                     .buttonStyle(.plain)
 
                     NavigationLink {
+                        KitCompendiumScreen(classGroup: "Warrior")
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_warrior_kits",
+                            systemImage: "shield.fill",
+                            badgeImage: "bolt.fill",
+                            badgeColor: Ember.crimson,
+                            title: "Warrior Kits",
+                            subtitle: "114 kits · Fighter, Paladin, Ranger & Barbarian",
+                            accent: Ember.crimson,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        KitCompendiumScreen(classGroup: "Rogue")
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_rogue_kits",
+                            systemImage: "eye.slash.fill",
+                            badgeImage: "star.fill",
+                            badgeColor: Ember.mintDeep,
+                            title: "Rogue Kits",
+                            subtitle: "73 kits · Thief, Bard & Ninja",
+                            accent: Ember.mintDeep,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
                         DeityCompendiumScreen()
                     } label: {
                         CompendiumTile(
@@ -91,7 +123,7 @@ struct CompendiumHubView: View {
                             badgeImage: "questionmark",
                             badgeColor: Ember.teal,
                             title: "Rules Reference",
-                            subtitle: "783 rules · PHB, DMG, CPrH, CFH, CPaH, CRH, CBarbH, CBH, CNH & CTH",
+                            subtitle: "888 rules · PHB, DMG, 8 Complete Handbooks & Psionics (CPsiH, DSC, DK, WatW)",
                             accent: Ember.teal,
                             isEnabled: true
                         )
@@ -189,6 +221,22 @@ struct CompendiumHubView: View {
                             title: "Mage Grimoire",
                             subtitle: "2,608 spells · search, favorites, schools",
                             accent: Ember.teal,
+                            isEnabled: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        PsionicPowerCompendiumScreen()
+                    } label: {
+                        CompendiumTile(
+                            imageName: "icon_psionic_powers",
+                            systemImage: "brain.head.profile",
+                            badgeImage: "sparkle",
+                            badgeColor: Ember.mintDeep,
+                            title: "Psionic Powers",
+                            subtitle: "257 powers · 6 disciplines, Complete Psionics Handbook",
+                            accent: Ember.mintDeep,
                             isEnabled: true
                         )
                     }
@@ -337,6 +385,29 @@ private struct MageGrimoireScreen: View {
                 }, accessibilityLabel: "Compendium")
 
                 SpellbookView(caster: .arcane)
+            }
+            .padding(18)
+        }
+        .background(PaperBackground())
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Moldura do Compendium de Psionic Powers — mesmo tratamento do
+/// `MageGrimoireScreen` acima. Rodada "fundação primeiro" dos Psiônicos
+/// (2026-10-01): só consulta, nenhum personagem conhece power nenhum
+/// ainda (ver `PsionicPowerCompendiumView`).
+private struct PsionicPowerCompendiumScreen: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                RoundIconButton(systemImage: "chevron.left", style: .badge, action: {
+                    dismiss()
+                }, accessibilityLabel: "Compendium")
+
+                PsionicPowerCompendiumView()
             }
             .padding(18)
         }

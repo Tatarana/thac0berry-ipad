@@ -1122,6 +1122,8 @@ private struct RecordSheetPageTwo: View {
                 AlliesBlock(character: $character)
                     .frame(maxWidth: .infinity)
             }
+
+            WildTalentBlock(character: $character)
         }
         .padding(16)
         .background(Color.white.opacity(0.4))
@@ -1631,6 +1633,13 @@ private struct ExperienceForm: View {
                     .changeFlash(character: $character, key: "xpNeededNextLevel")
             }
             .padding(.bottom, 2)
+
+            if let note = ExperienceProgressionTable.note(for: character.characterClass, level: character.level) {
+                Text(note)
+                    .font(Paper.printedItalic(11))
+                    .foregroundStyle(Paper.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             CombatLine(label: "Kit Modifier", value: $character.xpKitModifier.orDefault(""))
             CombatLine(label: "Ability Bonus", value: $character.xpAbilityBonus.orDefault(""))
@@ -2272,6 +2281,9 @@ private struct ClassPicker: View {
     /// primeira folha — fica pendente até ele ser associado a uma.
     private func select(_ option: CharacterClass) {
         character.characterClass = option
+        // Trocar de classe também muda THAC0/Saves/etc. — liga o sinal de
+        // consequência no campo de nível (ver `hasPendingLevelChange`).
+        character.lastChangedField = "level"
         // Cada classe usa uma coluna diferente da tabela de progressão —
         // ver `PlayerCharacter.refreshXPNeededNextLevel()`.
         character.refreshXPNeededNextLevel()
@@ -3781,6 +3793,59 @@ private struct AlliesBlock: View {
         ListBlock(title: "Allies & Henchmen", items: $character.allies)
     }
 }
+
+/// Wild Talent (CPsiH cap. 1 — ver `Models/Character.swift`/`WildTalent`)
+/// — rodada "fundação primeiro" dos Psiônicos (2026-10-01). Disponível pra
+/// QUALQUER classe (ao contrário de Kit/Spheres, que dependem de
+/// `characterClass`), por isso vive aqui na Page 2 em vez de no cabeçalho
+/// da ficha, perto de Allies/Languages — mesma ideia de "traço do
+/// personagem, não do dia de jogo" que já vale pro resto desta página.
+/// `$character.wildTalent.orInit(WildTalent())` materializa o struct na
+/// primeira escrita (mesmo padrão de `combat`/`page2MagicItems` — ver
+/// `Binding.orInit`), então o bloco já aparece pronto pra preencher, sem
+/// precisar de um botão "+ add" separado.
+private struct WildTalentBlock: View {
+    @Binding var character: PlayerCharacter
+
+    private var wildTalent: Binding<WildTalent> { $character.wildTalent.orInit(WildTalent()) }
+    private var powers: Binding<[String]> { wildTalent.powers }
+    private var psp: Binding<Int> { wildTalent.psionicStrengthPoints }
+
+    var body: some View {
+        SheetBlock(title: "Wild Talent", trailing: "\(powers.wrappedValue.count)") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Any character can test for latent psionic potential, regardless of class.")
+                        .font(Paper.printedItalic(11))
+                        .foregroundStyle(Paper.inkSoft)
+                    RuleLinkButton(ruleID: "cpsih_ch01_wild_talents")
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(powers.wrappedValue.indices, id: \.self) { index in
+                        HStack {
+                            EditableText(value: powers[index], placeholder: "power name…",
+                                         size: 18, underline: false)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 3)
+                        .overlay(alignment: .bottom) { DottedRule() }
+                    }
+                    AddLineButton(title: "power") {
+                        powers.wrappedValue.append("")
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    FieldLabel(text: "PSP")
+                    EditableNumber(value: psp, size: 15, lower: 0, upper: 999)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+}
+
 
 private struct AddLineButton: View {
     let title: String

@@ -13,6 +13,7 @@ struct THAC0berryApp: App {
     @StateObject private var rules = RulesDatabase()
     @StateObject private var deities = DeityDatabase()
     @StateObject private var ruleset = RulesetRegistry()
+    @StateObject private var psionicPowers = PsionicPowerDatabase()
 
     var body: some Scene {
         WindowGroup {
@@ -29,6 +30,7 @@ struct THAC0berryApp: App {
                     .environmentObject(rules)
                     .environmentObject(deities)
                     .environmentObject(ruleset)
+                    .environmentObject(psionicPowers)
 
                 // Por cima de qualquer tela do app (lista, ficha, folha de
                 // magia) — não faz parte de nenhuma delas, então continua

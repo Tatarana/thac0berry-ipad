@@ -14,7 +14,9 @@ final class WeaponDatabase: ObservableObject {
     @Published private(set) var loadError: String? = nil
 
     init() {
-        weapons = EmbeddedWeapons.entries.sorted { $0.name < $1.name }
+        let result = BundleJSON.load([Weapon].self, file: "weapons.json")
+        weapons = result.items.sorted { $0.name < $1.name }
+        loadError = result.error
     }
 
     func weapon(id: String) -> Weapon? {

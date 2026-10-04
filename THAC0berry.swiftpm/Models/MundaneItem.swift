@@ -10,7 +10,7 @@ import Foundation
 /// Usado pelo Equipment Compendium (consulta) e pelo seletor da tabela de
 /// Equipment da página 2 da ficha (`Page2EquipmentEntry` — preenche peso
 /// sozinho; local de guarda continua sempre manual, é escolha do jogador).
-struct MundaneItem: Identifiable, Hashable {
+struct MundaneItem: Codable, Identifiable, Hashable {
     let id: String
     let name: String
 

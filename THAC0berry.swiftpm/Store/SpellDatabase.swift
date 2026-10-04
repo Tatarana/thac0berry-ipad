@@ -50,20 +50,15 @@ final class SpellDatabase: ObservableObject {
         var seenIDs: Set<String> = []
         var errors: [String] = []
 
-        // Exemplos do Kelmon primeiro — igual antes, prioridade no merge
-        // abaixo (nenhum id da base real de sacerdote sobrescreve um
-        // exemplo igual). Literais Swift, sem JSON nem bundle nenhum no
-        // meio — nada aqui pode falhar em runtime.
-        for spell in EmbeddedSampleSpells.spells {
-            guard !seenIDs.contains(spell.id) else { continue }
-            seenIDs.insert(spell.id)
-            merged.append(spell)
-        }
+        // Exemplos do Kelmon (`sample_spells.json`): entram primeiro no merge
+        // (prioridade sobre ids repetidos), mas são lidos junto com os demais
+        // arquivos, com as mesmas tentativas e o mesmo relatório de erro.
+        var batches: [String: [Spell]] = [:]
 
         // "priest_" (sacerdote) e "wizard_" (mago, 2026-09-29 — Grimório
         // do Mago) — mesmo formato de arquivo, mesmo tratamento de erro,
         // só o prefixo muda.
-        var pending = bundleFiles(withPrefix: "priest_") + bundleFiles(withPrefix: "wizard_")
+        var pending = bundleFiles(names: ["sample_spells"]) + bundleFiles(withPrefix: "priest_") + bundleFiles(withPrefix: "wizard_")
         var lastFailure: [String: String] = [:]  // nome -> descrição do erro real (2026-09-29)
 
         // Até 4 tentativas, com pausa crescente entre elas, RE-VARRENDO o
@@ -90,11 +85,7 @@ final class SpellDatabase: ObservableObject {
             for file in pending {
                 switch readBatch(at: file.url) {
                 case .success(let batch):
-                    for spell in batch {
-                        guard !seenIDs.contains(spell.id) else { continue }
-                        seenIDs.insert(spell.id)
-                        merged.append(spell)
-                    }
+                    batches[file.name] = batch
                 case .failure(let reason):
                     lastFailure[file.name] = reason
                     stillPending.append(file)
@@ -102,6 +93,20 @@ final class SpellDatabase: ObservableObject {
             }
             pending = stillPending
             if pending.isEmpty { break }
+        }
+
+        // Merge em ordem fixa: exemplos primeiro, depois priest_*/wizard_* por nome.
+        let order = batches.keys.sorted { a, b in
+            if a == "sample_spells" { return b != "sample_spells" }
+            if b == "sample_spells" { return false }
+            return a < b
+        }
+        for name in order {
+            for spell in batches[name] ?? [] {
+                guard !seenIDs.contains(spell.id) else { continue }
+                seenIDs.insert(spell.id)
+                merged.append(spell)
+            }
         }
 
         for file in pending {

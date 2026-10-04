@@ -11,7 +11,9 @@ final class MundaneItemDatabase: ObservableObject {
     @Published private(set) var loadError: String? = nil
 
     init() {
-        items = EmbeddedMundaneItems.entries.sorted { $0.name < $1.name }
+        let result = BundleJSON.load([MundaneItem].self, file: "mundane_items.json")
+        items = result.items.sorted { $0.name < $1.name }
+        loadError = result.error
     }
 
     func item(id: String) -> MundaneItem? {

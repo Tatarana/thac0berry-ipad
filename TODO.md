@@ -6180,3 +6180,75 @@ já está na ficha:
 
 `Package.swift`: `displayVersion` "1.95"→"1.96", `bundleVersion`
 "200"→"201".
+
+## AJUSTE v1.97 (2026-10-01) — Warrior Kits e Rogue Kits (fecha o pendente da v1.92/v1.94)
+
+O usuário forneceu `warrior_kits.json` (114 kits) e `rogue_kits.json` (73
+kits) — o JSON estruturado que faltava desde a v1.92 ("Warrior Kits fica
+pendente até lá") e a v1.94 (mesmo acordo pro Rogue). Diferente do
+`wizard_kits.json` bruto (wiki-scrape cru), estes dois já vieram no
+esquema praticamente idêntico ao de `Resources/kits.json` — mesmas chaves
+de topo, `features`/`description` já com `rawWikitext`.
+
+**1) `Scripts/convert_warrior_rogue_kits.py`** (novo, mesma filosofia dos
+outros dois conversores: tratar diferença de esquema em Python, não em
+Swift). Três ajustes de esquema: `requirements.alignment` singular →
+`alignments` lista; `weapons` ganha `forbidden: []` (chave que não existe
+no bruto); `armor`/`turnUndead` sintetizados com os mesmos valores
+neutros do mago (dado de armadura dessas classes só existe como prosa em
+`features.specialHindrances`/`equipment`, sem estrutura pra extrair).
+`weaponSlots` só vira campo quando tem conteúdo (39/114 kits de Warrior,
+14/73 de Rogue) — mesmo `Optional` que `Kit.swift` já suporta.
+
+Caso especial: Barbarian (14 dos 114 kits de Warrior) vem do arquivo
+bruto marcado como se fosse uma classe própria (`subclass: "Barbarian"`,
+`allowedClasses: ["Barbarian"]`) — mas a regra confirmada com o usuário
+antes do Warrior inteiro (v1.92) é que Barbarian é KIT de Fighter, não
+`CharacterClass`. Sem remapear isso, esses 14 kits ficariam invisíveis
+pra sempre em `KitDatabase.kits(allowedFor:)` (nenhuma classe jogável
+chamada "Barbarian" existe pra casar o filtro) — resolvido na conversão
+(`allowedClasses` vira `["Fighter"]`, `subclass` continua "Barbarian"
+como rótulo exibido) em vez de mais um caso especial em Swift, mesmo
+espírito do mago sintetizando `allowedClasses: ["Mage"]` direto.
+
+Rodado uma vez por grupo, cada um anexando ao `kits.json` da rodada
+anterior: 132 kits (Priest 91 + Wizard 41) → +114 Warrior → +73 Rogue =
+**319 kits no total**. Zero colisão de id, zero "Create Your Own" nos
+dois arquivos (diferente do mago, que tinha 9). Validado campo a campo em
+Python contra o schema exato de `Kit.swift` antes de ir pro app (tipos de
+`mechanics.requirements.abilities`, `weaponSlots.initial/additional`,
+etc.) — sem Swift disponível neste ambiente pra compilar de verdade, mas
+o histórico do bug de decode original (`KitDatabase.swift`) tornou essa
+checagem manual criteriosa, não opcional.
+
+**2) `Views/KitCompendiumView.swift`.** `groupOrder` (usado pelo
+compêndio de folhear, agrupado por subclasse) só sabia de `"Priest"` e
+"qualquer outra coisa" → `["Wizard"]` — teria mostrado o compêndio de
+Warrior/Rogue vazio mesmo com os kits carregados (`bySubclass["Wizard"]`
+nunca bate com "Fighter"/"Thief"/etc.). Ganhou `warriorGroupOrder`
+(`["Fighter", "Paladin", "Ranger", "Barbarian"]`) e `rogueGroupOrder`
+(`["Thief", "Bard", "Ninja"]`), com `switch` no lugar do ternário.
+`KitPickerSheet.emptyMessage` perdeu o branch especial do grupo Warrior
+("kits ainda não estão na base...") — virou morto na prática, já que
+`kits(allowedFor:)` não fica mais vazio pra Fighter/Paladin/Ranger/Thief/
+Bard/Ninja; a mensagem genérica ("\(className) has no kits in the
+compendium yet.") cobre qualquer classe futura sem kit.
+
+**3) `Views/CompendiumHubView.swift`.** Dois tiles novos no Hub, mesmo
+padrão de "Priest Kits"/"Wizard Kits" — "Warrior Kits" (`icon_warrior_kits`,
+sem asset ainda, cai no fallback `shield.fill`/badge raio crimson) e
+"Rogue Kits" (`icon_rogue_kits`, fallback `eye.slash.fill`/badge estrela
+verde-escuro), cada um navegando pro `KitCompendiumScreen(classGroup:)`
+já genérico.
+
+Nenhuma mudança em `Models/Kit.swift`/`KitDatabase.swift` além de
+comentário (doc-comment do topo atualizado pra citar os quatro grupos) —
+confirma a aposta de projeto desde o mago: `classEligibility` genérico
+dispensa qualquer mudança de modelo pra um grupo de classe novo.
+
+Pendente: ícones de verdade pra "Warrior Kits"/"Rogue Kits" (hoje no
+fallback de SF Symbol, igual todo tile sem arte própria) — cosmético, não
+bloqueia uso.
+
+`Package.swift`: `displayVersion` "1.96"→"1.97", `bundleVersion`
+"201"→"202".

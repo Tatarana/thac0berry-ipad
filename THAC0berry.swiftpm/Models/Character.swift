@@ -741,6 +741,32 @@ struct ThievingSkillEntry: Codable, Identifiable, Hashable {
     var value: String = ""
 }
 
+/// Wild Talent (CPsiH cap. 1, "Wild Talents" — `RuleEntry` id
+/// `cpsih_ch01_wild_talents`, `Scripts/convert_psionics_rules.py`):
+/// personagem de QUALQUER classe pode ter potencial psiônico latente,
+/// independente de classe/raça/alinhamento. Diferente de um Psionicist de
+/// verdade (que ainda não é uma `CharacterClass` jogável — rodada
+/// "fundação primeiro" dos Psiônicos, 2026-10-01, ver TODO.md), um wild
+/// talent não tem Attack/Defense Modes nem avança em nível igual um
+/// psiônico — só guarda o(s) poder(es) que a rolagem/Mestre concedeu e os
+/// PSP que vêm junto. Mesmo tratamento de `CombatDetails`/`WeaponEntry`:
+/// o app registra o RESULTADO da regra (powers conhecidos, PSP), não
+/// automatiza a rolagem percentual em si (Tabela 11 de chance base,
+/// Tabela 12/13 Wild Devotions/Sciences) — o jogador rola fora da ficha e
+/// anota aqui, do jeito que já faz com XP ou dano recebido.
+struct WildTalent: Codable, Hashable {
+    /// Nome(s) do(s) poder(es) conhecido(s) — texto livre (pode bater com
+    /// `PsionicPower.title` da base, ou vir escrito à mão); mais de um
+    /// poder é raro mas possível ("a lucky few" no texto da regra), por
+    /// isso lista em vez de campo único.
+    var powers: [String] = []
+    /// PSP do wild talent — bem menor que um Psionicist de verdade (CPsiH:
+    /// "the minimum number of PSPs necessary to use the power once" +
+    /// 4x o custo de manutenção se o poder puder ser mantido; +4 PSP a
+    /// cada nível novo depois).
+    var psionicStrengthPoints: Int = 0
+}
+
 /// Os detalhes de combate da ficha oficial que não têm campo próprio ainda
 /// no personagem — tudo texto livre, como as linhas em branco do PDF.
 /// Todo o struct é Optional no personagem (ver `PlayerCharacter.combat`)
@@ -1431,6 +1457,9 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     // aceso do nada.
     var lastAppliedLevel: Int? = nil
     var lastAppliedAbilities: AbilityScores? = nil
+    /// Classe no último snapshot de consequências — sem ela, trocar de
+    /// classe nunca aparecia como mudança (o "antes" usava a classe atual).
+    var lastAppliedClass: CharacterClass? = nil
 
     /// Qual campo foi editado por último, entre os que o motor de
     /// consequências acompanha ("level", "strength", "dexterity",
@@ -1844,13 +1873,20 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// liga o sinal "•" no cabeçalho da ficha.
     var hasPendingConsequences: Bool {
         guard let lastAppliedLevel, let lastAppliedAbilities else { return false }
-        return lastAppliedLevel != level || lastAppliedAbilities != abilities
+        return lastAppliedLevel != level || lastAppliedAbilities != abilities || hasPendingClassChange
     }
 
     /// `true` só quando o NÍVEL mudou desde a última revisão.
     var hasPendingLevelChange: Bool {
         guard let lastAppliedLevel else { return false }
-        return lastAppliedLevel != level
+        return lastAppliedLevel != level || hasPendingClassChange
+    }
+
+    /// `true` quando a CLASSE mudou desde a última revisão (fichas antigas
+    /// sem `lastAppliedClass` não contam como mudança).
+    var hasPendingClassChange: Bool {
+        guard let lastAppliedClass else { return false }
+        return lastAppliedClass != characterClass
     }
 
     /// Mesma ideia de `hasPendingLevelChange`, mas por ATRIBUTO.
@@ -1922,7 +1958,7 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// abertura de uma ficha antiga, antes do snapshot inicial rodar.
     var lastAppliedRuleContext: RuleContext? {
         guard let lastAppliedLevel, let lastAppliedAbilities else { return nil }
-        return RuleContext(level: lastAppliedLevel, characterClass: characterClass, abilities: lastAppliedAbilities)
+        return RuleContext(level: lastAppliedLevel, characterClass: lastAppliedClass ?? characterClass, abilities: lastAppliedAbilities)
     }
 
     /// Retrato "agora" pro `ConsequenceEngine.diff`.
@@ -1937,6 +1973,9 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// já existe não faz nada (por isso é seguro repetir a cada
     /// `.onAppear`, sem apagar uma consequência pendente de verdade).
     mutating func ensureConsequenceSnapshotInitialized() {
+        if lastAppliedClass == nil, lastAppliedLevel != nil {
+            lastAppliedClass = characterClass  // ficha antiga: só passa a rastrear a classe daqui pra frente
+        }
         guard lastAppliedLevel == nil, lastAppliedAbilities == nil else { return }
         markConsequencesReviewed()
     }
@@ -1948,6 +1987,7 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     mutating func markConsequencesReviewed() {
         lastAppliedLevel = level
         lastAppliedAbilities = abilities
+        lastAppliedClass = characterClass
         lastChangedField = nil
     }
 
@@ -2031,6 +2071,12 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// o dicionário já impede o estado inválido "maior E menor ao mesmo
     /// tempo" que dois conjuntos permitiriam sem checagem extra.
     var sphereAccess: [String: SphereAccessLevel]? = nil
+
+    /// Wild Talent (CPsiH, "fundação primeiro" dos Psiônicos, 2026-10-01)
+    /// — `nil` até o jogador registrar um (toda ficha de antes desta
+    /// versão não tem essa chave). Disponível pra QUALQUER classe, ao
+    /// contrário de `sphereAccess`/`kit` — ver `WildTalent`.
+    var wildTalent: WildTalent? = nil
 
     /// `nil` quando a esfera não está marcada (nem maior nem menor) — o
     /// mesmo "sem preferência" de antes de o jogador mexer em nada.

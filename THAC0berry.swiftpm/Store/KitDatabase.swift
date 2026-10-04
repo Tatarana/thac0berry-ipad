@@ -1,6 +1,10 @@
 import Foundation
 
-/// Base de kits de sacerdote — lida de `Resources/kits.json` em runtime.
+/// Base de kits — lida de `Resources/kits.json` em runtime. Começou só
+/// com os de sacerdote; hoje cobre quatro grupos no mesmo arquivo/array
+/// (Priest, Wizard, Warrior, Rogue — ver o comentário no topo de
+/// `Models/Kit.swift`), todos filtrados pelo mesmo `classEligibility`
+/// genérico abaixo, sem nenhum caso especial por classe.
 ///
 /// HISTÓRICO (pra quem ler isto e se assustar de novo): entre v0.81 e
 /// v0.84, TRÊS tentativas diferentes de ler isso de JSON de bundle

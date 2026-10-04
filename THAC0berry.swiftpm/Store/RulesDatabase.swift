@@ -1,9 +1,10 @@
 import Foundation
 
-/// Base de regras (PHB, DMG, CPrH e os oito "Complete X's Handbook" dos
-/// grupos Warrior e Rogue — 783 entradas ao todo desde 2026-09-30, ~202
-/// tabelas, todas do PHB/DMG/CPrH: os oito "Complete X's Handbook"
-/// vieram sem tabela estruturada, só prosa) — lida de
+/// Base de regras (PHB, DMG, CPrH, os oito "Complete X's Handbook" dos
+/// grupos Warrior e Rogue, e desde 2026-10-01 os quatro livros de
+/// Psiônicos — CPsiH, DSC, DK, WatW, `Scripts/convert_psionics_rules.py`
+/// — 888 entradas ao todo, ~202 tabelas, todas do PHB/DMG/CPrH: o resto
+/// veio sem tabela estruturada, só prosa) — lida de
 /// `Resources/rules.json` em runtime (ver o comentário grande em
 /// `Rule.swift`/`RuleEntry` pro porquê da volta ao JSON, 2026-09-25: o
 /// literal Swift gigante que morava aqui antes travava o archive de

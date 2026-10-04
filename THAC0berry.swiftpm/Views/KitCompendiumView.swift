@@ -94,8 +94,24 @@ struct KitCompendiumView: View {
     /// de especialista aqui), então essa lista nem entra em jogo pra ele.
     private static let priestGroupOrder = ["Cleric", "Druid", "Any Priest", "Specialty Priest"]
 
+    /// Ordem por subclasse dentro do grupo Warrior (`Scripts/convert_warrior_rogue_kits.py`,
+    /// 2026-09-30) — Fighter primeiro por ser de longe o maior (66 dos 114),
+    /// Barbarian por último por ser tecnicamente um Kit de Fighter e não
+    /// uma `CharacterClass` própria (ver `classEligibility.allowedClasses`
+    /// no conversor).
+    private static let warriorGroupOrder = ["Fighter", "Paladin", "Ranger", "Barbarian"]
+
+    /// Ordem por subclasse dentro do grupo Rogue — mesmo conversor, Thief
+    /// primeiro (o maior, e a única subclasse já jogável desde o PHB).
+    private static let rogueGroupOrder = ["Thief", "Bard", "Ninja"]
+
     private var groupOrder: [String] {
-        classGroup == "Priest" ? Self.priestGroupOrder : ["Wizard"]
+        switch classGroup {
+        case "Priest": return Self.priestGroupOrder
+        case "Warrior": return Self.warriorGroupOrder
+        case "Rogue": return Self.rogueGroupOrder
+        default: return ["Wizard"]
+        }
     }
 
     private var filtered: [Kit] {
@@ -511,24 +527,18 @@ struct KitPickerSheet: View {
     /// não achou nada" — mensagens genéricas de "sem resultado" confundem
     /// quando a causa é a classe escolhida, não o texto digitado.
     ///
-    /// Corrigido em 2026-09-30 (item 1 do feedback do usuário): a mensagem
-    /// antiga ("priest kits only apply to Cleric and Druid") já estava
-    /// desatualizada mesmo antes do Warrior — Mago tem 41 kits próprios
-    /// desde a v1.87 e a frase não mencionava isso. Pior ainda pro grupo
-    /// Warrior (Fighter/Paladin/Ranger): a base não tem NENHUM kit deles
-    /// ainda (só zip de regras em prosa foi entregue — o JSON estruturado
-    /// dos kits fica pro usuário mandar depois, ver TODO.md v1.92), então a
-    /// frase de "só Cleric e Druid" ficava simplesmente errada pra essa
-    /// classe — e foi a causa do item 5 ("não consegui escolher o kit de
-    /// Barbarian"): a lista realmente está vazia, só a explicação estava
-    /// enganosa.
+    /// 2026-09-30: o caso especial do grupo Warrior ("kits ainda não estão
+    /// na base — só o texto de regras veio no zip") saiu daqui — os 114
+    /// kits de Warrior (Fighter/Paladin/Ranger + Barbarian, dobrado dentro
+    /// de Fighter) e os 73 de Rogue (Thief/Bard/Ninja) chegaram via
+    /// `Scripts/convert_warrior_rogue_kits.py`, então `unfilteredByClass`
+    /// não fica mais vazio pra nenhuma dessas classes — este branch virou
+    /// morto na prática, mas a mensagem genérica abaixo continua certa
+    /// pra qualquer classe futura sem kit nenhum.
     private var emptyMessage: String {
         let unfilteredByClass = kitDatabase.kits(allowedFor: className)
         guard unfilteredByClass.isEmpty, let className else {
             return "No kits match — try a different search."
-        }
-        if let charClass = CharacterClass(rawValue: className), charClass.proficiencyGroup == "Warrior" {
-            return "\(className) kits (including Barbarian) aren't in the compendium yet — the Warrior sourcebooks only came with rules text, not kit stat blocks. They'll show up here once that data is added."
         }
         return "\(className) has no kits in the compendium yet."
     }
