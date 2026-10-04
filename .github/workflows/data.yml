@@ -1,0 +1,42 @@
+# Valida os dados de referência (Resources/*.json) contra schemas/.
+# Linux: barato e rápido; não depende de Mac nem de Swift.
+
+name: Dados (JSON Schema)
+
+on:
+  push:
+    paths:
+      - "THAC0berry.swiftpm/Resources/**.json"
+      - "schemas/**"
+      - "Scripts/validate_schemas.py"
+      - ".github/workflows/data.yml"
+  pull_request:
+    paths:
+      - "THAC0berry.swiftpm/Resources/**.json"
+      - "schemas/**"
+      - "Scripts/validate_schemas.py"
+  workflow_dispatch:
+
+jobs:
+  schemas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema==4.*
+      - name: Validar
+        run: |
+          set -o pipefail
+          python Scripts/validate_schemas.py | tee validate.log
+      - name: Anotações
+        if: always()
+        run: |
+          # Logs exigem login; anotações são públicas.
+          grep -E '^(FAIL|SKIP)' validate.log | while IFS= read -r l; do
+            case "$l" in FAIL*) echo "::error title=Schema::$l";; SKIP*) echo "::notice title=Não carregado::$l";; esac
+          done
+          grep -E '^\s+(erro|aviso)' validate.log | head -20 | while IFS= read -r l; do echo "::warning::$l"; done
+          echo "::notice title=Resumo::$(grep -c '^OK' validate.log) arquivos OK, $(grep -c '^FAIL' validate.log) com falha"
