@@ -59,8 +59,11 @@ jobs:
             -Xfrontend -debug-time-function-bodies \
             -Xfrontend -warn-long-expression-type-checking=${SLOW_MS} \
             $(cat files.txt) > tc.log 2>&1 || echo "failed=1" >> "$GITHUB_OUTPUT"
-          # Pico de memória do compilador (indicador do risco no iPad).
-          grep -E "maximum resident set size|real" tc.log | tail -3 || true
+          # Pico de memória e tempo do compilador (indicador do risco no
+          # iPad). Vira anotação pública: os logs de step exigem login.
+          rss=$(awk '/maximum resident set size/ {print $1}' tc.log | tail -1)
+          real=$(awk '/ real / {print $1}' tc.log | tail -1)
+          echo "::notice title=Compilador::$(wc -l < files.txt | tr -d ' ') arquivos, $(cat $(cat files.txt) | wc -l | tr -d ' ') linhas; pico de memória $((rss / 1048576)) MB; ${real}s"
 
       - name: Relatório
         if: always()
@@ -87,6 +90,8 @@ jobs:
             f=$(echo "$loc" | cut -d: -f1); n=$(echo "$loc" | cut -d: -f2)
             echo "::warning file=$f,line=$n::type-check lento: $ms ($what)"
           done
+
+          echo "::notice title=Resumo::erros $(wc -l < errors.txt | tr -d ' '), avisos $(wc -l < warnings.txt | tr -d ' '), corpos ≥ ${SLOW_MS}ms $(wc -l < slow_bodies.txt | tr -d ' '), expressões ≥ ${SLOW_MS}ms $(wc -l < slow_expr.txt | tr -d ' ')"
 
           {
             echo "## Typecheck"
@@ -137,12 +142,17 @@ jobs:
       - name: Build (iOS Simulator)
         working-directory: THAC0berry.swiftpm
         run: |
-          set -o pipefail
           xcodebuild build \
             -scheme THAC0berry \
             -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log | grep -E 'error:|warning: .*resource|BUILD (SUCCEEDED|FAILED)' | head -200
+            CODE_SIGNING_ALLOWED=NO > xcodebuild.log 2>&1 && ok=1 || ok=0
+          res=$(grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' xcodebuild.log | tail -1)
+          app=$(find ~/Library/Developer/Xcode/DerivedData -name 'THAC0berry.app' -type d | head -1)
+          size=$( [ -n "$app" ] && du -sh "$app" | cut -f1 )
+          echo "::notice title=xcodebuild::${res:-sem linha BUILD} | .app: ${app:+gerado, $size}${app:-não encontrado} | $(wc -l < xcodebuild.log | tr -d ' ') linhas de log"
+          grep -E '^/.*: error: ' xcodebuild.log | sed "s|$GITHUB_WORKSPACE/||" | head -10 | while IFS= read -r l; do echo "::error::$l"; done
+          [ "$ok" = 1 ]
       - uses: actions/upload-artifact@v4
         if: always()
         with:
