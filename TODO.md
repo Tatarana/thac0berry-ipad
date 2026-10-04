@@ -6294,3 +6294,28 @@ ao repo), não com `git archive` — neste PC o `core.autocrlf=true` faz o
 `git archive` converter os textos pra CRLF.
 
 `Package.swift`: `displayVersion` "1.98-p2b2"→"1.99", `bundleVersion` "209"→"210".
+
+## AJUSTE v1.99.1 (2026-10-04) — contrato de dados (JSON Schema), CLAUDE.md, limpeza de legados
+
+**Contrato dos dados de referência.** `schemas/*.schema.json` (13 schemas,
+JSON Schema 2020-12) cobrem todos os JSON de `Resources/`, escritos a partir
+do decode de cada modelo Swift (obrigatório = o Swift falha sem o campo).
+`Scripts/validate_schemas.py` valida tudo (JSON sem schema, id duplicado,
+campos ignorados pelo app como aviso; `--strict` vira erro). CI novo
+`.github/workflows/data.yml` (Linux). Resultado: 41 arquivos OK, nenhum
+campo ignorado. Regra: mudou modelo decodificável → muda o schema no mesmo
+commit (ver `schemas/README.md`).
+
+**CLAUDE.md** na raiz: regras do projeto e armadilhas conhecidas (ambiente
+sem Mac, Playgrounds/ícone, Codable, dados do usuário, CI, empacotamento,
+versão, direção backend/web). **README.md** reescrito para o estado atual
+(o antigo descrevia a v1).
+
+**Removidos.** `Resources/spells.json` (não era carregado pelo app desde que
+as magias foram para `sample_spells`/`priest_*`/`wizard_*`; nem decodificava
+mais no formato atual de `SpellDamage`) e `Scripts/validate_data.py`
+(substituído pelo validador de schemas). Pendente cosmético: o texto
+placeholder em `SpellSheetView.swift` ("Once the entry exists in
+spells.json…") ainda cita o arquivo antigo.
+
+`Package.swift`: `displayVersion` "1.99"→"1.99.1", `bundleVersion` "210"→"211".

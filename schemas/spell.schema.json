@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://thac0berry/schemas/spell.schema.json",
   "title": "Magias",
-  "description": "Arquivos: sample_spells.json, priest_*.json, wizard_*.json (e spells.json, hoje não carregado pelo app). Espelha o decode em Swift: Models/Spell.swift (Spell.init(from:), SpellDamage).",
+  "description": "Arquivos: sample_spells.json, priest_*.json, wizard_*.json. Espelha o decode em Swift: Models/Spell.swift (Spell.init(from:), SpellDamage).",
   "type": "array",
   "items": {
     "$ref": "#/$defs/Spell"

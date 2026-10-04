@@ -26,9 +26,6 @@ schemas ou no validador.
 | `rules_saving_throws.json` | `rules-saving-throws.schema.json` | `Store/RuleEngine/CoreRuleset/SavingThrowsByLevelProvider.swift` |
 | `rules_experience.json` | `rules-experience.schema.json` | `Models/ExperienceProgressionTable.swift` |
 
-`spells.json` não é carregado pelo app (versão antiga de `sample_spells.json`)
-e é pulado pelo validador.
-
 ## Como o schema espelha o Swift
 
 O schema descreve o que o **decode do Swift aceita**, não o que "parece certo":

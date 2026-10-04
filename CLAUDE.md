@@ -64,7 +64,6 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   algum código usa.
 - A mensagem "The data couldn't be read because it is missing" costuma ser
   `DecodingError.keyNotFound`, **não** arquivo ausente. Logue o erro completo.
-- `Resources/spells.json` não é carregado pelo app (resquício); o validador o pula.
 
 ## 5. Dados do usuário (não perder personagens)
 
@@ -95,6 +94,10 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 ## 7. Pacote para teste no iPad
 
 - O usuário apaga a pasta local, descompacta o zip e abre no Playgrounds.
+- **Cada cópia de projeto no Playgrounds tem armazenamento próprio**: abrir um zip como
+  projeto *novo* (outra pasta) começa sem personagens. Para testes assim, lembre o
+  usuário de exportar backup antes (Settings → Backup) e nunca peça para apagar o
+  projeto original.
 - Gere o zip a partir dos **blobs do git** (`git ls-tree` + `git cat-file blob`, com
   permissões 0644 e diretórios 0755), em `dist/` (que está no gitignore).
 - **Não use `git archive`:** neste PC `core.autocrlf=true` faz ele converter os textos
@@ -122,7 +125,8 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 - Regra de jogo nova não vai para uma View: fica em `Store/` (funções puras sobre os
   modelos).
 
-## 10. Documentação desatualizada
+## 10. Documentação
 
-O `README.md` descreve a v1 (fala em `spells.json`, `characters.json` e no Kelmon semeado
-automaticamente). Em caso de conflito, valem este arquivo, `schemas/` e o código.
+`README.md` (visão geral e estrutura), este arquivo (regras), `schemas/README.md`
+(formato dos dados), `TODO.md` (histórico de cada versão). Em caso de conflito com o
+código, o código vale; corrija o documento.

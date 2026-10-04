@@ -28,10 +28,7 @@ SCHEMAS = os.path.join(ROOT, "schemas")
 # Arquivo (glob) -> schema. Todo .json de Resources/ precisa casar com um.
 # Arquivos que estão em Resources/ mas o app NÃO carrega — listados à parte
 # pra não passarem despercebidos (e nem quebrarem a validação).
-NOT_LOADED = {
-    "spells.json": "versão antiga de sample_spells.json (damageDice sem bonusPerLevel); "
-                   "SpellDatabase só lê sample_spells/priest_*/wizard_*",
-}
+NOT_LOADED = {}
 
 MAPPING = [
     ("sample_spells.json", "spell.schema.json"),

@@ -1,142 +1,119 @@
 # THAC0berry
 
 Ficha de personagem de **AD&D 2ª edição** para iPad, pensada para a Apple Pencil.
-Substitui a ficha de papel no que ela é pior: controlar slots de magia dia após dia
-e registrar o que foi conjurado sem parar o jogo.
+Substitui a ficha de papel no que ela é pior: controlar magias dia após dia,
+consultar regras e itens sem parar o jogo, e manter o histórico da campanha.
 
-Projeto irmão do [Just Pencil It](https://github.com/Tatarana/Justpencilit) — apps
+Projeto irmão do [Just Pencil It](https://github.com/Tatarana/Justpencilit): apps
 separados, com a base técnica (canvas PencilKit, proteção de dados) clonada de lá.
 
-## Duas folhas, não uma tela
+> Agentes de IA e quem for mexer no código: leia primeiro o [`CLAUDE.md`](CLAUDE.md).
+> Ele tem as regras do projeto e as armadilhas conhecidas do Swift Playgrounds.
 
-O app é uma pasta de folhas, como a de mesa:
+## A tela é a folha
 
-**Folha 1 — a ficha do personagem**, no arranjo da ficha oficial de AD&D 2e:
-atributos com os ajustes derivados ao lado (acerto e dano da Força, defesa da
-Destreza, choque e ressurreição da Constituição, magias bônus da Sabedoria…),
-tabela de armas com THAC0 e dano P/M e G, jogadas de proteção, equipamento com
-peso, proficiências, perícias, idiomas, itens mágicos, aliados e tesouro em
-moedas.
+O app não usa `Form`, `List` nem controles padrão do iOS: cada tela imita a ficha
+impressa. Pergaminho, tarjas em tinta escura, rótulos em versalete, valores em letra
+de mão com caneta azul. Tocar num valor abre um balão onde a Pencil escreve por cima.
+O texto é reconhecido pelo Scribble do próprio iPadOS, e não por OCR próprio; o
+teclado de software fica desligado por padrão.
 
-**Folha 2 em diante — uma folha de magias por dia de jogo.** Esta é a diferença
-que muda o modelo de dados: em 2e os slots zeram no repouso, então a memorização
-não é um atributo permanente do personagem — é o preenchimento de um dia. Cada
-folha tem seus próprios slots e seu próprio registro, no formato do registro
-oficial: um quadro por círculo, bolinhas de slot no cabeçalho e a tabela do que
-está memorizado com iniciativa, alcance, duração, resistência e componentes.
-Começar uma folha nova herda a mesma quantidade de slots do dia anterior, já
-zerados — que é o que o repouso faz na regra. As folhas antigas ficam guardadas:
-dá para folhear a campanha inteira e ver o que o clérigo levava preparado no dia
-da emboscada.
+## O que o app faz
 
-As abas de papel no alto trocam de folha.
+**Campanhas e personagens.** A Home leva a Campanhas, Personagens e Compêndio. Uma
+campanha tem elenco, sessões datadas, ambientação (Forgotten Realms, Dark Sun,
+Ravenloft…) e um **caderno compartilhado**, folheado como livro, com páginas pautadas,
+quadriculadas ou de desenho livre. Personagens podem ser arquivados ou marcados como
+mortos ("Fallen Heroes").
 
-## Como a ficha se parece
+**Ficha do personagem**, no arranjo da ficha oficial de AD&D 2e:
+- atributos com os ajustes derivados;
+- THAC0 e tabela de acerto por CA;
+- jogadas de proteção, armas, armadura com CA automática, proficiências (com contagem
+  de slots), perícias de ladrão, equipamento, tesouro e descrição do personagem;
+- raça, classe e kit vêm do compêndio.
 
-O app não usa `Form`, `List` nem controles padrão do iOS: a tela **é** a folha.
-Pergaminho com grão, tarjas de título em tinta escura, rótulos em versalete
-serifado e todos os valores em letra de mão, caneta azul. Slots de magia são
-bolinhas que ganham um ✕ vermelho quando gastas; pontos de vida são caixinhas
-que se preenchem ao toque; magias já conjuradas aparecem riscadas na lista.
-Tocar em qualquer valor abre um balão pequeno onde a Apple Pencil escreve por
-cima — nunca uma célula de formulário.
+Ao subir de nível ou trocar atributo ou classe, a **janela de consequências** mostra o
+que muda (THAC0, saves, slots…) antes de aplicar.
 
-Em paisagem, as três colunas da ficha impressa; em retrato, a mesma folha
-rolando de cima para baixo.
+**Folhas de magia por dia.** Em 2e os slots zeram no repouso, então a memorização é o
+preenchimento de um dia, não um atributo do personagem. Cada dia de jogo tem a sua
+folha, para sacerdote, mago e bardo:
+- slots por círculo;
+- magias memorizadas;
+- registro do que foi conjurado: escreva o nome com a Pencil, o app sugere candidatos
+  por casamento aproximado (`Utils/Fuzzy.swift`) e só grava com a sua confirmação.
 
-Na primeira execução a pasta já vem com **Kelmon**, clérigo humano de 11º nível,
-com a ficha preenchida e duas folhas de magia (o 2º e o 3º dia em Elturel) — dá
-para ver o app cheio antes de criar sua ficha.
+As folhas antigas ficam guardadas e se folheiam como páginas, cronologicamente. O mago
+tem ainda o **grimório pessoal** (as magias que conhece) e a escola de especialização.
 
-## O que a v1 faz
+**Efeitos ativos.** Magias e itens com duração (bônus de CA, de acerto, de saves,
+dano…) aplicados sobre a ficha, com desfazer.
 
-**Ficha** — atributos (com força excepcional), PV atual/máximo, CA, THAC0,
-movimento, equipamento, as cinco categorias de jogada de proteção, nível e XP.
+**Relatório de sessão.** Magias conjuradas por círculo e cargas de itens gastas,
+somadas por sessão.
 
-**Slots de magia** — por círculo, dentro da folha do dia, separados entre mago e
-sacerdote. Cada slot guarda uma magia específica; um toque na bolinha risca o
-slot, e tocar no nome troca a magia memorizada.
-
-**Registro do dia** — você escreve o nome da magia com a Apple Pencil, o app
-reconhece, sugere candidatos da base embutida e, depois da sua confirmação, grava
-a linha e risca sozinho o slot correspondente. Cada linha aceita uma anotação
-livre e um valor de XP.
-
-## Como o reconhecimento funciona
-
-O app **não** roda OCR em cima da tinta. Ele usa o Scribble nativo do iPadOS: a linha
-de escrita é um campo de texto onde você escreve com a caneta e o sistema converte
-com o mesmo motor de reconhecimento da Apple — mais preciso que qualquer OCR
-próprio, principalmente com nomes que não são palavras comuns. O teclado de software
-fica desligado por padrão (há um botão para ligá-lo).
-
-O texto reconhecido passa por um casamento aproximado (`Utils/Fuzzy.swift`):
-distância de edição, bônus para prefixo e reconhecimento de iniciais — "mm" acha
-*Magic Missile*. O app **nunca** grava sem confirmação: ele lista candidatos com um
-selo de confiança e você escolhe.
-
-## Base de magias
-
-`Resources/spells.json` traz 62 magias: mago nos círculos 1 a 3 e sacerdote nos
-círculos 1 a 6, com os dados mecânicos do cabeçalho de cada descrição.
-
-⚠️ **Confira os valores contra o seu PHB antes de usar em mesa.** Os dados foram
-montados de memória, sem acesso ao livro — o dano de *Burning Hands* em especial
-merece uma olhada. O arquivo é JSON puro: para corrigir ou adicionar magias, basta
-editá-lo mantendo as mesmas chaves.
-
-Círculos de mago acima do 3º e de sacerdote acima do 6º funcionam na grade de
-slots, mas ainda não têm magias na base — nesses, use o nome livre.
+**Compêndio** (todo embutido, sem internet):
+- grimórios de sacerdote e de mago;
+- kits de sacerdote, mago, guerreiro e ladino;
+- divindades e regras (PHB, DMG e Complete Handbooks);
+- proficiências, armas, armaduras, equipamento, itens mágicos e poderes psiônicos;
+- telas de referência por classe.
 
 ## Rodando no iPad
 
-1. Abra o **Swift Playgrounds** e importe `THAC0berry.swiftpm`.
-2. Rode. Requer iPadOS 17 ou superior.
+1. Abra a pasta `THAC0berry.swiftpm` no **Swift Playgrounds** (iPadOS 17 ou superior).
+2. Aperte Play.
 
-Não precisa de Mac. Para publicar na App Store depois, será preciso o Apple
-Developer Program.
+Não precisa de Mac. O app aparece com o ícone padrão do Playgrounds: o ícone próprio
+foi retirado porque derruba o build no Playgrounds (detalhes no `CLAUDE.md`).
+
+**Antes de abrir uma versão nova como projeto novo, exporte um backup** (Settings →
+Backup). Cada cópia de projeto no Playgrounds tem o seu próprio armazenamento: uma
+cópia nova começa vazia. Depois é só importar o backup nela.
+
+## Dados
+
+- **Seus dados:** tudo fica local, em `Documents/library.json` (campanhas, personagens
+  e preferências), gravado com a proteção de dados nativa do iOS
+  (`.completeUnlessOpen`). Não há sincronização com a nuvem nesta versão.
+- **Dados de referência** (magias, kits, regras, itens): arquivos JSON em
+  `THAC0berry.swiftpm/Resources/`. O formato de cada um está definido em
+  [`schemas/`](schemas/README.md), que é o contrato para o futuro backend e a versão
+  web. Valide com `python Scripts/validate_schemas.py`.
 
 ## Estrutura
 
 ```
-THAC0berry.swiftpm/
-├── Package.swift            App Playground, produto .iOSApplication
-├── App.swift                ponto de entrada, injeta os dois stores
-├── Models/
-│   ├── Character.swift      personagem, atributos, saves, armas, tesouro
-│   ├── SpellSheet.swift     a folha de magias de um dia e o registro
-│   ├── SampleCharacter.swift  Kelmon, clérigo 11 de exemplo
-│   └── Spell.swift          magia da base
-├── Store/
-│   ├── CharacterLibrary.swift  persistência em JSON com Data Protection
-│   └── SpellDatabase.swift     carga do spells.json e busca aproximada
-├── Views/
-│   ├── PaperTheme.swift           pergaminho, tinta, tipografia, peças da ficha
-│   ├── PaperFields.swift          valores editáveis em letra de mão
-│   ├── CharacterListView.swift    a pasta de fichas
-│   ├── CharacterSheetView.swift   abas de papel + a ficha oficial
-│   ├── SpellSheetView.swift       a folha de magias de um dia
-│   ├── HandwritingField.swift     campo Scribble para a caneta
-│   └── InkCanvasView.swift        canvas PencilKit
-├── Utils/
-│   └── Fuzzy.swift          normalização e casamento aproximado
-└── Resources/
-    └── spells.json
+THAC0berry.swiftpm/          o app (tudo aqui dentro entra no build)
+├── Package.swift            App Playground, produto .iOSApplication, iPad, iOS 17+
+├── App.swift                ponto de entrada; injeta os stores
+├── Models/                  personagem, campanha, folha de magia, magia, kit, item…
+│   └── RuleEngine/          tipos do motor de regras (RuleProvider, RuleValue…)
+├── Store/                   persistência (CharacterLibrary), bases do compêndio
+│   │                        (*Database), ConsequenceEngine
+│   └── RuleEngine/          tabelas e cálculos do livro (THAC0, saves, slots…)
+├── Views/                   telas; PaperTheme/PaperFields = visual de papel
+├── Utils/Fuzzy.swift        casamento aproximado de nomes
+└── Resources/               JSON de dados e imagens
+
+schemas/                     JSON Schema de cada arquivo de Resources/
+Scripts/                     conversão e validação de dados (Python)
+Docs/                        documentação de apoio (ícones, dados, arte do ícone)
+.github/workflows/           CI: typecheck/build iOS (macOS) e validação de dados (Linux)
+CLAUDE.md                    regras do projeto para agentes e desenvolvedores
+TODO.md                      histórico detalhado de cada versão
 ```
 
-## Dados e segurança
+## Desenvolvimento
 
-Tudo fica local, em `characters.json` no diretório Documents do app, gravado com a
-proteção de dados nativa do iOS na classe `.completeUnlessOpen` — mesma decisão do
-Just Pencil It, sem criptografia própria por cima.
-
-Sincronização via iCloud ainda não está ligada nesta versão.
+Não há Mac no fluxo. A cada push, o CI no GitHub compila o app contra o SDK do iOS e
+valida os dados. O teste final é no Swift Playgrounds do iPad. O ciclo completo
+(branch, CI, pacote de teste, merge) está no `CLAUDE.md`.
 
 ## Próximos passos
 
-- Regra de cálculo automático de XP (a definir com a mesa).
-- Sincronização iCloud/CloudKit.
-- Modo do mestre: campanha com vários personagens.
-- Encerrar a folha do dia com um "repouso" que já cria a próxima.
-- Completar a base de magias (mago 4-9).
-- Encumbrance e ataques por rodada.
+- Backend e versão web compartilhando os dados de referência. A linguagem e a
+  hospedagem ainda estão em avaliação.
+- Versão (`schemaVersion`) no formato salvo das fichas.
+- Tirar as regras de jogo das telas, para que possam ser reaproveitadas fora do iPad.
