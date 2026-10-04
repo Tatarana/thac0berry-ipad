@@ -551,13 +551,8 @@ private struct SheetTabs: View {
             page = .spells(latest.id)
             return
         }
-        var sheet = SpellSheet()
-        sheet.sessionID = session.id
-        sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        sheet.slotBoard = character.freshSlotBoard()
-        character.spellSheets.append(sheet)
-        page = .spells(sheet.id)
+        let sheetID = character.startSpellSheet(sessionID: session.id, title: "Day 1")
+        page = .spells(sheetID)
     }
 }
 
@@ -807,18 +802,12 @@ private struct SpellSheetBeadRow: View {
     /// ficha.
     private func newSheet() {
         guard let session else { return }
-        let previous = daySheets.last
-        var sheet: SpellSheet = previous?.nextDay(keepingPreparations: true) ?? SpellSheet()
-        sheet.sessionID = session.id
-        sheet.slotBoard = reconciled(sheet.slotBoard, with: character.computedSpellSlotAllotments)
-        sheet.title = "Day \(daySheets.count + 1)"
-        // Congela hoje o atributo que decide os slots (Sabedoria/
-        // Inteligência, conforme a classe — ver
-        // `spellSheetAbilityScoreAtCreation`) na folha nova — é o valor que
-        // vale pra esse dia, mesmo que o personagem mude depois.
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        character.spellSheets.append(sheet)
-        page = .spells(sheet.id)
+        // Regra única em `Store/SpellSheetRules.swift`; o "+" herda do
+        // último dia DESTA sessão, como sempre fez.
+        let sheetID = character.startSpellSheet(sessionID: session.id,
+                                                title: "Day \(daySheets.count + 1)",
+                                                continuingFrom: daySheets.last)
+        page = .spells(sheetID)
     }
 
     /// Apaga uma folha (pelo menu de contexto de um pingo de dia). Sempre
@@ -831,29 +820,6 @@ private struct SpellSheetBeadRow: View {
         if wasShowing {
             page = character.sortedSpellSheets.first.map { .spells($0.id) } ?? .record
         }
-    }
-
-    /// Ajusta uma grade herdada do dia anterior para bater com a tabela da
-    /// ficha: aumenta ou diminui a contagem de cada círculo (`setCount`
-    /// preserva o que estava preparado quando um nível encolhe) e zera
-    /// círculos que saíram da tabela por completo.
-    private func reconciled(_ board: SpellSlotBoard,
-                            with allotments: [SpellSlotAllotment]) -> SpellSlotBoard {
-        var result = board
-        var covered = Set<CasterLevel>()
-
-        for allotment in allotments {
-            let key = CasterLevel(caster: allotment.caster, level: allotment.level)
-            covered.insert(key)
-            result.setCount(allotment.count, level: allotment.level, caster: allotment.caster)
-        }
-
-        let existing = Set(result.slots.map { CasterLevel(caster: $0.caster, level: $0.level) })
-        for pair in existing where !covered.contains(pair) {
-            result.setCount(0, level: pair.level, caster: pair.caster)
-        }
-
-        return result
     }
 }
 
@@ -2301,12 +2267,7 @@ private struct ClassPicker: View {
         character.seedWizardSpellbookIfNeeded(in: spellbook)
         guard option.hasSpellSheet, character.spellSheets.isEmpty, let campaignBinding else { return }
         let session = campaignBinding.wrappedValue.activeSession()
-        var sheet = SpellSheet()
-        sheet.sessionID = session.id
-        sheet.title = "First day"
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        sheet.slotBoard = character.freshSlotBoard()
-        character.spellSheets = [sheet]
+        character.startSpellSheet(sessionID: session.id, title: "First day")
     }
 }
 

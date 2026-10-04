@@ -83,9 +83,9 @@ As telas de referência (`ClericReferenceView`, `WizardReferenceView`,
 
 ## Proposta de execução (cada lote = uma versão, CI verde + teste no iPad)
 
-1. **Lote 1: folha de magia do dia (A3).** Unifica as 5 cópias numa função. Antes,
-   confirmar com o usuário se a diferença da `newSheet` (herdar preparações) é o
-   comportamento desejado. Maior risco de divergência hoje; mudança pequena.
+1. ~~**Lote 1: folha de magia do dia (A3).**~~ **Feito na v1.99.3:**
+   `PlayerCharacter.startSpellSheet` em `Store/SpellSheetRules.swift`. Decisão do
+   usuário: todo dia novo herda as preparações do dia anterior.
 2. **Lote 2: troca de classe, nível e kit (A1, A2, A4, B1, B2, B5).** Funções de mutação
    no modelo; as telas passam a chamá-las.
 3. **Lote 3: CA e equipamento (B4, A6, A11).**

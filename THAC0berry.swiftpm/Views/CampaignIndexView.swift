@@ -65,18 +65,13 @@ struct CampaignIndexView: View {
         let session = Session(date: date, title: title)
         campaign.sessions.append(session)
 
-        var sheet = SpellSheet()
-        sheet.sessionID = session.id
         // The sheet is born on the same date as the session, not "now" —
         // otherwise a backdated session would fall out of order in the
-        // chronological list of sheets.
-        sheet.date = date
-        sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        sheet.slotBoard = character.freshSlotBoard()
-        character.spellSheets.append(sheet)
+        // chronological list of sheets. Herda o dia anterior (ver
+        // `Store/SpellSheetRules.swift`).
+        let sheetID = character.startSpellSheet(sessionID: session.id, title: "Day 1", date: date)
 
-        page = .spells(sheet.id)
+        page = .spells(sheetID)
     }
 
     private var header: some View {
@@ -161,13 +156,8 @@ struct CampaignIndexView: View {
             page = .spells(latest.id)
             return
         }
-        var sheet = SpellSheet()
-        sheet.sessionID = session.id
-        sheet.title = "Day 1"
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        sheet.slotBoard = character.freshSlotBoard()
-        character.spellSheets.append(sheet)
-        page = .spells(sheet.id)
+        let sheetID = character.startSpellSheet(sessionID: session.id, title: "Day 1")
+        page = .spells(sheetID)
     }
 
     private func toggleArchive(_ session: Session) {

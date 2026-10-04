@@ -6342,3 +6342,23 @@ pela tela (C1–C2), estado de UI persistido no modelo (D), e a proposta de
 mais o `spells.json` (removido na v1.99.1).
 
 `Package.swift`: `displayVersion` "1.99.1"→"1.99.2", `bundleVersion` "211"→"212".
+
+## AJUSTE v1.99.3 (2026-10-04) — Lote 1: regra única de "dia novo de magias"
+
+Item A3 de `Docs/inventario-regras-nas-telas.md`. A criação da folha de um
+dia novo existia em 5 cópias nas telas (`CampaignIndexView.createSession`,
+`SessionGroup.open`, `SheetTabs.selectSession`, `SpellSheetBeadRow.newSheet`,
+`ClassPicker.select`) e só o "+" herdava as magias preparadas do dia
+anterior. Agora é uma função só, `PlayerCharacter.startSpellSheet(...)` em
+`Store/SpellSheetRules.swift` (Foundation pura, sem SwiftUI), e
+`SpellSlotBoard.reconciled(with:)` saiu de `CharacterSheetView` pra lá.
+
+**Mudança de comportamento (decisão do usuário):** todo dia novo herda do
+dia anterior — magias memorizadas, slots desmarcados, registro vazio, itens
+mágicos com cargas zeradas, grade ajustada à tabela de slots atual. "Dia
+anterior" = a folha mais recente do personagem com data até a do dia novo;
+sem folha anterior (primeira folha do personagem), nasce em branco como
+antes. O "+" dentro de uma sessão continua herdando do último dia DAQUELA
+sessão, idêntico ao que era.
+
+`Package.swift`: `displayVersion` "1.99.2"→"1.99.3", `bundleVersion` "212"→"213".
