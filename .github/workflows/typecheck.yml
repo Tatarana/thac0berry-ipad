@@ -149,8 +149,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO > xcodebuild.log 2>&1 && ok=1 || ok=0
           res=$(grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' xcodebuild.log | tail -1)
           app=$(find ~/Library/Developer/Xcode/DerivedData -name 'THAC0berry.app' -type d | head -1)
-          size=$( [ -n "$app" ] && du -sh "$app" | cut -f1 )
-          echo "::notice title=xcodebuild::${res:-sem linha BUILD} | .app: ${app:+gerado, $size}${app:-não encontrado} | $(wc -l < xcodebuild.log | tr -d ' ') linhas de log"
+          if [ -n "$app" ]; then appinfo="gerado, $(du -sh "$app" | cut -f1)"; else appinfo="não encontrado"; fi
+          echo "::notice title=xcodebuild::${res:-sem linha BUILD} | .app: $appinfo | $(wc -l < xcodebuild.log | tr -d ' ') linhas de log"
           grep -E '^/.*: error: ' xcodebuild.log | sed "s|$GITHUB_WORKSPACE/||" | head -10 | while IFS= read -r l; do echo "::error::$l"; done
           [ "$ok" = 1 ]
       - uses: actions/upload-artifact@v4
