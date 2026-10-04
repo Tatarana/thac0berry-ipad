@@ -72,7 +72,10 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 - **Nunca quebre a decodificação de um `library.json` existente.** Campo novo entra
   como opcional ou com `decodeIfPresent`; renomear ou remover campo exige migração.
   `LossyArray` descarta um personagem que não decodifica, em vez de perder todos.
-- Hoje não há `schemaVersion` nesse arquivo (planejado).
+- O arquivo tem `schemaVersion` (`CharacterLibrary.currentSchemaVersion`, hoje 1; 0 =
+  salvo antes do campo existir). Mudou o formato de um jeito que um build antigo não lê?
+  Suba o número e escreva a migração em `load()`. Arquivo de formato **mais novo** abre
+  só para leitura (`isReadOnly`): nada é gravado por cima.
 - Há binários embutidos (base64) no JSON: `NotebookEntry.drawingData`,
   `PlayerCharacter.portraitImageData` e `SpellSheet.inkNotes`. Não mexa no formato
   deles sem um plano de migração aprovado.
@@ -118,10 +121,10 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 - Haverá **backend e versão web** compartilhando os dados. A **linguagem do backend não
   está decidida**: o usuário quer avaliar hospedagem e deploy antes. Não assuma Swift
   nem TypeScript.
-- Já feito: dados em JSON com schemas (passo 1). Próximos passos propostos:
-  `schemaVersion` no `library.json`; inventário das regras de jogo que hoje estão nas
-  Views, para movê-las para fora das telas; depois, separar um módulo de regras.
-  **Cada passo só com aprovação.**
+- Já feito: dados em JSON com schemas; `schemaVersion` no `library.json`; inventário das
+  regras de jogo que estão nas telas (`Docs/inventario-regras-nas-telas.md`, com a
+  proposta de lotes). Próximo: mover essas regras em lotes; depois, separar um módulo de
+  regras. **Cada lote só com aprovação.**
 - Regra de jogo nova não vai para uma View: fica em `Store/` (funções puras sobre os
   modelos).
 

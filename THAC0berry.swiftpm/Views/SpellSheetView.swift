@@ -2093,13 +2093,13 @@ struct SpellDetailSheet: View {
     }
 
     /// Enquanto a magia não está na base, mostra um texto de exemplo — dá
-    /// pra ver a janela funcionando antes de completar o spells.json.
+    /// pra ver a janela funcionando antes de a magia entrar na base.
     private var description: String {
         if let spell { return spell.fullDescription ?? spell.summary }
         return """
         This spell hasn't been added to the built-in spellbook yet, so \
         there's no real description to show — this is placeholder text \
-        standing in for it. Once the entry exists in spells.json, its \
+        standing in for it. Once the spell is added to the spell database, its \
         actual casting time, range, duration, and description will show \
         up here automatically.
         """

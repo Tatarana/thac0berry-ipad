@@ -36,7 +36,31 @@ final class CharacterLibrary: ObservableObject {
     }
     @Published private(set) var lastError: String? = nil
 
+    /// Versão do formato de `library.json` que este build grava (2026-10-04,
+    /// preparação pro backend/web). 0 = arquivo salvo antes do campo
+    /// existir. Suba este número só quando o formato mudar de um jeito que
+    /// um build antigo não saberia ler — e escreva a migração em `load()`.
+    static let currentSchemaVersion = 1
+
+    /// `true` quando o arquivo veio de um build MAIS NOVO (formato maior que
+    /// `currentSchemaVersion`). Nesse caso nada é gravado: este build pode
+    /// ter descartado dados que não entende (`LossyArray`), e salvar por
+    /// cima apagaria esses dados de vez.
+    private(set) var isReadOnly = false
+
+    enum LibraryError: LocalizedError {
+        case newerFormat(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .newerFormat(let version):
+                return "This library was saved by a newer version of THAC0berry (format \(version); this build reads up to \(CharacterLibrary.currentSchemaVersion)). Update the app — nothing will be saved until then."
+            }
+        }
+    }
+
     private struct LibraryData: Codable {
+        var schemaVersion: Int = CharacterLibrary.currentSchemaVersion
         var campaigns: [Campaign] = []
         var characters: [PlayerCharacter] = []
         /// Opcional só pra ler bibliotecas salvas ANTES de favoritar virar
@@ -57,7 +81,7 @@ final class CharacterLibrary: ObservableObject {
         }
 
         enum CodingKeys: String, CodingKey {
-            case campaigns, characters, favoriteSpellIDs, defaultNotebookPaperStyle
+            case schemaVersion, campaigns, characters, favoriteSpellIDs, defaultNotebookPaperStyle
         }
 
         /// Decode manual (2026-09-20) — em vez do sintetizado automático,
@@ -80,6 +104,7 @@ final class CharacterLibrary: ObservableObject {
         /// inteiro a cada versão nova.
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
             campaigns = try container.decodeIfPresent(LossyArray<Campaign>.self, forKey: .campaigns)?.elements ?? []
             characters = try container.decodeIfPresent(LossyArray<PlayerCharacter>.self, forKey: .characters)?.elements ?? []
             favoriteSpellIDs = try container.decodeIfPresent(Set<String>.self, forKey: .favoriteSpellIDs)
@@ -115,6 +140,10 @@ final class CharacterLibrary: ObservableObject {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let decoded = try decoder.decode(LibraryData.self, from: data)
+            if decoded.schemaVersion > Self.currentSchemaVersion {
+                isReadOnly = true
+                lastError = LibraryError.newerFormat(decoded.schemaVersion).localizedDescription
+            }
             campaigns = decoded.campaigns
             characters = decoded.characters
             if let saved = decoded.favoriteSpellIDs {
@@ -149,6 +178,7 @@ final class CharacterLibrary: ObservableObject {
     }
 
     func saveNow() {
+        guard !isReadOnly else { return }
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -371,6 +401,9 @@ final class CharacterLibrary: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let decoded = try decoder.decode(LibraryData.self, from: data)
+        if decoded.schemaVersion > Self.currentSchemaVersion {
+            throw LibraryError.newerFormat(decoded.schemaVersion)
+        }
         return ImportPreview(campaignCount: decoded.campaigns.count, characterCount: decoded.characters.count)
     }
 
@@ -381,6 +414,14 @@ final class CharacterLibrary: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let decoded = try decoder.decode(LibraryData.self, from: data)
+        if decoded.schemaVersion > Self.currentSchemaVersion {
+            throw LibraryError.newerFormat(decoded.schemaVersion)
+        }
+        // O jogador confirmou SUBSTITUIR tudo: um backup legível por este
+        // build libera a gravação mesmo que o arquivo anterior fosse de um
+        // formato mais novo.
+        isReadOnly = false
+        lastError = nil
         campaigns = decoded.campaigns
         characters = decoded.characters
         favoriteSpellIDs = decoded.favoriteSpellIDs ?? Set(decoded.characters.flatMap(\.favoriteSpellIDs))

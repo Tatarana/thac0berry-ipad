@@ -6319,3 +6319,26 @@ placeholder em `SpellSheetView.swift` ("Once the entry exists in
 spells.json…") ainda cita o arquivo antigo.
 
 `Package.swift`: `displayVersion` "1.99"→"1.99.1", `bundleVersion` "210"→"211".
+
+## AJUSTE v1.99.2 (2026-10-04) — versão no library.json, inventário de regras nas telas, texto do placeholder
+
+**`schemaVersion` no `library.json`** (`Store/CharacterLibrary.swift`). Este
+build grava `schemaVersion: 1` (`CharacterLibrary.currentSchemaVersion`);
+arquivo sem o campo é lido como 0 (tudo que existia antes) e regravado como
+1 no próximo salvamento, sem perder nada. Proteção nova: se o arquivo (ou um
+backup importado) vier de um formato MAIOR que o deste build, a biblioteca
+abre só pra leitura (`isReadOnly`, aviso em `lastError`) e nada é gravado —
+antes, um personagem que não decodificasse seria descartado pelo
+`LossyArray` e sumiria de vez no próximo save. Importar um backup legível
+libera a gravação de novo (o jogador já confirmou substituir tudo).
+
+**Inventário** em `Docs/inventario-regras-nas-telas.md`: 11 regras de jogo
+dentro de Views (A1–A11), 6 gatilhos (B1–B6), migração/preenchimento feitos
+pela tela (C1–C2), estado de UI persistido no modelo (D), e a proposta de
+5 lotes. Achado principal: a regra "criar folha de magia do dia" existe em
+5 cópias, e uma delas (`SpellSheetBeadRow.newSheet`) se comporta diferente.
+
+**Texto.** Placeholder de magia fora da base (`SpellSheetView`) não cita
+mais o `spells.json` (removido na v1.99.1).
+
+`Package.swift`: `displayVersion` "1.99.1"→"1.99.2", `bundleVersion` "211"→"212".
