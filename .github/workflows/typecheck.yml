@@ -12,13 +12,11 @@ name: Typecheck (iOS SDK)
 on:
   push:
     paths:
-      - "THAC0berry.swiftpm/**/*.swift"
-      - "THAC0berry.swiftpm/Package.swift"
+      - "THAC0berry.swiftpm/**"
       - ".github/workflows/typecheck.yml"
   pull_request:
     paths:
-      - "THAC0berry.swiftpm/**/*.swift"
-      - "THAC0berry.swiftpm/Package.swift"
+      - "THAC0berry.swiftpm/**"
   workflow_dispatch:
 
 concurrency:
@@ -110,6 +108,30 @@ jobs:
             echo "### Tempo/memória do compilador"
             echo '```'; grep -E "maximum resident set size|real|user|sys" tc.log | tail -4; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Alerta (não bloqueia): segura o crescimento que deixa o build do
+      # iPad frágil. Step próprio = cota própria de anotações.
+      - name: Limites (arquivo > 1500 linhas, função > 1s)
+        if: always()
+        env:
+          MAX_LINES: "1500"
+          MAX_BODY_MS: "1000"
+        run: |
+          n=0
+          while IFS= read -r f; do
+            l=$(wc -l < "$f" | tr -d ' ')
+            if [ "$l" -gt "$MAX_LINES" ]; then
+              echo "::warning file=$f,title=Arquivo grande::$l linhas (limite $MAX_LINES) — dividir por tipo ao mexer nele"
+              n=$((n+1))
+            fi
+          done < files.txt
+          if [ -f slow_bodies.txt ]; then
+            awk -F'\t' -v t="$MAX_BODY_MS" '($1+0) >= t' slow_bodies.txt | while IFS=$'\t' read -r ms loc what; do
+              f=$(echo "$loc" | cut -d: -f1); ln=$(echo "$loc" | cut -d: -f2)
+              echo "::warning file=$f,line=$ln,title=Função lenta::$ms para checar (limite ${MAX_BODY_MS}ms) — quebrar em sub-Views / anotar tipos"
+            done
+          fi
+          echo "Arquivos acima do limite: $n"
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -3,7 +3,7 @@
 Rode antes de toda entrega:  python3 Scripts/validate_data.py
 Sai com código 1 se algo estiver errado."""
 import json, os, sys
-R = os.path.join(os.path.dirname(__file__), "..", "Resources")
+R = os.path.join(os.path.dirname(__file__), "..", "THAC0berry.swiftpm", "Resources")
 S, I = str, int
 # campo -> (tipo, obrigatório)
 SCHEMAS = {

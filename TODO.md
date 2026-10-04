@@ -6252,3 +6252,36 @@ bloqueia uso.
 
 `Package.swift`: `displayVersion` "1.96"→"1.97", `bundleVersion`
 "201"→"202".
+
+## AJUSTE v1.99 (2026-10-04) — Limpeza Fase 1: projeto mais leve e CI com compilador de verdade
+
+Sem funcionalidade nova. Objetivo: deixar o build do Swift Playgrounds mais
+leve e parar de depender só dele pra achar erro.
+
+**CI (`.github/workflows/typecheck.yml`, já em `main`).** A cada push que
+mexe em `THAC0berry.swiftpm/**`, um Mac do GitHub roda (1) `swiftc
+-typecheck` contra o SDK do iOS 17 — erros com arquivo:linha + ranking das
+funções mais lentas de checar — e (2) `xcodebuild` do `.swiftpm` completo
+(recursos e asset catalog inclusos). Resultado sai como anotações no
+commit. Novo alerta (não bloqueia): arquivo > 1500 linhas ou função > 1s
+de type-check. Base medida na v1.98-p2b2: 0 erros, 27.9k linhas, pico de
+310 MB / 57 s no typecheck, função mais lenta 0,68 s (`RuleTableView`).
+Regra daqui pra frente: CI verde antes de abrir no Playgrounds.
+
+**Fora do target.** `THAC0berry.swiftpm/Scripts/*.py` e
+`THAC0berry.swiftpm/Docs/data-schemas.md` foram pra `Scripts/` e `Docs/` na
+raiz — com `path: "."` no `Package.swift`, tudo dentro do `.swiftpm` entra
+no target. `validate_data.py` ajustado pro novo caminho.
+`generate_embedded_proficiencies.py`/`swift_lit_to_json.py` são da época dos
+literais embutidos (obsoletos), mantidos por histórico.
+
+**Imagens.** Novo `Scripts/optimize_images.py` (idempotente): `icon_*` ≤ 384
+px, `seal_*` ≤ 128 px, `banner_*` ≤ 324 px de altura (3× o maior tamanho
+exibido). PNGs de 13,6 MB → 4,6 MB. Rodar de novo sempre que chegar arte
+nova da LLM de imagem.
+
+**No iPad:** se a cópia do projeto no iPad não apagar pastas sozinha ao
+sincronizar, remover à mão `Scripts/` e `Docs/` de dentro do
+`THAC0berry.swiftpm`.
+
+`Package.swift`: `displayVersion` "1.98-p2b2"→"1.99", `bundleVersion` "209"→"210".
