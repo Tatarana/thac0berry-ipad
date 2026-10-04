@@ -1,0 +1,150 @@
+# Compilador de verdade fora do iPad (Fase 0 do plano de "buildabilidade").
+#
+# O Swift Playgrounds às vezes falha com "Build Failed" sem mensagem
+# nenhuma. Este workflow roda o type-checker do Swift contra o SDK do iOS
+# e devolve: (1) erros com arquivo:linha, (2) o ranking das funções e
+# expressões mais lentas de checar — a lista de alvos pra refatorar.
+#
+# Ciclo: editar → push → este CI verde → só então abrir no Playgrounds.
+
+name: Typecheck (iOS SDK)
+
+on:
+  push:
+    paths:
+      - "THAC0berry.swiftpm/**/*.swift"
+      - "THAC0berry.swiftpm/Package.swift"
+      - ".github/workflows/typecheck.yml"
+  pull_request:
+    paths:
+      - "THAC0berry.swiftpm/**/*.swift"
+      - "THAC0berry.swiftpm/Package.swift"
+  workflow_dispatch:
+
+concurrency:
+  group: typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      # Ranking: tudo acima disto vira aviso/linha no relatório.
+      SLOW_MS: "100"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          xcrun swiftc --version
+
+      - name: Typecheck (swiftc, todos os .swift do app num módulo só)
+        id: tc
+        run: |
+          set -o pipefail
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          # Mesma composição do target AppModule (path: ".") menos o
+          # Package.swift, que importa AppleProductTypes (só existe no
+          # Playgrounds/Xcode). -swift-version 5 = tools-version 5.9.
+          find THAC0berry.swiftpm -name '*.swift' ! -name Package.swift | sort > files.txt
+          echo "Arquivos: $(wc -l < files.txt)"
+          /usr/bin/time -l xcrun swiftc -typecheck \
+            -sdk "$SDK" \
+            -target arm64-apple-ios17.0-simulator \
+            -swift-version 5 \
+            -module-name AppModule \
+            -parse-as-library \
+            -Xfrontend -debug-time-function-bodies \
+            -Xfrontend -warn-long-expression-type-checking=${SLOW_MS} \
+            $(cat files.txt) > tc.log 2>&1 || echo "failed=1" >> "$GITHUB_OUTPUT"
+          # Pico de memória do compilador (indicador do risco no iPad).
+          grep -E "maximum resident set size|real" tc.log | tail -3 || true
+
+      - name: Relatório
+        if: always()
+        run: |
+          ROOT="$GITHUB_WORKSPACE/"
+          strip() { sed "s|$ROOT||g"; }
+
+          # Diagnósticos: "arquivo:linha:col: error|warning: msg"
+          grep -E '^/.*\.swift:[0-9]+:[0-9]+: (error|warning):' tc.log | strip > diags.txt || true
+          grep -E ': error:' diags.txt > errors.txt || true
+          grep -E ': warning:' diags.txt | grep -v 'expression took' > warnings.txt || true
+          grep -E 'expression took' diags.txt > slow_expr.txt || true
+
+          # -debug-time-function-bodies: "12.3ms\t/path/File.swift:10:5\tgetter body"
+          grep -E '^[0-9.]+ms\s' tc.log | strip | sort -t$'\t' -k1 -rn | awk -F'\t' -v t="$SLOW_MS" '($1+0) >= t' > slow_bodies.txt || true
+
+          # Anotações no commit/PR (o GitHub mostra as 10 primeiras por tipo).
+          while IFS= read -r l; do
+            f=$(echo "$l" | cut -d: -f1); n=$(echo "$l" | cut -d: -f2); c=$(echo "$l" | cut -d: -f3)
+            m=$(echo "$l" | cut -d: -f5- | sed 's/^ //')
+            echo "::error file=$f,line=$n,col=$c::$m"
+          done < errors.txt
+          head -10 slow_bodies.txt | while IFS=$'\t' read -r ms loc what; do
+            f=$(echo "$loc" | cut -d: -f1); n=$(echo "$loc" | cut -d: -f2)
+            echo "::warning file=$f,line=$n::type-check lento: $ms ($what)"
+          done
+
+          {
+            echo "## Typecheck"
+            echo ""
+            echo "- Erros: **$(wc -l < errors.txt | tr -d ' ')**"
+            echo "- Avisos: $(wc -l < warnings.txt | tr -d ' ')"
+            echo "- Corpos de função ≥ ${SLOW_MS}ms: $(wc -l < slow_bodies.txt | tr -d ' ')"
+            echo "- Expressões ≥ ${SLOW_MS}ms: $(wc -l < slow_expr.txt | tr -d ' ')"
+            echo ""
+            echo "### Erros"
+            echo '```'; head -100 errors.txt; echo '```'
+            echo "### Top 40 corpos de função mais lentos"
+            echo '```'; head -40 slow_bodies.txt; echo '```'
+            echo "### Expressões lentas"
+            echo '```'; head -40 slow_expr.txt; echo '```'
+            echo "### Tempo/memória do compilador"
+            echo '```'; grep -E "maximum resident set size|real|user|sys" tc.log | tail -4; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typecheck-report
+          path: |
+            tc.log
+            errors.txt
+            warnings.txt
+            slow_bodies.txt
+            slow_expr.txt
+
+      - name: Falhar se houve erro de compilação
+        if: steps.tc.outputs.failed == '1'
+        run: exit 1
+
+  # Experimental: build completo do .swiftpm (inclui recursos e asset
+  # catalog — o tipo de falha que o swiftc -typecheck não vê). Ainda não
+  # confirmado que o xcodebuild aceita o produto .iOSApplication; por isso
+  # não bloqueia o resultado.
+  xcodebuild:
+    runs-on: macos-15
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Esquemas
+        working-directory: THAC0berry.swiftpm
+        run: xcodebuild -list
+      - name: Build (iOS Simulator)
+        working-directory: THAC0berry.swiftpm
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme THAC0berry \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log | grep -E 'error:|warning: .*resource|BUILD (SUCCEEDED|FAILED)' | head -200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xcodebuild-log
+          path: THAC0berry.swiftpm/xcodebuild.log
