@@ -38,6 +38,11 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   Antes de investigar o código, peça ao usuário para fechar o Playgrounds de vez e
   tentar de novo, e use um **pacote de controle** (a última versão que rodou) para
   separar "problema do código" de "problema do Playgrounds".
+- **O que destravou na prática (v1.99.6, 2026-10-05):** depois de vários restarts sem
+  sucesso, renomear o zip e a pasta do projeto fez rodar. Pasta nova = projeto novo
+  para o Playgrounds, **com armazenamento próprio (sem personagens)**: exportar backup
+  antes e importar depois. Cada teste no iPad custa caro para o usuário: agrupe o que
+  for seguro e evite rodadas de teste para ganhos pequenos.
 - **Ícone de app via asset catalog: suspeito, não comprovado.** Na bisseção de
   2026-10-04, só a variante sem `Assets.xcassets`/`appIcon` rodou, mas como o crash é
   intermitente, isso pode ter sido em parte coincidência. O ícone continua fora até um

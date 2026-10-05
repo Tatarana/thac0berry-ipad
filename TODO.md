@@ -6427,3 +6427,17 @@ esperada. Próximos, um por versão: `RuleTableView`, `Thac0TargetForm`,
 `RogueReferencePage` (`MagicItemCard` fica de fora: não melhorou).
 
 `Package.swift`: `displayVersion` "1.99.5"→"1.99.6", `bundleVersion` "215"→"216".
+
+## AJUSTE v1.99.7 (2026-10-05) — manutenção em blocos: bloco C (`RuleTableView`)
+
+Bloco B (v1.99.6, `RefCell`) confirmado pelo usuário — mas só rodou no
+Playgrounds depois de muitos restarts e de renomear o zip e a pasta do
+projeto (registrado no CLAUDE.md, seção 3). Blocos A+B mesclados em `main`.
+
+**Bloco C (esta versão):** só `RuleTableView` (`Views/RulesCompendiumView.swift`):
+as células do cabeçalho e do corpo viraram `RuleTableHeaderCell` e
+`RuleTableBodyCell` (privadas), e o sombreado alternado virou propriedade
+tipada. Sem mudança visual esperada. No CI essa função caiu de ~0,5–0,7 s
+para ~0,13 s de type-check.
+
+`Package.swift`: `displayVersion` "1.99.6"→"1.99.7", `bundleVersion` "216"→"217".

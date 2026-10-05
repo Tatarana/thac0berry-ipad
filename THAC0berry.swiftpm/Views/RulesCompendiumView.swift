@@ -424,29 +424,19 @@ struct RuleTableView: View {
             // espaçamento entre si formam uma barra contínua de verdade.
             ScrollView(.horizontal, showsIndicators: true) {
                 Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+                    // Células em subviews próprias (`RuleTableHeaderCell`/
+                    // `RuleTableBodyCell`): com tudo inline, este `body` era
+                    // a função mais lenta de compilar do app (~0,5–0,7 s).
                     GridRow {
-                        ForEach(Array(table.headers.enumerated()), id: \.offset) { _, header in
-                            Text(header)
-                                .font(Paper.printed(11.5))
-                                .tracking(0.4)
-                                .foregroundStyle(Paper.sheet)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Paper.ink)
+                        ForEach(table.headers.indices, id: \.self) { column in
+                            RuleTableHeaderCell(text: table.headers[column])
                         }
                     }
 
-                    ForEach(Array(table.rows.enumerated()), id: \.offset) { rowIndex, row in
+                    ForEach(table.rows.indices, id: \.self) { rowIndex in
                         GridRow {
-                            ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                                Text(cell)
-                                    .font(Paper.printed(12))
-                                    .foregroundStyle(Paper.ink)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(rowIndex.isMultiple(of: 2) ? Color.clear : Paper.ink.opacity(0.06))
+                            ForEach(table.rows[rowIndex].indices, id: \.self) { column in
+                                RuleTableBodyCell(text: table.rows[rowIndex][column], isShaded: !rowIndex.isMultiple(of: 2))
                             }
                         }
                     }
@@ -455,6 +445,38 @@ struct RuleTableView: View {
             .background(Paper.sheet.opacity(0.5))
             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(Paper.inkSoft.opacity(0.35), lineWidth: 1))
         }
+    }
+}
+
+private struct RuleTableHeaderCell: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(Paper.printed(11.5))
+            .tracking(0.4)
+            .foregroundStyle(Paper.sheet)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Paper.ink)
+    }
+}
+
+private struct RuleTableBodyCell: View {
+    let text: String
+    let isShaded: Bool
+
+    private var rowFill: Color { isShaded ? Paper.ink.opacity(0.06) : Color.clear }
+
+    var body: some View {
+        Text(text)
+            .font(Paper.printed(12))
+            .foregroundStyle(Paper.ink)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowFill)
     }
 }
 
