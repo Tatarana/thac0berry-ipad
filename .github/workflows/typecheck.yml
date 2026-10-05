@@ -31,7 +31,7 @@ jobs:
       # Ranking: tudo acima disto vira aviso/linha no relatório.
       SLOW_MS: "100"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Toolchain
         run: |
@@ -133,7 +133,7 @@ jobs:
           fi
           echo "Arquivos acima do limite: $n"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: typecheck-report
@@ -157,7 +157,7 @@ jobs:
     timeout-minutes: 40
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Esquemas
         working-directory: THAC0berry.swiftpm
         run: xcodebuild -list
@@ -175,7 +175,7 @@ jobs:
           echo "::notice title=xcodebuild::${res:-sem linha BUILD} | .app: $appinfo | $(wc -l < xcodebuild.log | tr -d ' ') linhas de log"
           grep -E '^/.*: error: ' xcodebuild.log | sed "s|$GITHUB_WORKSPACE/||" | head -10 | while IFS= read -r l; do echo "::error::$l"; done
           [ "$ok" = 1 ]
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: xcodebuild-log
