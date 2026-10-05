@@ -6427,3 +6427,17 @@ esperada. Próximos, um por versão: `RuleTableView`, `Thac0TargetForm`,
 `RogueReferencePage` (`MagicItemCard` fica de fora: não melhorou).
 
 `Package.swift`: `displayVersion` "1.99.5"→"1.99.6", `bundleVersion` "215"→"216".
+
+## DECISÃO (2026-10-05) — manutenção de funções lentas suspensa até ter Mac
+
+O bloco C (v1.99.7, `RuleTableView` com células extraídas, branch
+`maint/c-ruletable`) falhou no Playgrounds em todas as tentativas — fechar o
+app, renomear zip e pasta, alternar versões — sem log de crash. Junto com a
+v1.99.6 original (que também continha essa mudança e falhou), são 2 de 2
+falhas; o bloco B (`RefCell`, sem ela) rodou. O CI compila as duas.
+
+Decisão do usuário: deixar esse passo para quando houver um Mac com Xcode.
+`main` fica na v1.99.6 (blocos A+B). Blocos C (`RuleTableView`), D
+(`Thac0TargetForm`) e E (`RogueReferencePage`) não entram; `MagicItemCard` já
+estava fora. Branches `maint/limpeza` e `maint/c-ruletable` ficam como
+referência. Registrado no CLAUDE.md (seção 3).

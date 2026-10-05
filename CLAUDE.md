@@ -42,6 +42,11 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   2026-10-04, só a variante sem `Assets.xcassets`/`appIcon` rodou, mas como o crash é
   intermitente, isso pode ter sido em parte coincidência. O ícone continua fora até um
   teste repetido mostrar o contrário. A arte está em `Docs/app-icon/AppIcon.png`.
+- **Refatorar Views só para acelerar a compilação: adiado até haver Mac com Xcode**
+  (decisão do usuário, 2026-10-05). A extração das células do `RuleTableView`
+  (branch `maint/c-ruletable`) falhou no Playgrounds 2 de 2 vezes, sem log, embora o CI
+  compile; o `RefCell` (v1.99.6) passou. O ganho é de décimos de segundo no build, e
+  cada rodada no iPad é cara. Não reabra sem um Mac para depurar.
 - `Package.swift`: manter `.process("Resources")`. `.copy` quebra a assinatura do app
   na instalação (v1.84).
 - `Package.swift` usa `path: "."`: **tudo dentro de `THAC0berry.swiftpm/` entra no
