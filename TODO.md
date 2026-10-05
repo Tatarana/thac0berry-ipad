@@ -6387,3 +6387,25 @@ agora usa `startSpellSheet` (comportamento igual: sem folha anterior, nasce
 em branco). Ficou fora do inventário original porque não está numa View.
 
 `Package.swift`: `displayVersion` "1.99.3"→"1.99.4", `bundleVersion` "213"→"214".
+
+## AJUSTE v1.99.5 (2026-10-05) — troca de classe NÃO mexe em folhas existentes; correção sobre o ícone
+
+**Troca de classe (decisão do usuário, revoga a v1.99.4).** Testando a
+v1.99.4 (Clérigo com 2 folhas → Mago), a folha mais recente virou de Mago e a
+outra ficou — o usuário quer TODAS as folhas existentes preservadas; só as
+NOVAS nascem no padrão da classe nova. `realignCurrentSpellSheetToClass`
+removida; `ClassPicker.select` volta a só criar a primeira folha quando não
+há nenhuma. A primeira folha nova depois da troca herda do dia anterior e
+`reconciled(with:)` troca os slots do tipo antigo por slots vazios do tipo
+novo. A 6ª cópia unificada na v1.99.4 continua unificada.
+
+**Correção sobre o ícone (registro honesto).** A v1.99 concluiu que o
+asset catalog do ícone era "a causa" do "Build Failed" silencioso. Em
+2026-10-05 o mesmo crash do Playgrounds (mesma assinatura nos logs, 08:16 e
+08:36) aconteceu com a v1.99.4, que não tem ícone, e a versão rodou depois de
+várias tentativas. Conclusão revista: o crash é INTERMITENTE; o ícone é
+suspeito, não comprovado (a bisseção D1/D2/D3 pode ter sido em parte
+coincidência). Ícone continua fora. CLAUDE.md, README e comentário do
+`Package.swift` corrigidos.
+
+`Package.swift`: `displayVersion` "1.99.4"→"1.99.5", `bundleVersion` "214"→"215".

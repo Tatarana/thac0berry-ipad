@@ -16,7 +16,11 @@ extension PlayerCharacter {
     /// - Herdar = `SpellSheet.nextDay(keepingPreparations: true)`: mesmas
     ///   magias memorizadas, slots desmarcados, registro do dia vazio, itens
     ///   mágicos com cargas zeradas — e a grade ajustada à tabela de slots
-    ///   de HOJE (nível ou atributo podem ter mudado desde ontem).
+    ///   de HOJE (nível, atributo ou CLASSE podem ter mudado desde ontem).
+    /// - Troca de classe: folhas existentes nunca são alteradas (decisão do
+    ///   usuário, 2026-10-05). A primeira folha nova depois da troca herda
+    ///   do dia anterior e o ajuste à tabela troca os slots do tipo antigo
+    ///   (ex.: divinos de Clérigo) por slots vazios do tipo novo (arcanos).
     @discardableResult
     mutating func startSpellSheet(sessionID: UUID,
                                   title: String,
@@ -44,26 +48,6 @@ extension PlayerCharacter {
         sheet.wisdomAtCreation = spellSheetAbilityScoreAtCreation
         spellSheets.append(sheet)
         return sheet.id
-    }
-
-    /// Troca de classe que muda o TIPO de magia (Clérigo ↔ Mago/Bardo):
-    /// a folha do dia atual (a mais recente) ganha uma grade em branco da
-    /// classe nova. Sem isso, um personagem que passou por Clérigo e virou
-    /// Mago ficava com slots divinos — oferecendo magias de sacerdote e o
-    /// bloco de Turn Undead numa "Mage Spell Sheet" (achado no teste da
-    /// v1.99.3). Decisão do usuário (2026-10-05): só a folha atual; dias
-    /// passados ficam como registro histórico. O registro de conjurações
-    /// da folha é mantido. Mago ↔ Bardo (os dois arcanos) não mexe em nada.
-    ///
-    /// Devolve `true` se a folha foi refeita.
-    @discardableResult
-    mutating func realignCurrentSpellSheetToClass() -> Bool {
-        guard characterClass.hasSpellSheet, let index = currentSheetIndex else { return false }
-        let expected: CasterType = characterClass.isArcaneCaster ? .arcane : .divine
-        guard spellSheets[index].slotBoard.casters().contains(where: { $0 != expected }) else { return false }
-        spellSheets[index].slotBoard = freshSlotBoard()
-        spellSheets[index].wisdomAtCreation = spellSheetAbilityScoreAtCreation
-        return true
     }
 }
 

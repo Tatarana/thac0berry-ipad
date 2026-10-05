@@ -19,12 +19,12 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.tatarana.thac0berry",
             teamIdentifier: "",
-            displayVersion: "1.99.4",
-            bundleVersion: "214",
-            // Sem `appIcon` de propósito (v1.99): o asset catalog do ícone
-            // derruba o Swift Playgrounds 4.7 no iPad em build do zero
-            // ("Build Failed" sem mensagem). Arte guardada em
-            // `Docs/app-icon/AppIcon.png`, fora do target.
+            displayVersion: "1.99.5",
+            bundleVersion: "215",
+            // Sem `appIcon` de propósito (v1.99): o asset catalog do ícone é
+            // SUSPEITO de derrubar o Swift Playgrounds 4.7 no iPad ("Build
+            // Failed" sem mensagem) — não comprovado, o crash também é
+            // intermitente (ver CLAUDE.md). Arte em `Docs/app-icon/AppIcon.png`.
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad

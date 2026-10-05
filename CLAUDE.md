@@ -28,14 +28,20 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 
 ## 3. Armadilhas do Swift Playgrounds (iPad)
 
-- **"Build Failed" sem nenhuma mensagem = o próprio Playgrounds travou.** Não é erro de
-  código (erro de Swift sempre aparece no painel). Peça os logs em Ajustes → Privacidade
-  e Segurança → Análise e Melhorias → Dados de Análise (`Swift Playground-*.ips`,
-  `JetsamEvent-*.ips`).
-- **Não use ícone de app via asset catalog.** `Assets.xcassets` + `appIcon:
-  .asset("AppIcon")` derruba o Playgrounds em build do zero. Foi a causa de todas as
-  falhas silenciosas até a v1.99, e no CI (Xcode) passa normalmente. A arte está em
-  `Docs/app-icon/AppIcon.png`.
+- **"Build Failed" sem nenhuma mensagem = o próprio Playgrounds travou** (crash interno,
+  `_assertionFailure` numa Task da main thread, sempre o mesmo ponto nos logs). Não é
+  erro de código: erro de Swift sempre aparece no painel. Peça os logs em Ajustes →
+  Privacidade e Segurança → Análise e Melhorias → Dados de Análise
+  (`Swift Playground-*.ips`, `JetsamEvent-*.ips`).
+- **Esse crash é intermitente.** Aconteceu também sem nenhuma mudança relevante no
+  projeto (v1.99.4, 2026-10-05), e a mesma versão rodou depois de algumas tentativas.
+  Antes de investigar o código, peça ao usuário para fechar o Playgrounds de vez e
+  tentar de novo, e use um **pacote de controle** (a última versão que rodou) para
+  separar "problema do código" de "problema do Playgrounds".
+- **Ícone de app via asset catalog: suspeito, não comprovado.** Na bisseção de
+  2026-10-04, só a variante sem `Assets.xcassets`/`appIcon` rodou, mas como o crash é
+  intermitente, isso pode ter sido em parte coincidência. O ícone continua fora até um
+  teste repetido mostrar o contrário. A arte está em `Docs/app-icon/AppIcon.png`.
 - `Package.swift`: manter `.process("Resources")`. `.copy` quebra a assinatura do app
   na instalação (v1.84).
 - `Package.swift` usa `path: "."`: **tudo dentro de `THAC0berry.swiftpm/` entra no

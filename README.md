@@ -66,7 +66,11 @@ somadas por sessão.
 2. Aperte Play.
 
 Não precisa de Mac. O app aparece com o ícone padrão do Playgrounds: o ícone próprio
-foi retirado porque derruba o build no Playgrounds (detalhes no `CLAUDE.md`).
+está fora por suspeita de causar falhas de build no Playgrounds (detalhes no `CLAUDE.md`).
+
+Se o Play falhar com "Build Failed" sem mensagem, feche o Playgrounds de vez (deslizando
+o app para cima no seletor de apps) e tente de novo: é uma falha intermitente do próprio
+Playgrounds.
 
 **Antes de abrir uma versão nova como projeto novo, exporte um backup** (Settings →
 Backup). Cada cópia de projeto no Playgrounds tem o seu próprio armazenamento: uma
