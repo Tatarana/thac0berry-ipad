@@ -62,7 +62,7 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 ## 4. Dados de referência (contrato com o futuro backend/web)
 
 - **Fonte única: o repo [`thac0berry-data`](https://github.com/Tatarana/thac0berry-data)**
-  (clone em `E:\dev	hac0berry	hac0berry-data`): os JSON em `data/` e os schemas em
+  (clone em `E:\dev\thac0berry\thac0berry-data`): os JSON em `data/` e os schemas em
   `schemas/`, validados no CI de lá. **Não edite os JSON aqui:** mude lá e traga com
   `python Scripts/sync_data.py`. `Resources/*.json` é só a cópia que o Playgrounds
   precisa dentro do projeto; o CI `data.yml` acusa divergência (também roda toda
