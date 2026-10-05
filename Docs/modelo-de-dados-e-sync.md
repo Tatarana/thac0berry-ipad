@@ -1,6 +1,6 @@
 # Modelo de dados e sincronização (proposta)
 
-Versão 1, 2026-10-05. **É uma proposta para revisão: nada aqui está implementado.**
+Versão 2, 2026-10-05 (com as decisões da seção 8). **Nada aqui está implementado.**
 O texto não depende do backend escolhido. Funciona em Postgres (Supabase, Neon) e em
 SQLite (Cloudflare D1), trocando `jsonb` por `json`. Onde a escolha muda algo, está
 indicado.
@@ -49,13 +49,24 @@ indicado.
 |---|---|---|---|---|
 | `user` | (conta) | o próprio | o próprio | não existe |
 | `user_preferences` | usuário | o próprio | o próprio | `library.json` (favoritas, papel padrão) |
-| `campaign` | quem criou | membros | membros (metadados: dono) | `Campaign` |
-| `campaign_member` | campanha | membros | dono da campanha | não existe |
-| `session` | campanha | membros | membros | `Campaign.sessions` |
-| `notebook_entry` | campanha | membros | membros (ver §8, Q3) | `Campaign.notebookEntries` |
-| `character` | jogador | o dono + membros da campanha (ver §8, Q2) | o dono (ver §8, Q1) | `PlayerCharacter` (sem as folhas) |
-| `spell_sheet` | personagem | igual ao personagem | o dono do personagem | `PlayerCharacter.spellSheets` |
+| `campaign` | quem criou (mestre) | membros | mestre | `Campaign` |
+| `campaign_member` | campanha | membros | mestre | não existe |
+| `session` | campanha | membros | mestre e jogadores | `Campaign.sessions` |
+| `notebook_entry` | **autor** (jogador) | **só o autor** (Q3) | só o autor | `Campaign.notebookEntries` |
+| `character` | jogador | completo: dono, mestre, quem tem acesso temporário; **resumo**: demais membros (Q2) | dono, mestre e quem tem acesso temporário (Q1) | `PlayerCharacter` (sem as folhas) |
+| `character_grant` | personagem | mestre, dono, beneficiado | mestre (concede e revoga) | não existe |
+| `spell_sheet` | personagem | igual à ficha completa do personagem | igual ao personagem | `PlayerCharacter.spellSheets` |
 | `attachment` | dono do registro que o usa | igual ao registro | o dono | base64 no JSON |
+
+**Acesso temporário (Q1):** quando um jogador falta, o mestre concede a outro jogador
+acesso de edição à ficha do ausente (`character_grant`). O acesso vale até o mestre
+revogar ou até `expires_at`. **Assumido:** o padrão é 24 h, para cobrir uma sessão sem
+ficar aberto para sempre. O dono continua com acesso total.
+
+**Caderno privado (Q3):** cada jogador lê e escreve só as próprias páginas. **Assumido:**
+nem o mestre lê o caderno dos jogadores. Isso **muda o conceito atual do app**: hoje o
+caderno é da campanha e compartilhado no aparelho. Na migração, as páginas existentes
+ficam com o dono do aparelho que as enviar primeiro.
 
 **Mudança de forma em relação ao app:** sessões, páginas do caderno e folhas de magia
 deixam de ser arrays dentro do pai e viram registros próprios. Para o app, isso vale
@@ -84,7 +95,7 @@ create table campaign (
 
 create table campaign_member (
   campaign_id uuid references campaign, user_id uuid references auth.users,
-  role text not null check (role in ('owner','player')),   -- 'gm'? ver Q1
+  role text not null check (role in ('gm','player')),      -- quem cria a campanha é 'gm'
   joined_at timestamptz default now(),
   primary key (campaign_id, user_id));
 
@@ -95,6 +106,7 @@ create table session (
 
 create table notebook_entry (
   id uuid primary key, campaign_id uuid not null references campaign,
+  author_id uuid not null references auth.users,    -- caderno privado (Q3)
   date timestamptz, title text, text text, kind text, paper_style text,
   drawing_attachment uuid references attachment,
   /* colunas de sincronização */ );
@@ -107,6 +119,13 @@ create table character (
   portrait_attachment uuid references attachment,
   data jsonb not null,                           -- PlayerCharacter sem spellSheets/portrait
   /* colunas de sincronização */ );
+
+create table character_grant (                    -- acesso temporário (Q1)
+  id uuid primary key, character_id uuid not null references character,
+  grantee_id uuid not null references auth.users, granted_by uuid not null references auth.users,
+  created_at timestamptz default now(),
+  expires_at timestamptz not null,               -- padrão: +24 h
+  revoked_at timestamptz);
 
 create table spell_sheet (
   id uuid primary key, character_id uuid not null references character,
@@ -134,10 +153,14 @@ create table record_history (                     -- versões anteriores (ver §
 
 **Permissões:** no Supabase, via *Row Level Security*; em backend próprio, na API. Em
 resumo:
-- `character` e `spell_sheet`: o dono lê e escreve; os membros da campanha do
-  personagem leem.
-- `campaign`, `session` e `notebook_entry`: membros leem e escrevem; só o dono apaga a
-  campanha e gerencia membros.
+- `character` e `spell_sheet`: leem e escrevem o dono, o mestre da campanha e quem
+  tiver um `character_grant` válido (não revogado nem expirado). Os demais membros
+  veem só o resumo: nome, classe, nível e PV, por uma *view* com essas colunas.
+- `campaign` e `campaign_member`: membros leem; o mestre edita, convida, remove e
+  apaga.
+- `session`: membros leem; mestre e jogadores criam e editam.
+- `notebook_entry`: só o autor.
+- `character_grant`: o mestre cria e revoga; o dono e o beneficiado leem.
 - `user_preferences`: só o próprio usuário.
 
 ## 5. O que muda no formato do personagem
@@ -181,9 +204,11 @@ mexer no formato dele.
 - **Por que não juntar campo a campo:** a ficha é editada quase sempre por uma pessoa,
   num aparelho de cada vez. Conflito real é raro, e um merge automático errado numa
   ficha de RPG é pior do que um aviso.
-- **Onde o conflito é mais provável: o caderno compartilhado.** Por isso cada página é
-  um registro próprio, e dois jogadores escrevendo em páginas diferentes nunca
-  conflitam.
+- **Onde o conflito é mais provável: a ficha durante a sessão.** Com o mestre podendo
+  editar fichas e o acesso temporário, até três pessoas podem mexer na mesma ficha.
+  Proposta: além do histórico, mostrar **"fulano está editando esta ficha"** (presença,
+  Fase 3) e, ao conceder acesso temporário, avisar o dono. O caderno, privado por
+  autor, não tem conflito entre pessoas.
 
 ### 6.4 Exclusões
 Nunca apagar a linha: marcar `deleted_at`. O pull leva a marcação aos outros
@@ -224,17 +249,17 @@ Limites sugeridos:
 - O servidor não precisa importar esses dados para o banco, a menos que alguma
   consulta no servidor precise deles, o que hoje não acontece.
 
-## 8. Decisões que são suas
+## 8. Decisões (2026-10-05)
 
-| # | Pergunta | Opções | Minha sugestão |
-|---|---|---|---|
-| Q1 | Existe papel de **Mestre** na campanha? Ele pode editar fichas dos jogadores? | (a) não existe; (b) mestre lê tudo; (c) mestre lê e edita | (b): ler tudo ajuda na mesa; editar ficha alheia é fonte de conflito |
-| Q2 | O que um jogador vê dos personagens dos outros na campanha? | Ficha completa / resumo (nome, classe, nível, PV) / nada | Resumo |
-| Q3 | Caderno: quem edita cada página? | Todos editam tudo / cada um edita as suas páginas e lê as dos outros | Cada um edita as suas: elimina conflito no caderno |
-| Q4 | Como entrar numa campanha? | Código de convite / link / e-mail | Código curto de convite, que o dono gera e pode revogar |
-| Q5 | Login | E-mail com link mágico / Apple / Google | E-mail com link mágico no início. "Entrar com Apple" exige configuração extra e só vale com App Store |
-| Q6 | A web precisa funcionar offline? | Sim / não | Não no início: simplifica muito a web |
-| Q7 | Sandbox (personagem sem campanha) sincroniza? | Sim / não | Sim: é a ficha do jogador |
+| # | Pergunta | Decisão |
+|---|---|---|
+| Q1 | Papel de Mestre? | **Sim.** O mestre edita as fichas dos jogadores e concede **acesso temporário** à ficha de um jogador para outro (quem faltou à sessão). Ver `character_grant`. |
+| Q2 | O que um jogador vê dos outros? | **Resumo** (nome, classe, nível, PV). Com acesso temporário, ficha completa com edição. |
+| Q3 | Caderno | **Privado:** cada um lê e escreve só o seu. Assumido: nem o mestre lê. |
+| Q4 | Entrar numa campanha | Código curto de convite, que o mestre gera e pode revogar *(sugestão aceita)*. |
+| Q5 | Login | **Google.** No iPad, via `ASWebAuthenticationSession`, framework do sistema, sem biblioteca externa; validar no teste mínimo de rede. **Se um dia for para a App Store:** a regra 4.8 da Apple exige oferecer também uma opção equivalente de privacidade (na prática, "Entrar com Apple"). |
+| Q6 | Web offline? | Não, no início *(sugestão aceita)*. |
+| Q7 | Sandbox sincroniza? | Sim *(sugestão aceita)*. |
 
 ## 9. Fases sugeridas
 
@@ -242,8 +267,9 @@ Limites sugeridos:
    Sem compartilhamento. Entra `user`, `user_preferences`, `character`, `spell_sheet`,
    `campaign`, `session`, `notebook_entry` e `attachment`, tudo dono = usuário. Já
    resolve "não perder personagens ao trocar de versão no Playgrounds".
-2. **Fase 2: campanha compartilhada.** `campaign_member`, convites, permissões por
-   campanha e caderno compartilhado.
+2. **Fase 2: campanha compartilhada.** `campaign_member` (mestre e jogadores),
+   convites, permissões por campanha, resumo dos personagens dos outros e acesso
+   temporário (`character_grant`).
 3. **Fase 3 (opcional): tempo real.** Mudanças aparecem durante a sessão sem precisar
    de "Sync" (Supabase Realtime, WebSocket).
 
