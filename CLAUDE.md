@@ -89,6 +89,12 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   salvo antes do campo existir). Mudou o formato de um jeito que um build antigo não lê?
   Suba o número e escreva a migração em `load()`. Arquivo de formato **mais novo** abre
   só para leitura (`isReadOnly`): nada é gravado por cima.
+- O formato tem schema: `schemas/library.schema.json` no `thac0berry-data`, **gerado**
+  dos modelos por `python Scripts/gen_library_schema.py` (é o contrato da ficha com a
+  web). Mudou um modelo da ficha (`Character.swift`, `ActiveEffect.swift`,
+  `SpellSheet.swift`)? Rode o gerador e leve o schema ao `thac0berry-data` na mesma
+  entrega; o `data.yml` acusa a divergência. Decode próprio novo exige entrada em
+  `OVERRIDES` no gerador.
 - Há binários embutidos (base64) no JSON: `NotebookEntry.drawingData`,
   `PlayerCharacter.portraitImageData` e `SpellSheet.inkNotes`. Não mexa no formato
   deles sem um plano de migração aprovado.

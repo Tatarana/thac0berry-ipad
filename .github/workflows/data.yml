@@ -1,5 +1,6 @@
 # Confere se Resources/*.json do app é idêntico à fonte única, o repo
-# thac0berry-data (que tem a validação por schema no CI dele).
+# thac0berry-data (que tem a validação por schema no CI dele), e se o
+# schema da ficha de lá (library.schema.json) ainda bate com os modelos Swift.
 # Linux: barato e rápido.
 
 name: Dados (sincronia com thac0berry-data)
@@ -9,11 +10,21 @@ on:
     paths:
       - "THAC0berry.swiftpm/Resources/**.json"
       - "Scripts/sync_data.py"
+      - "Scripts/gen_library_schema.py"
+      - "THAC0berry.swiftpm/Models/Character.swift"
+      - "THAC0berry.swiftpm/Models/ActiveEffect.swift"
+      - "THAC0berry.swiftpm/Models/SpellSheet.swift"
+      - "THAC0berry.swiftpm/Models/Spell.swift"
       - ".github/workflows/data.yml"
   pull_request:
     paths:
       - "THAC0berry.swiftpm/Resources/**.json"
       - "Scripts/sync_data.py"
+      - "Scripts/gen_library_schema.py"
+      - "THAC0berry.swiftpm/Models/Character.swift"
+      - "THAC0berry.swiftpm/Models/ActiveEffect.swift"
+      - "THAC0berry.swiftpm/Models/SpellSheet.swift"
+      - "THAC0berry.swiftpm/Models/Spell.swift"
   schedule:
     - cron: "0 9 * * 1"   # toda segunda: pega mudanças feitas só no thac0berry-data
   workflow_dispatch:
@@ -35,6 +46,11 @@ jobs:
         run: |
           set -o pipefail
           python Scripts/sync_data.py --check --source thac0berry-data/data | tee sync.log
+      - name: Schema da ficha (library.schema.json gerado dos modelos)
+        if: always()
+        run: |
+          set -o pipefail
+          python Scripts/gen_library_schema.py --check --out thac0berry-data/schemas/library.schema.json | tee -a sync.log
       - name: Anotações
         if: always()
         run: |
