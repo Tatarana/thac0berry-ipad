@@ -6362,3 +6362,28 @@ antes. O "+" dentro de uma sessão continua herdando do último dia DAQUELA
 sessão, idêntico ao que era.
 
 `Package.swift`: `displayVersion` "1.99.2"→"1.99.3", `bundleVersion` "212"→"213".
+
+## AJUSTE v1.99.4 (2026-10-05) — troca de classe refaz a folha atual; 6ª cópia da regra de dia novo
+
+**Bug (antigo, exposto no teste da v1.99.3).** Um personagem que passou por
+Clérigo e virou Mago ficava com a folha de magias de slots DIVINOS: a "Mage
+Spell Sheet" oferecia Cure Light Wounds (e não Fireball) e mostrava Turn
+Undead. Causa: o tipo de cada slot é gravado na criação da folha, e
+`ClassPicker.select` só criava folha quando o personagem não tinha nenhuma —
+nada atualizava folhas existentes. Com o Lote 1, o dia seguinte ajustava a
+grade à tabela do Mago e descartava as magias divinas, por isso "não herdou".
+Confirmado pelo usuário: personagem criado direto como Mago funciona.
+
+**Correção (decisão do usuário: opção "só a folha atual").**
+`PlayerCharacter.realignCurrentSpellSheetToClass()` em
+`Store/SpellSheetRules.swift`: quando a troca de classe muda o tipo de magia,
+a folha mais recente ganha a grade em branco da classe nova (e o atributo
+de criação atualizado); o registro de conjurações é mantido; dias passados
+ficam como estão. Mago ↔ Bardo não mexe em nada.
+
+**6ª cópia.** `CharacterLibrary.seedFirstSpellSheetIfNeeded` (criar, clonar
+ou associar personagem a campanha) também montava a primeira folha à mão;
+agora usa `startSpellSheet` (comportamento igual: sem folha anterior, nasce
+em branco). Ficou fora do inventário original porque não está numa View.
+
+`Package.swift`: `displayVersion` "1.99.3"→"1.99.4", `bundleVersion` "213"→"214".

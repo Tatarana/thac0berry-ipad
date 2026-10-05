@@ -295,12 +295,9 @@ final class CharacterLibrary: ObservableObject {
               let campaignIdx = campaignIndex(of: campaignID)
         else { return }
         let session = campaigns[campaignIdx].activeSession()
-        var sheet = SpellSheet()
-        sheet.sessionID = session.id
-        sheet.title = "First day"
-        sheet.wisdomAtCreation = character.spellSheetAbilityScoreAtCreation
-        sheet.slotBoard = character.freshSlotBoard()
-        character.spellSheets = [sheet]
+        // Regra única de dia novo (`Store/SpellSheetRules.swift`); sem folha
+        // anterior, nasce em branco como sempre.
+        character.startSpellSheet(sessionID: session.id, title: "First day")
     }
 
     @discardableResult

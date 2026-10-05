@@ -2265,7 +2265,15 @@ private struct ClassPicker: View {
         // guard dentro do método garante isso: `wizardSpellbook.isEmpty`)
         // — nunca sobrescreve um livro já editado pelo jogador.
         character.seedWizardSpellbookIfNeeded(in: spellbook)
-        guard option.hasSpellSheet, character.spellSheets.isEmpty, let campaignBinding else { return }
+        guard option.hasSpellSheet else { return }
+        // Já tem folhas: se o tipo de magia mudou (Clérigo ↔ Mago/Bardo),
+        // a folha do dia atual ganha a grade da classe nova — ver
+        // `Store/SpellSheetRules.swift`.
+        guard character.spellSheets.isEmpty else {
+            character.realignCurrentSpellSheetToClass()
+            return
+        }
+        guard let campaignBinding else { return }
         let session = campaignBinding.wrappedValue.activeSession()
         character.startSpellSheet(sessionID: session.id, title: "First day")
     }

@@ -45,6 +45,26 @@ extension PlayerCharacter {
         spellSheets.append(sheet)
         return sheet.id
     }
+
+    /// Troca de classe que muda o TIPO de magia (Clérigo ↔ Mago/Bardo):
+    /// a folha do dia atual (a mais recente) ganha uma grade em branco da
+    /// classe nova. Sem isso, um personagem que passou por Clérigo e virou
+    /// Mago ficava com slots divinos — oferecendo magias de sacerdote e o
+    /// bloco de Turn Undead numa "Mage Spell Sheet" (achado no teste da
+    /// v1.99.3). Decisão do usuário (2026-10-05): só a folha atual; dias
+    /// passados ficam como registro histórico. O registro de conjurações
+    /// da folha é mantido. Mago ↔ Bardo (os dois arcanos) não mexe em nada.
+    ///
+    /// Devolve `true` se a folha foi refeita.
+    @discardableResult
+    mutating func realignCurrentSpellSheetToClass() -> Bool {
+        guard characterClass.hasSpellSheet, let index = currentSheetIndex else { return false }
+        let expected: CasterType = characterClass.isArcaneCaster ? .arcane : .divine
+        guard spellSheets[index].slotBoard.casters().contains(where: { $0 != expected }) else { return false }
+        spellSheets[index].slotBoard = freshSlotBoard()
+        spellSheets[index].wisdomAtCreation = spellSheetAbilityScoreAtCreation
+        return true
+    }
 }
 
 extension SpellSlotBoard {
