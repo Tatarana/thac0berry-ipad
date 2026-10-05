@@ -138,6 +138,12 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   regras. **Cada lote só com aprovação.**
 - Regra de jogo nova não vai para uma View: fica em `Store/` (funções puras sobre os
   modelos).
+- **Modelo de dados e sincronização: `Docs/modelo-de-dados-e-sync.md`** (aprovado em
+  2026-10-05). Inclui: mestre com acesso temporário à ficha de outro jogador, caderno
+  individual, login Google + "Entrar com Apple".
+- **O app vai para a App Store.** Isso exige ícone (hoje fora do projeto, ver seção 3),
+  política de privacidade, exclusão de conta dentro do app e Apple Developer Program.
+  Ver a seção 12 do documento de modelo de dados.
 
 ## 10. Documentação
 
