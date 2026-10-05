@@ -2896,13 +2896,8 @@ private struct Thac0TargetForm: View {
                             // CA 0 é a coluna de referência (sem bônus nem
                             // penalidade) — destacada com fundo escuro/letra
                             // clara pra achar rápido na tira inteira.
-                            Text("\(ac)")
-                                .font(Paper.printed(12))
-                                .fontWeight(ac == 0 ? .bold : .regular)
-                                .foregroundStyle(ac == 0 ? Paper.sheet : Paper.ink)
+                            Thac0TargetACHeaderCell(ac: ac)
                                 .frame(width: cellWidth, height: 28)
-                                .background(ac == 0 ? Paper.ink : Color.clear)
-                                .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
                         }
                     }
                     HStack(spacing: 0) {
@@ -2920,6 +2915,28 @@ private struct Thac0TargetForm: View {
                 .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1.3))
             }
         }
+    }
+}
+
+/// Cabeçalho "Target's AC" de uma coluna (CA 0 destacada). Separado do
+/// `Thac0TargetForm` pelos ternários de cor/peso, que inline deixavam o
+/// `body` dele lento de compilar (~0,15–0,24 s).
+private struct Thac0TargetACHeaderCell: View {
+    let ac: Int
+
+    private var isZero: Bool { ac == 0 }
+    private var weight: Font.Weight { isZero ? .bold : .regular }
+    private var textColor: Color { isZero ? Paper.sheet : Paper.ink }
+    private var fill: Color { isZero ? Paper.ink : Color.clear }
+
+    var body: some View {
+        Text("\(ac)")
+            .font(Paper.printed(12))
+            .fontWeight(weight)
+            .foregroundStyle(textColor)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(fill)
+            .overlay(Rectangle().stroke(Paper.ink, lineWidth: 1))
     }
 }
 

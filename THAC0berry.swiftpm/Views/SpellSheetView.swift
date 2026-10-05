@@ -931,6 +931,11 @@ private struct MagicItemCard: View {
         return magicItemDatabase.items.first { $0.name == item.name }
     }
 
+    // Tipados fora do `body`: `Text(cond ? "literal" : string)` inline
+    // obriga o type-checker a testar String × LocalizedStringKey (~0,25 s).
+    private var itemNameText: String { item.name.isEmpty ? "item name" : item.name }
+    private var itemNameColor: Color { item.name.isEmpty ? Paper.inkSoft : Paper.penInk }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // A régua fica fora do campo do nome e embaixo da linha
@@ -945,9 +950,9 @@ private struct MagicItemCard: View {
                         Button {
                             if matchedItem != nil { showCatalogDetail = true } else { showCatalogPicker = true }
                         } label: {
-                            Text(item.name.isEmpty ? "item name" : item.name)
+                            Text(itemNameText)
                                 .font(Paper.hand(19))
-                                .foregroundStyle(item.name.isEmpty ? Paper.inkSoft : Paper.penInk)
+                                .foregroundStyle(itemNameColor)
                                 .lineLimit(1)
                         }
                         .buttonStyle(.plain)

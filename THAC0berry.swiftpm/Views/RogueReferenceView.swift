@@ -11,6 +11,10 @@ struct RogueReferencePage: View {
     let character: PlayerCharacter
 
     private var skills: [String] { ThievingSkillsTable.skills(for: character.characterClass) }
+    // Comparações tipadas fora do `body` (`x == .a || x == .b` inline faz
+    // o type-checker testar todos os `==` possíveis; ~0,16–0,23 s).
+    private var showsBackstab: Bool { [CharacterClass.thief, .ninja].contains(character.characterClass) }
+    private var showsBardSpells: Bool { character.characterClass == CharacterClass.bard }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -23,11 +27,11 @@ struct RogueReferencePage: View {
             ThievingSkillsBaseTable(characterClass: character.characterClass, skills: skills)
             ArmorAdjustmentReferenceTable(characterClass: character.characterClass, skills: skills)
 
-            if character.characterClass == .thief || character.characterClass == .ninja {
+            if showsBackstab {
                 BackstabReferenceTable(currentLevel: character.level)
             }
 
-            if character.characterClass == .bard {
+            if showsBardSpells {
                 BardSpellProgressionReferenceTable(currentLevel: character.level)
             }
         }

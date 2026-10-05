@@ -6409,3 +6409,21 @@ coincidência). Ícone continua fora. CLAUDE.md, README e comentário do
 `Package.swift` corrigidos.
 
 `Package.swift`: `displayVersion` "1.99.4"→"1.99.5", `bundleVersion` "214"→"215".
+
+## AJUSTE v1.99.6 (2026-10-05) — manutenção: funções lentas de compilar, CI atualizado
+
+**Funções lentas (type-checker), sem mudança visual.** As 5 piores do ranking
+do CI, todas pelo mesmo motivo — ternários dentro de modificadores SwiftUI
+(`.background(a ? Cor : Cor)`, `Text(a ? "literal" : string)`,
+`x == .a || x == .b`) multiplicam as combinações de tipo que o compilador
+testa. Movidos para propriedades tipadas ou subviews pequenas:
+`RuleTableView` (células viraram `RuleTableHeaderCell`/`RuleTableBodyCell`),
+`RefCell`, `MagicItemCard` (`itemNameText`/`itemNameColor`),
+`Thac0TargetForm` (cabeçalho virou `Thac0TargetACHeaderCell`) e
+`RogueReferencePage` (`showsBackstab`/`showsBardSpells`).
+
+**CI.** `actions/checkout`, `upload-artifact` e `setup-python` v4/v5 → v7
+(Node 24; o aviso de Node 20 some); `ubuntu-latest` → `ubuntu-24.04` fixo
+(o `latest` migra pra Ubuntu 26 em 19/10/2026).
+
+`Package.swift`: `displayVersion` "1.99.5"→"1.99.6", `bundleVersion` "215"→"216".
