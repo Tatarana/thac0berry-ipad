@@ -6461,3 +6461,21 @@ confere que `Resources/*.json` é idêntico ao thac0berry-data (em todo push
 que mexe nos dados e toda segunda). App sem mudança (Resources idênticos).
 Pendente: os conversores antigos em `Scripts/convert_*.py` ainda escrevem em
 `Resources/`; quando forem usados de novo, devem ir para o thac0berry-data.
+
+## AJUSTE v1.99.8 (2026-10-05) — Etapa 3: tela de Diagnostics (rede + login Google)
+
+Teste mínimo de rede contra o backend Supabase (repo `thac0berry-backend`,
+projeto `azydmvnlzmyvtsgfogbq`, Fase 1 já aplicada na nuvem). Versão 1.99.7
+pulada de propósito (foi o pacote do bloco C que falhou, nunca mesclado).
+
+- `Store/Network/BackendConfig.swift`: URL e chave PÚBLICA (publishable) do
+  projeto, e o retorno do login (`thac0berry://auth-callback`).
+- `Store/Network/BackendDiagnostics.swift`: só `URLSession` + `CryptoKit`
+  (sem biblioteca externa). Testa o serviço de login (espera 200) e se a API
+  recusa anônimo (espera 401); login OAuth com PKCE; leitura já logado
+  (espera 200 e lista vazia).
+- `Views/DiagnosticsView.swift`: tela aberta por "Open Diagnostics" em
+  Settings. Login via `webAuthenticationSession` do SwiftUI (iOS 16.4+),
+  sessão efêmera, só na memória. Não grava nada nem toca no `library.json`.
+
+`Package.swift`: `displayVersion` "1.99.6"→"1.99.8", `bundleVersion` "216"→"218".

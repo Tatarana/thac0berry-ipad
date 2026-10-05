@@ -23,6 +23,10 @@ struct SettingsView: View {
     @State private var showImportConfirm = false
     @State private var importErrorMessage: String? = nil
 
+    // MARK: - Diagnóstico do backend (Etapa 3, 2026-10-05)
+
+    @State private var isDiagnosticsPresented = false
+
     private var versionText: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
@@ -40,6 +44,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     notebookSection
                     backupSection
+                    diagnosticsSection
 
                     HStack {
                         Text("THAC0berry")
@@ -170,6 +175,36 @@ struct SettingsView: View {
         }
         .padding(14)
         .emberCard(accent: Ember.brassDim)
+    }
+
+    /// Entrada discreta para a tela de diagnóstico do backend. O `.sheet` fica
+    /// aqui, e não no `body`, para não alongar a cadeia de modificadores
+    /// principal (custo de compilação no Playgrounds).
+    private var diagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Diagnostics")
+                .font(Paper.printed(13))
+                .fontWeight(.bold)
+                .foregroundStyle(Ember.onObsidian)
+            Text("Tests the connection to the THAC0berry server and the Google sign-in. Nothing is saved.")
+                .font(Paper.printedItalic(12.5))
+                .foregroundStyle(Ember.onObsidianSoft)
+            Button(action: { isDiagnosticsPresented = true }) {
+                Label("Open Diagnostics", systemImage: "stethoscope")
+                    .font(Paper.printed(12.5))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Ember.onObsidian)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(14)
+        .emberCard(accent: Ember.brassDim)
+        .sheet(isPresented: $isDiagnosticsPresented) {
+            DiagnosticsView()
+        }
     }
 
     private func startExport() {
