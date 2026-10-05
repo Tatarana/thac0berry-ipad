@@ -63,8 +63,8 @@ acesso de edição à ficha do ausente (`character_grant`). O acesso vale até o
 revogar ou até `expires_at`. **Assumido:** o padrão é 24 h, para cobrir uma sessão sem
 ficar aberto para sempre. O dono continua com acesso total.
 
-**Caderno privado (Q3):** cada jogador lê e escreve só as próprias páginas. **Assumido:**
-nem o mestre lê o caderno dos jogadores. Isso **muda o conceito atual do app**: hoje o
+**Caderno individual (Q3):** cada jogador lê e escreve só as próprias anotações; nem o
+mestre lê. Anotações "públicas" para a campanha ficam para o futuro. Isso **muda o conceito atual do app**: hoje o
 caderno é da campanha e compartilhado no aparelho. Na migração, as páginas existentes
 ficam com o dono do aparelho que as enviar primeiro.
 
@@ -106,7 +106,9 @@ create table session (
 
 create table notebook_entry (
   id uuid primary key, campaign_id uuid not null references campaign,
-  author_id uuid not null references auth.users,    -- caderno privado (Q3)
+  author_id uuid not null references auth.users,    -- caderno individual (Q3)
+  -- futuro: visibility text default 'private' ('private' | 'campaign') para
+  -- anotações públicas; entra como coluna nova, sem migrar as existentes
   date timestamptz, title text, text text, kind text, paper_style text,
   drawing_attachment uuid references attachment,
   /* colunas de sincronização */ );
@@ -255,9 +257,9 @@ Limites sugeridos:
 |---|---|---|
 | Q1 | Papel de Mestre? | **Sim.** O mestre edita as fichas dos jogadores e concede **acesso temporário** à ficha de um jogador para outro (quem faltou à sessão). Ver `character_grant`. |
 | Q2 | O que um jogador vê dos outros? | **Resumo** (nome, classe, nível, PV). Com acesso temporário, ficha completa com edição. |
-| Q3 | Caderno | **Privado:** cada um lê e escreve só o seu. Assumido: nem o mestre lê. |
+| Q3 | Caderno | **Individual:** as anotações são do jogador; só ele lê e escreve, nem o mestre lê. **Futuro:** anotações "públicas" para a campanha (ver nota em `notebook_entry`). |
 | Q4 | Entrar numa campanha | Código curto de convite, que o mestre gera e pode revogar *(sugestão aceita)*. |
-| Q5 | Login | **Google.** No iPad, via `ASWebAuthenticationSession`, framework do sistema, sem biblioteca externa; validar no teste mínimo de rede. **Se um dia for para a App Store:** a regra 4.8 da Apple exige oferecer também uma opção equivalente de privacidade (na prática, "Entrar com Apple"). |
+| Q5 | Login | **Google + Entrar com Apple.** O app vai para a App Store, e a regra 4.8 da Apple exige "Entrar com Apple" quando há login social. No iPad: Google via `ASWebAuthenticationSession` e Apple via `AuthenticationServices`, os dois frameworks do sistema, sem biblioteca externa. Supabase, Cognito e similares aceitam os dois provedores. |
 | Q6 | Web offline? | Não, no início *(sugestão aceita)*. |
 | Q7 | Sandbox sincroniza? | Sim *(sugestão aceita)*. |
 
@@ -300,3 +302,20 @@ Nada disso é para agora. Fica como lista de impacto:
 - **Plano gratuito do Supabase pausa após 7 dias sem uso** (ver análise de backend). O
   app offline-first não quebra com isso, só deixa de sincronizar até o projeto ser
   reativado.
+
+## 12. Consequências de ir para a App Store
+
+A publicação foi decidida em 2026-10-05. Ela traz itens que não existiam no fluxo atual
+(só Playgrounds):
+- **Apple Developer Program** (US$ 99/ano), necessário para publicar e para
+  "Entrar com Apple".
+- **Ícone do app é obrigatório na loja.** O ícone hoje está fora do projeto por
+  suspeita de derrubar o build no Playgrounds (CLAUDE.md, seção 3). Antes de publicar,
+  isso precisa ser resolvido, de preferência com acesso a um Mac/Xcode, ou
+  configurando o ícone pela tela de ajustes do próprio Playgrounds.
+- **"Entrar com Apple" exige a capability correspondente no app.** É preciso confirmar
+  se o Swift Playgrounds permite ativá-la; se não permitir, isso vira mais um motivo
+  para um Mac.
+- **Política de privacidade e exclusão de conta:** a loja exige uma URL de privacidade e
+  uma forma de o usuário apagar a própria conta dentro do app. Entra no escopo da
+  Fase 1.
