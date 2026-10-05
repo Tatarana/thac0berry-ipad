@@ -6441,3 +6441,23 @@ Decisão do usuário: deixar esse passo para quando houver um Mac com Xcode.
 (`Thac0TargetForm`) e E (`RogueReferencePage`) não entram; `MagicItemCard` já
 estava fora. Branches `maint/limpeza` e `maint/c-ruletable` ficam como
 referência. Registrado no CLAUDE.md (seção 3).
+
+## REPOS SEPARADOS (2026-10-05) — dados, backend e web
+
+Decisões do usuário: backend em **Supabase** (pouca experiência com AWS; AWS
+fica como plano B no modelo de dados), web em **Vite + React + TypeScript**,
+três repos novos e públicos:
+- `Tatarana/thac0berry-data`: **fonte única** dos JSON de referência
+  (`data/`) e dos schemas (`schemas/`), com o validador e o CI. Extraído
+  daqui; os 41 JSON conferidos byte a byte (mesmos hashes de blob).
+- `Tatarana/thac0berry-backend`: Supabase (migrações SQL, permissões, testes)
+  e o modelo de dados (`docs/modelo-de-dados-e-sync.md`, movido daqui).
+- `Tatarana/thac0berry-web`: app web.
+
+**Neste repo:** `schemas/` e `Scripts/validate_schemas.py` saíram (estão no
+thac0berry-data). Novo `Scripts/sync_data.py` copia `thac0berry-data/data`
+para `Resources/` (ou só compara, com `--check`). O CI `data.yml` agora
+confere que `Resources/*.json` é idêntico ao thac0berry-data (em todo push
+que mexe nos dados e toda segunda). App sem mudança (Resources idênticos).
+Pendente: os conversores antigos em `Scripts/convert_*.py` ainda escrevem em
+`Resources/`; quando forem usados de novo, devem ir para o thac0berry-data.

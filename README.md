@@ -81,10 +81,10 @@ cópia nova começa vazia. Depois é só importar o backup nela.
 - **Seus dados:** tudo fica local, em `Documents/library.json` (campanhas, personagens
   e preferências), gravado com a proteção de dados nativa do iOS
   (`.completeUnlessOpen`). Não há sincronização com a nuvem nesta versão.
-- **Dados de referência** (magias, kits, regras, itens): arquivos JSON em
-  `THAC0berry.swiftpm/Resources/`. O formato de cada um está definido em
-  [`schemas/`](schemas/README.md), que é o contrato para o futuro backend e a versão
-  web. Valide com `python Scripts/validate_schemas.py`.
+- **Dados de referência** (magias, kits, regras, itens): a fonte única e o contrato
+  (JSON Schema) estão no repo [`thac0berry-data`](https://github.com/Tatarana/thac0berry-data).
+  `THAC0berry.swiftpm/Resources/*.json` é uma cópia, atualizada com
+  `python Scripts/sync_data.py`.
 
 ## Estrutura
 
@@ -101,10 +101,9 @@ THAC0berry.swiftpm/          o app (tudo aqui dentro entra no build)
 ├── Utils/Fuzzy.swift        casamento aproximado de nomes
 └── Resources/               JSON de dados e imagens
 
-schemas/                     JSON Schema de cada arquivo de Resources/
-Scripts/                     conversão e validação de dados (Python)
+Scripts/                     sync_data.py (dados do thac0berry-data) e conversores antigos
 Docs/                        documentação de apoio (ícones, dados, arte do ícone)
-.github/workflows/           CI: typecheck/build iOS (macOS) e validação de dados (Linux)
+.github/workflows/           CI: typecheck/build iOS (macOS) e sincronia dos dados (Linux)
 CLAUDE.md                    regras do projeto para agentes e desenvolvedores
 TODO.md                      histórico detalhado de cada versão
 ```

@@ -1,42 +1,43 @@
-# Valida os dados de referência (Resources/*.json) contra schemas/.
-# Linux: barato e rápido; não depende de Mac nem de Swift.
+# Confere se Resources/*.json do app é idêntico à fonte única, o repo
+# thac0berry-data (que tem a validação por schema no CI dele).
+# Linux: barato e rápido.
 
-name: Dados (JSON Schema)
+name: Dados (sincronia com thac0berry-data)
 
 on:
   push:
     paths:
       - "THAC0berry.swiftpm/Resources/**.json"
-      - "schemas/**"
-      - "Scripts/validate_schemas.py"
+      - "Scripts/sync_data.py"
       - ".github/workflows/data.yml"
   pull_request:
     paths:
       - "THAC0berry.swiftpm/Resources/**.json"
-      - "schemas/**"
-      - "Scripts/validate_schemas.py"
+      - "Scripts/sync_data.py"
+  schedule:
+    - cron: "0 9 * * 1"   # toda segunda: pega mudanças feitas só no thac0berry-data
   workflow_dispatch:
 
 jobs:
-  schemas:
+  sync-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: Tatarana/thac0berry-data
+          path: thac0berry-data
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install jsonschema==4.*
-      - name: Validar
+      - name: Comparar
         run: |
           set -o pipefail
-          python Scripts/validate_schemas.py | tee validate.log
+          python Scripts/sync_data.py --check --source thac0berry-data/data | tee sync.log
       - name: Anotações
         if: always()
         run: |
           # Logs exigem login; anotações são públicas.
-          grep -E '^(FAIL|SKIP)' validate.log | while IFS= read -r l; do
-            case "$l" in FAIL*) echo "::error title=Schema::$l";; SKIP*) echo "::notice title=Não carregado::$l";; esac
-          done
-          grep -E '^\s+(erro|aviso)' validate.log | head -20 | while IFS= read -r l; do echo "::warning::$l"; done
-          echo "::notice title=Resumo::$(grep -c '^OK' validate.log) arquivos OK, $(grep -c '^FAIL' validate.log) com falha"
+          grep -E '^(DIFERE|SÓ NO APP)' sync.log | head -20 | while IFS= read -r l; do echo "::error title=Dados divergentes::$l"; done
+          grep -E '^OK' sync.log | while IFS= read -r l; do echo "::notice title=Dados::$l"; done

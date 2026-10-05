@@ -61,12 +61,14 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 
 ## 4. Dados de referência (contrato com o futuro backend/web)
 
-- Magias, kits, regras, itens etc. ficam em `THAC0berry.swiftpm/Resources/*.json`.
-  **O formato está definido em `schemas/`** (JSON Schema que espelha o decode do Swift;
-  ver `schemas/README.md`).
-- Validar antes de toda entrega que toque dados ou modelos:
-  `python Scripts/validate_schemas.py`. O CI `data.yml` também roda.
-- **Mudou um modelo Swift decodificável → atualize o schema no mesmo commit.**
+- **Fonte única: o repo [`thac0berry-data`](https://github.com/Tatarana/thac0berry-data)**
+  (clone em `E:\dev	hac0berry	hac0berry-data`): os JSON em `data/` e os schemas em
+  `schemas/`, validados no CI de lá. **Não edite os JSON aqui:** mude lá e traga com
+  `python Scripts/sync_data.py`. `Resources/*.json` é só a cópia que o Playgrounds
+  precisa dentro do projeto; o CI `data.yml` acusa divergência (também roda toda
+  segunda).
+- **Mudou um modelo Swift decodificável → atualize o schema em `thac0berry-data` na
+  mesma entrega.**
 - **Armadilha do Codable:** `var x: T = default` com Codable *sintetizado* **exige a
   chave** no JSON. Campo novo em modelo existente precisa de `init(from:)` com
   `decodeIfPresent(...) ?? default`, senão os JSON antigos param de decodificar.
@@ -138,8 +140,9 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
   regras. **Cada lote só com aprovação.**
 - Regra de jogo nova não vai para uma View: fica em `Store/` (funções puras sobre os
   modelos).
-- **Modelo de dados e sincronização: `Docs/modelo-de-dados-e-sync.md`** (aprovado em
-  2026-10-05). Inclui: mestre com acesso temporário à ficha de outro jogador, caderno
+- **Modelo de dados e sincronização:** `docs/modelo-de-dados-e-sync.md` no repo
+  [`thac0berry-backend`](https://github.com/Tatarana/thac0berry-backend) (aprovado em
+  2026-10-05). A web fica em [`thac0berry-web`](https://github.com/Tatarana/thac0berry-web). Inclui: mestre com acesso temporário à ficha de outro jogador, caderno
   individual, login Google + "Entrar com Apple".
 - **O app vai para a App Store.** Isso exige ícone (hoje fora do projeto, ver seção 3),
   política de privacidade, exclusão de conta dentro do app e Apple Developer Program.
@@ -147,6 +150,6 @@ rodada perdida. O histórico completo está em `TODO.md` (longo; busque pela ver
 
 ## 10. Documentação
 
-`README.md` (visão geral e estrutura), este arquivo (regras), `schemas/README.md`
-(formato dos dados), `TODO.md` (histórico de cada versão). Em caso de conflito com o
+`README.md` (visão geral e estrutura), este arquivo (regras), `thac0berry-data`
+(dados e formato), `TODO.md` (histórico de cada versão). Em caso de conflito com o
 código, o código vale; corrija o documento.
