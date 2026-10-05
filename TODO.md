@@ -6461,3 +6461,26 @@ confere que `Resources/*.json` é idêntico ao thac0berry-data (em todo push
 que mexe nos dados e toda segunda). App sem mudança (Resources idênticos).
 Pendente: os conversores antigos em `Scripts/convert_*.py` ainda escrevem em
 `Resources/`; quando forem usados de novo, devem ir para o thac0berry-data.
+
+## PENDENTE iPad (2026-10-05) — campos novos que quebram backup antigo
+
+Achado ao validar um backup real de 2026-09-20 contra o `library.schema.json`
+(gerado dos modelos na W2.0 da web): o personagem seria **descartado em
+silêncio** (`LossyArray`) se esse backup fosse importado no iPad hoje. Dois
+campos entraram depois com valor padrão, mas sem `decodeIfPresent` (a
+armadilha do Codable sintetizado):
+
+- `SpellSlot.orderKey` (`var orderKey: Int = 0`, 2026-09-28). O comentário
+  diz "ausência vira 0", mas não vira: a chave é obrigatória. Correção:
+  `init(from:)` próprio em `SpellSlot` (struct pequeno) com
+  `decodeIfPresent ?? 0`, redeclarando o memberwise init se for usado.
+- `PlayerCharacter.wizardSpellbook` (`var wizardSpellbook: [WizardSpellbookEntry] = []`,
+  2026-09-29). `PlayerCharacter` não tem `init(from:)` (85 campos); escrever
+  um é grande e arriscado. Correção sugerida: tornar opcional
+  (`[WizardSpellbookEntry]?`) com acessor que devolve `[]`.
+
+Os dados atuais do usuário não correm risco (o app regrava o arquivo inteiro a
+cada salvamento). Decisão do usuário: backups antigos podem ser descartados na
+web; a correção no iPad entra quando houver rodada de teste. Depois de corrigir:
+rodar `python Scripts/gen_library_schema.py` e levar o schema ao thac0berry-data
+(os dois campos saem de `required`).
