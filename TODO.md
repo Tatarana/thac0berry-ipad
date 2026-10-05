@@ -6409,3 +6409,21 @@ coincidência). Ícone continua fora. CLAUDE.md, README e comentário do
 `Package.swift` corrigidos.
 
 `Package.swift`: `displayVersion` "1.99.4"→"1.99.5", `bundleVersion` "214"→"215".
+
+## AJUSTE v1.99.6 (2026-10-05) — manutenção em blocos: bloco B (`RefCell`)
+
+**Contexto.** Uma primeira v1.99.6 (branch `maint/limpeza`, NÃO mesclada)
+juntava 5 ajustes de funções lentas de compilar + CI atualizado e deu
+"Build Failed" no Playgrounds — sem log de crash desta vez, mesmo depois de
+fechar/reabrir e vários refresh. Decisão do usuário: voltar à v1.99.5 e
+aplicar em blocos menores, um por versão.
+
+**Bloco A (só CI, sem mudança no app):** actions v7 e `ubuntu-24.04` fixo.
+
+**Bloco B (esta versão):** só `RefCell` (`Views/ClericReferenceView.swift`):
+os ternários de fonte, espaçamento, cor, alinhamento e fundo saíram de
+dentro dos modificadores para propriedades tipadas. Sem mudança visual
+esperada. Próximos, um por versão: `RuleTableView`, `Thac0TargetForm`,
+`RogueReferencePage` (`MagicItemCard` fica de fora: não melhorou).
+
+`Package.swift`: `displayVersion` "1.99.5"→"1.99.6", `bundleVersion` "215"→"216".

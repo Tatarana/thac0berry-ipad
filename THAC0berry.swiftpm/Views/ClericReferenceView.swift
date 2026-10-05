@@ -50,14 +50,26 @@ struct RefCell: View {
     var minWidth: CGFloat = 30
     var alignment: Alignment = .center
 
+    // Ternários tirados de dentro dos modificadores e tipados aqui: cada um
+    // inline multiplicava as combinações que o type-checker testava (era a
+    // 2ª função mais lenta de compilar do app, ~0,4–0,56 s — ver CI).
+    private var cellFont: Font { isHeader ? Paper.printed(10.5) : Paper.printed(11.5) }
+    private var cellTracking: CGFloat { isHeader ? 0.4 : 0 }
+    private var textColor: Color { isHighlighted ? Paper.redInk : Paper.ink }
+    private var textAlignment: TextAlignment { alignment == .leading ? .leading : .center }
+    private var fill: Color {
+        if isHighlighted { return Paper.redInk.opacity(0.1) }
+        return isHeader ? Color.black.opacity(0.05) : Color.clear
+    }
+
     var body: some View {
         Text(text)
-            .font(isHeader ? Paper.printed(10.5) : Paper.printed(11.5))
-            .tracking(isHeader ? 0.4 : 0)
-            .foregroundStyle(isHighlighted ? Paper.redInk : Paper.ink)
+            .font(cellFont)
+            .tracking(cellTracking)
+            .foregroundStyle(textColor)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
-            .multilineTextAlignment(alignment == .leading ? .leading : .center)
+            .multilineTextAlignment(textAlignment)
             .frame(minWidth: minWidth, minHeight: 26, alignment: alignment)
             .padding(.horizontal, 3)
             .padding(.vertical, 3)
@@ -70,7 +82,7 @@ struct RefCell: View {
             // ficou larga pelas linhas com texto longo, e as linhas com só
             // "—" não preenchiam esse espaço).
             .frame(maxWidth: .infinity, alignment: alignment)
-            .background(isHighlighted ? Paper.redInk.opacity(0.1) : (isHeader ? Color.black.opacity(0.05) : Color.clear))
+            .background(fill)
             .overlay(Rectangle().stroke(Paper.hairline, lineWidth: 0.6))
     }
 }
