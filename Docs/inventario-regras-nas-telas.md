@@ -87,9 +87,9 @@ As telas de referência (`ClericReferenceView`, `WizardReferenceView`,
    `PlayerCharacter.startSpellSheet` em `Store/SpellSheetRules.swift`. Decisão do
    usuário: todo dia novo herda as preparações do dia anterior. **v1.99.4:** havia
    uma 6ª cópia fora das telas (`CharacterLibrary.seedFirstSpellSheetIfNeeded`), que
-   também passou a usar a função. Corrigido também um bug antigo achado no teste:
-   trocar a classe (Clérigo ↔ Mago/Bardo) não refazia a folha atual
-   (`realignCurrentSpellSheetToClass`; parte da A2).
+   também passou a usar a função. **v1.99.5 (decisão do usuário):** trocar a classe
+   **não altera nenhuma folha existente**; só as folhas novas nascem no padrão da
+   classe nova (a tentativa da v1.99.4 de refazer a folha atual foi revertida).
 2. **Lote 2: troca de classe, nível e kit (A1, A2, A4, B1, B2, B5).** Funções de mutação
    no modelo; as telas passam a chamá-las.
 3. **Lote 3: CA e equipamento (B4, A6, A11).**
