@@ -1153,6 +1153,11 @@ struct NotebookEntry: Codable, Identifiable, Hashable {
     /// picker no cabeçalho); só a folha NOVA nasce com o padrão configurado
     /// em Settings (`CharacterLibrary.defaultNotebookPaperStyle`, item 3).
     var paperStyle: NotebookPaperStyle? = nil
+
+    /// PNG do desenho (folha .freeform), para a versão web mostrar só para
+    /// leitura. Preenchido apenas no backup exportado
+    /// (`NotebookDrawingImage`); no arquivo do app fica vazio.
+    var drawingImage: Data? = nil
 }
 
 /// Uma campanha de mesa: dura meses ou anos, agrupa as sessões jogadas e o

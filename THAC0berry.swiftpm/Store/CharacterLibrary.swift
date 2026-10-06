@@ -384,7 +384,9 @@ final class CharacterLibrary: ObservableObject {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return try? encoder.encode(LibraryData(campaigns: campaigns, characters: characters,
+        // Folhas de desenho levam também uma imagem PNG, para a web (2026-10-06).
+        return try? encoder.encode(LibraryData(campaigns: campaigns,
+                                                characters: NotebookDrawingImage.addingImages(to: characters),
                                                 favoriteSpellIDs: favoriteSpellIDs,
                                                 defaultNotebookPaperStyle: defaultNotebookPaperStyle))
     }

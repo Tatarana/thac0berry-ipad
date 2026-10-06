@@ -6541,3 +6541,15 @@ personagem, e não da campanha. Cada personagem de cada jogador tem o seu
 Próximos passos combinados: backend e web com o caderno por personagem (e o
 ícone do caderno na ficha da web); depois, imagem PNG das folhas de desenho
 para a web mostrar (só leitura).
+
+## AJUSTE v1.101 (2026-10-06) — imagem das folhas de desenho no backup
+
+Pedido do usuário: a web deve mostrar as folhas de desenho do caderno (só
+leitura). O formato do PencilKit não abre no navegador, então o backup exportado
+leva também um PNG de cada folha de desenho (`NotebookEntry.drawingImage`).
+
+- `Store/NotebookDrawingImage.swift`: gera o PNG (modo claro, do canto da folha
+  até o último traço). Só roda em `exportSnapshot`, longe do `DrawingCanvas` e do
+  salvamento automático; no `library.json` do app o campo fica vazio.
+- Schema regenerado e levado ao `thac0berry-data`.
+- Construído sobre a v1.100 (caderno por personagem), ainda em teste.
