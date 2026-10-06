@@ -6548,7 +6548,7 @@ Pedido do usuário: a web deve mostrar as folhas de desenho do caderno (só
 leitura). O formato do PencilKit não abre no navegador, então o backup exportado
 leva também um PNG de cada folha de desenho (`NotebookEntry.drawingImage`).
 
-- `Store/NotebookDrawingImage.swift`: gera o PNG (modo claro, do canto da folha
+- `Views/NotebookDrawingImage.swift` (UIKit; `Store/` é compilado no macOS pelo gerador de regras): gera o PNG (modo claro, do canto da folha
   até o último traço). Só roda em `exportSnapshot`, longe do `DrawingCanvas` e do
   salvamento automático; no `library.json` do app o campo fica vazio.
 - Schema regenerado e levado ao `thac0berry-data`.
