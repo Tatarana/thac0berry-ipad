@@ -521,7 +521,7 @@ private struct SheetTabs: View {
     /// vazio se ainda não existir nenhuma.
     private func openNotebook() {
         if case .notebook = page { return }
-        let firstID = notebookEntries.wrappedValue.sorted { $0.date < $1.date }.first?.id
+        let firstID = (character.notebookEntries ?? []).sorted { $0.date < $1.date }.first?.id
         page = .notebook(firstID)
     }
 
