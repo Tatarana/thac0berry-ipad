@@ -1179,9 +1179,10 @@ struct Campaign: Codable, Identifiable, Hashable {
     /// um ou mais personagens.
     var sessions: [Session] = []
 
-    /// Caderno de anotações livres da campanha — encontros com NPCs,
-    /// pistas, decisões do grupo. Compartilhado por todo mundo que joga
-    /// essa campanha, não mais um caderno por personagem.
+    /// LEGADO: o caderno era da campanha até o formato 2 (2026-10-06).
+    /// Agora cada personagem tem o seu (`PlayerCharacter.notebookEntries`);
+    /// `CharacterLibrary.migrateNotebooks` move as folhas daqui para lá ao
+    /// abrir um arquivo antigo. O campo continua só para ler esses arquivos.
     var notebookEntries: [NotebookEntry] = []
 
     /// Cenários de campanha ligados (ver `CampaignSettingCatalog`) — `nil`
@@ -1234,17 +1235,19 @@ struct Campaign: Codable, Identifiable, Hashable {
         return created
     }
 
+}
+
+extension Array where Element == NotebookEntry {
     /// Cria uma folha nova no fim do caderno (mais recente) e devolve o id
     /// dela, pronto pra virar o `currentID` do pager. `paperStyle` nasce da
     /// preferência padrão configurada em Settings (item 3 do pedido de
-    /// 2026-09-24) — parâmetro com default `.plain` só pra não quebrar
-    /// nenhuma chamada antiga que não passe esse argumento.
+    /// 2026-09-24).
     @discardableResult
     mutating func addNotebookPage(kind: NotebookPageKind, paperStyle: NotebookPaperStyle = .plain) -> UUID {
         var entry = NotebookEntry()
         entry.kind = kind
         entry.paperStyle = paperStyle
-        notebookEntries.append(entry)
+        append(entry)
         return entry.id
     }
 }
@@ -1442,6 +1445,12 @@ struct PlayerCharacter: Codable, Identifiable, Hashable {
     /// clonado — só pra rastrear a linhagem; nada no app depende disso pra
     /// funcionar.
     var clonedFromCharacterID: UUID? = nil
+
+    /// Caderno do personagem (formato 2, 2026-10-06): anotações do jogador
+    /// sobre a história, NPCs e o próprio personagem. Cada personagem tem o
+    /// seu; antes o caderno era da campanha (ver `Campaign.notebookEntries`).
+    /// Optional pelo mesmo motivo de sempre: fichas antigas não têm a chave.
+    var notebookEntries: [NotebookEntry]? = nil
 
     // MARK: - Motor de Consequências (2026-09-19)
     //

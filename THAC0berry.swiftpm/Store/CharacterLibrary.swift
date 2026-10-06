@@ -40,7 +40,9 @@ final class CharacterLibrary: ObservableObject {
     /// preparação pro backend/web). 0 = arquivo salvo antes do campo
     /// existir. Suba este número só quando o formato mudar de um jeito que
     /// um build antigo não saberia ler — e escreva a migração em `load()`.
-    static let currentSchemaVersion = 1
+    /// 2 (2026-10-06): o caderno passou da campanha para o personagem
+    /// (`migrateNotebooks`).
+    static let currentSchemaVersion = 2
 
     /// `true` quando o arquivo veio de um build MAIS NOVO (formato maior que
     /// `currentSchemaVersion`). Nesse caso nada é gravado: este build pode
@@ -146,6 +148,7 @@ final class CharacterLibrary: ObservableObject {
             }
             campaigns = decoded.campaigns
             characters = decoded.characters
+            if decoded.schemaVersion < 2 { Self.migrateNotebooks(campaigns: &campaigns, characters: &characters) }
             if let saved = decoded.favoriteSpellIDs {
                 favoriteSpellIDs = saved
             } else {
@@ -324,6 +327,7 @@ final class CharacterLibrary: ObservableObject {
         clone.deathNote = nil
         clone.clonedFromCharacterID = original.id
         clone.spellSheets = []
+        clone.notebookEntries = nil
         seedFirstSpellSheetIfNeeded(&clone)
         characters.append(clone)
         return clone
@@ -390,6 +394,22 @@ final class CharacterLibrary: ObservableObject {
         let characterCount: Int
     }
 
+    /// Formato 1 → 2: o caderno de cada campanha vai para um personagem dela
+    /// (o primeiro vivo em ordem de nome; sem vivo, o primeiro de todos).
+    /// Decisão do usuário (2026-10-06): ainda é beta, as folhas antigas não
+    /// precisam de regra melhor. Campanha sem personagem fica com as folhas
+    /// guardadas no campo legado.
+    static func migrateNotebooks(campaigns: inout [Campaign], characters: inout [PlayerCharacter]) {
+        for campaignIndex in campaigns.indices where !campaigns[campaignIndex].notebookEntries.isEmpty {
+            let cast = characters.indices
+                .filter { characters[$0].campaignID == campaigns[campaignIndex].id }
+                .sorted { characters[$0].name.localizedCaseInsensitiveCompare(characters[$1].name) == .orderedAscending }
+            guard let target = cast.first(where: { characters[$0].status == .alive }) ?? cast.first else { continue }
+            characters[target].notebookEntries = (characters[target].notebookEntries ?? []) + campaigns[campaignIndex].notebookEntries
+            campaigns[campaignIndex].notebookEntries = []
+        }
+    }
+
     /// Só olha o arquivo, sem aplicar nada ainda — pra `SettingsView` poder
     /// mostrar "isso tem N campanhas e M personagens, substituir os M
     /// atuais?" antes do jogador confirmar (importar é destrutivo: troca a
@@ -421,6 +441,7 @@ final class CharacterLibrary: ObservableObject {
         lastError = nil
         campaigns = decoded.campaigns
         characters = decoded.characters
+        if decoded.schemaVersion < 2 { Self.migrateNotebooks(campaigns: &campaigns, characters: &characters) }
         favoriteSpellIDs = decoded.favoriteSpellIDs ?? Set(decoded.characters.flatMap(\.favoriteSpellIDs))
         defaultNotebookPaperStyle = decoded.defaultNotebookPaperStyle ?? .plain
         saveNow()

@@ -14,14 +14,6 @@ enum AppRoute: Hashable {
 
     case campaign(UUID)
     case character(UUID, CharacterSheetView.SheetPage)
-    /// O caderno da campanha aberto direto, sem passar por nenhum
-    /// personagem — ver `CampaignNotebookView`. Antes, o link "Open
-    /// campaign notebook" de `CampaignDetailView` empurrava
-    /// `.character(primeiroDoElenco, .notebook(nil))`, o que trazia junto
-    /// toda a fileira de abas da ficha (Sheet/Notebook, distintivo de
-    /// sessão, menu ☰) — amarrando sem querer "ver o caderno" a "estar
-    /// dentro da ficha de um personagem específico".
-    case campaignNotebook(UUID)
 }
 
 private struct PopToRootKey: EnvironmentKey {

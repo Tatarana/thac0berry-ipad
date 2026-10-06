@@ -92,32 +92,24 @@ struct CharacterSheetView: View {
                         }
                         .transition(.opacity)
                     case .notebook(let id):
-                        if let campaignBinding {
-                            // `id` chega `nil` tanto quando o caderno está
-                            // mesmo vazio quanto quando quem abriu a tela só
-                            // pediu "vai pro caderno" sem escolher página
-                            // (o link da Campanha, por exemplo) — nos dois
-                            // casos cai pra primeira folha em ordem, se
-                            // existir alguma.
-                            let resolvedID = id ?? campaignBinding.wrappedValue.notebookEntries
-                                .sorted { $0.date < $1.date }.first?.id
-                            if let resolvedID,
-                               campaignBinding.wrappedValue.notebookEntries.contains(where: { $0.id == resolvedID }) {
-                                VStack(spacing: 0) {
-                                    NotebookBeadRow(campaign: campaignBinding, selection: notebookSelection, currentID: resolvedID)
-                                    NotebookPagerView(campaign: campaignBinding, currentID: currentNotebookPageID)
-                                }
-                                .transition(.opacity)
-                            } else {
-                                ScrollView {
-                                    NotebookEmptyState(campaign: campaignBinding, selection: notebookSelection)
-                                        .padding(18)
-                                }
-                                .transition(.opacity)
+                        // `id` chega `nil` tanto quando o caderno está
+                        // mesmo vazio quanto quando quem abriu a tela só
+                        // pediu "vai pro caderno" sem escolher página —
+                        // nos dois casos cai pra primeira folha em ordem,
+                        // se existir alguma. O caderno é do personagem
+                        // (formato 2): existe mesmo no Sandbox.
+                        let resolvedID = id ?? notebookEntries.wrappedValue
+                            .sorted { $0.date < $1.date }.first?.id
+                        if let resolvedID,
+                           notebookEntries.wrappedValue.contains(where: { $0.id == resolvedID }) {
+                            VStack(spacing: 0) {
+                                NotebookBeadRow(entries: notebookEntries, selection: notebookSelection, currentID: resolvedID)
+                                NotebookPagerView(entries: notebookEntries, currentID: currentNotebookPageID)
                             }
+                            .transition(.opacity)
                         } else {
                             ScrollView {
-                                NoCampaignNotice()
+                                NotebookEmptyState(entries: notebookEntries, selection: notebookSelection)
                                     .padding(18)
                             }
                             .transition(.opacity)
@@ -225,7 +217,7 @@ struct CharacterSheetView: View {
         Binding(
             get: {
                 if case .notebook(let id) = page, let id { return id }
-                return campaignBinding?.wrappedValue.notebookEntries.sorted { $0.date < $1.date }.first?.id ?? UUID()
+                return notebookEntries.wrappedValue.sorted { $0.date < $1.date }.first?.id ?? UUID()
             },
             set: { newID in page = .notebook(newID) }
         )
@@ -234,13 +226,17 @@ struct CharacterSheetView: View {
     /// Ponte entre `page` e o `Binding<UUID?>` que `NotebookBeadRow`/
     /// `NotebookEmptyState` esperam agora (ver comentário em
     /// `NotebookBeadRow.selection`) — desacoplado do enum `SheetPage` pra
-    /// esses dois também funcionarem fora de uma `CharacterSheetView`
-    /// (`CampaignNotebookView`, aberta direto da Campanha).
+    /// esses dois não dependerem da ficha.
     private var notebookSelection: Binding<UUID?> {
         Binding(
             get: { if case .notebook(let id) = page { return id }; return nil },
             set: { newID in page = .notebook(newID) }
         )
+    }
+
+    /// O caderno deste personagem (formato 2): `nil` no arquivo vira lista vazia.
+    private var notebookEntries: Binding<[NotebookEntry]> {
+        $character.notebookEntries.orDefault([])
     }
 
     /// A campanha deste personagem — `nil` enquanto ele estiver no Sandbox,
@@ -265,15 +261,15 @@ struct CharacterSheetView: View {
 }
 
 /// Aviso mostrado no lugar do Caderno/Índice/Grimório enquanto o personagem
-/// ainda está no Sandbox — sem campanha, não há sessão nem caderno pra
-/// abrir; some sozinho assim que ele for associado a uma campanha.
+/// ainda está no Sandbox — sem campanha, não há sessão pra abrir; some
+/// sozinho assim que ele for associado a uma campanha.
 private struct NoCampaignNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("No campaign yet")
                 .font(Paper.hand(26))
                 .foregroundStyle(Paper.penInk)
-            Text("This character is in the Sandbox. Assign it to a campaign to start its notebook and session log.")
+            Text("This character is in the Sandbox. Assign it to a campaign to start its session log.")
                 .font(Paper.printedItalic(13))
                 .foregroundStyle(Paper.inkSoft)
         }
@@ -525,7 +521,7 @@ private struct SheetTabs: View {
     /// vazio se ainda não existir nenhuma.
     private func openNotebook() {
         if case .notebook = page { return }
-        let firstID = campaignBinding?.wrappedValue.notebookEntries.sorted { $0.date < $1.date }.first?.id
+        let firstID = notebookEntries.wrappedValue.sorted { $0.date < $1.date }.first?.id
         page = .notebook(firstID)
     }
 

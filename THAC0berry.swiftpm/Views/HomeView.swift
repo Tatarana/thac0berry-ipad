@@ -123,10 +123,6 @@ struct HomeView: View {
                     if let binding = library.binding(forCharacterID: id) {
                         CharacterSheetView(character: binding, initialPage: initialPage)
                     }
-                case .campaignNotebook(let id):
-                    if let binding = library.binding(forCampaignID: id) {
-                        CampaignNotebookView(campaign: binding)
-                    }
                 }
             }
         }

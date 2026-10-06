@@ -25,7 +25,6 @@ struct CampaignDetailView: View {
                 header
                 Rectangle().fill(Ember.brassDim).frame(height: 1.4)
                 castSection
-                notebookLink
             }
             .padding(26)
         }
@@ -230,34 +229,4 @@ struct CampaignDetailView: View {
     private var aliveCast: [PlayerCharacter] { cast.filter { $0.status == .alive } }
     private var deadCast: [PlayerCharacter] { cast.filter { $0.status == .dead } }
     private var archivedCast: [PlayerCharacter] { cast.filter { $0.status == .archived } }
-
-    // MARK: - Caderno
-
-    private var notebookLink: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("NOTEBOOK")
-                .font(Paper.printed(9.5))
-                .tracking(2)
-                .foregroundStyle(Ember.onObsidianSoft)
-            // Abre direto pelo caderno da campanha (`CampaignNotebookView`)
-            // — antes isso pegava emprestada a ficha do primeiro personagem
-            // do elenco só pra chegar lá, o que também trazia a fileira de
-            // abas da ficha (Sheet/Notebook, menu ☰) junto sem necessidade;
-            // o caderno é da campanha, nunca precisou de personagem nenhum
-            // pra existir.
-            NavigationLink(value: AppRoute.campaignNotebook(campaign.id)) {
-                HStack {
-                    Text("Open campaign notebook")
-                        .font(Paper.printed(13))
-                        .foregroundStyle(Ember.onObsidian)
-                    Spacer()
-                    DiceIconBadge(kind: .d10, value: "\(campaign.notebookEntries.count)", diameter: 34)
-                }
-                .padding(12)
-                .padding(.leading, 3)
-                .emberCard(accent: Ember.teal)
-            }
-            .buttonStyle(.plain)
-        }
-    }
 }

@@ -2,15 +2,13 @@ import SwiftUI
 import UIKit
 import PencilKit
 
-/// O caderno de campanha vira um livro de verdade: folheado com o mesmo
-/// curl de página do UIPageViewController que a Ficha de Magias já usa
-/// (ver `DayPagerView`), em vez de uma lista rolável de cartões. As
-/// páginas não são agrupadas por sessão — é um único caderno contínuo da
-/// CAMPANHA, compartilhado por todo mundo que joga nela, do jeito que a
-/// mesa carregaria um caderno físico só pra sessão inteira (não mais um
-/// caderno por personagem).
+/// O caderno vira um livro de verdade: folheado com o mesmo curl de página
+/// do UIPageViewController que a Ficha de Magias já usa (ver
+/// `DayPagerView`), em vez de uma lista rolável de cartões. Desde o formato
+/// 2 (2026-10-06) o caderno é do PERSONAGEM (`PlayerCharacter.notebookEntries`):
+/// cada personagem de cada jogador tem o seu.
 struct NotebookPagerView: UIViewControllerRepresentable {
-    @Binding var campaign: Campaign
+    @Binding var entries: [NotebookEntry]
     @Binding var currentID: UUID
 
     func makeUIViewController(context: Context) -> UIPageViewController {
@@ -54,7 +52,7 @@ struct NotebookPagerView: UIViewControllerRepresentable {
     // MARK: - Conteúdo e vizinhança
 
     fileprivate func pageContent(for id: UUID, readiness: PageReadiness) -> AnyView {
-        guard let index = campaign.notebookEntries.firstIndex(where: { $0.id == id }) else {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else {
             return AnyView(
                 Text("This page is no longer in the notebook.")
                     .font(Paper.printedItalic(14))
@@ -65,14 +63,14 @@ struct NotebookPagerView: UIViewControllerRepresentable {
         return AnyView(
             NotebookPageView(
                 entry: Binding(
-                    get: { campaign.notebookEntries[index] },
+                    get: { entries[index] },
                     set: { newValue in
-                        guard campaign.notebookEntries.indices.contains(index) else { return }
-                        campaign.notebookEntries[index] = newValue
+                        guard entries.indices.contains(index) else { return }
+                        entries[index] = newValue
                     }
                 ),
                 pageNumber: index + 1,
-                pageCount: campaign.notebookEntries.count,
+                pageCount: entries.count,
                 onDelete: { deleteEntry(id) },
                 pageReadiness: readiness
             )
@@ -81,9 +79,9 @@ struct NotebookPagerView: UIViewControllerRepresentable {
     }
 
     /// Toda folha do caderno inteiro, em ordem — sem separar por sessão:
-    /// o caderno é um único fio contínuo da campanha.
+    /// o caderno é um único fio contínuo.
     private func orderedIDs() -> [UUID] {
-        campaign.notebookEntries.sorted { $0.date < $1.date }.map(\.id)
+        entries.sorted { $0.date < $1.date }.map(\.id)
     }
 
     fileprivate func neighborID(of id: UUID, forward: Bool) -> UUID? {
@@ -96,8 +94,8 @@ struct NotebookPagerView: UIViewControllerRepresentable {
 
     private func isForward(from: UUID?, to: UUID) -> Bool {
         guard let from,
-              let fromDate = campaign.notebookEntries.first(where: { $0.id == from })?.date,
-              let toDate = campaign.notebookEntries.first(where: { $0.id == to })?.date
+              let fromDate = entries.first(where: { $0.id == from })?.date,
+              let toDate = entries.first(where: { $0.id == to })?.date
         else { return true }
         return toDate >= fromDate
     }
@@ -106,7 +104,7 @@ struct NotebookPagerView: UIViewControllerRepresentable {
     /// em vez de deixar o livro parado num id que não existe mais.
     private func deleteEntry(_ id: UUID) {
         let fallback = neighborID(of: id, forward: false) ?? neighborID(of: id, forward: true)
-        campaign.notebookEntries.removeAll { $0.id == id }
+        entries.removeAll { $0.id == id }
         if currentID == id, let fallback {
             currentID = fallback
         }
@@ -243,7 +241,7 @@ private final class NotebookPageController: UIHostingController<AnyView> {
 /// escolha (transcrita ou desenho livre) que antes vivia solto na fileira
 /// global de abas.
 struct NotebookBeadRow: View {
-    @Binding var campaign: Campaign
+    @Binding var entries: [NotebookEntry]
     // Item 3 do pedido do usuário (2026-09-24): folha nova nasce com o
     // estilo de papel padrão configurado em Settings.
     @EnvironmentObject private var library: CharacterLibrary
@@ -251,21 +249,19 @@ struct NotebookBeadRow: View {
     /// direto, mas isso amarrava o caderno a sempre estar dentro de uma
     /// `CharacterSheetView`. Desacoplado pra `Binding<UUID?>` puro: dentro
     /// da ficha de personagem, `CharacterSheetView.notebookSelection` faz a
-    /// ponte pra `page`; fora dela (`CampaignNotebookView`, aberta direto
-    /// da Campanha, sem passar por nenhum personagem), é só um `@State`
-    /// local.
+    /// ponte pra `page`.
     @Binding var selection: UUID?
     let currentID: UUID
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 13) {
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                ForEach(Array(ordered.enumerated()), id: \.element.id) { index, entry in
                     InkDayBead(number: index + 1, isSelected: entry.id == currentID) {
                         selection = entry.id
                     }
                     .contextMenu {
-                        if entries.count > 1 {
+                        if ordered.count > 1 {
                             Button("Delete page", role: .destructive) { delete(entry) }
                         }
                     }
@@ -302,29 +298,29 @@ struct NotebookBeadRow: View {
         .padding(.bottom, 2)
     }
 
-    private var entries: [NotebookEntry] {
-        campaign.notebookEntries.sorted { $0.date < $1.date }
+    private var ordered: [NotebookEntry] {
+        entries.sorted { $0.date < $1.date }
     }
 
     private var currentTitle: String? {
-        entries.first { $0.id == currentID }?.title
+        ordered.first { $0.id == currentID }?.title
     }
 
     private func addPage(_ kind: NotebookPageKind) {
-        selection = campaign.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
+        selection = entries.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
     }
 
     /// Apaga a página; se era a que estava aberta, pula pra uma vizinha.
     private func delete(_ entry: NotebookEntry) {
-        guard entries.count > 1 else { return }
-        let ordered = entries
+        guard ordered.count > 1 else { return }
+        let ordered = self.ordered
         let fallback: UUID? = {
             guard let position = ordered.firstIndex(where: { $0.id == entry.id }) else { return nil }
             if ordered.indices.contains(position - 1) { return ordered[position - 1].id }
             if ordered.indices.contains(position + 1) { return ordered[position + 1].id }
             return nil
         }()
-        campaign.notebookEntries.removeAll { $0.id == entry.id }
+        entries.removeAll { $0.id == entry.id }
         if currentID == entry.id, let fallback {
             selection = fallback
         }
@@ -498,7 +494,7 @@ private struct NotebookPaperTexture: View {
 /// Tela em branco quando o caderno ainda não tem nenhuma folha — pede pra
 /// escolher o tipo antes mesmo da primeira página nascer.
 struct NotebookEmptyState: View {
-    @Binding var campaign: Campaign
+    @Binding var entries: [NotebookEntry]
     /// Ver o comentário em `NotebookBeadRow.selection` — mesma troca de
     /// `Binding<CharacterSheetView.SheetPage>` por `Binding<UUID?>` puro.
     @Binding var selection: UUID?
@@ -512,7 +508,7 @@ struct NotebookEmptyState: View {
             Text("Notebook")
                 .font(Paper.hand(30))
                 .foregroundStyle(Paper.penInk)
-            Text("No pages yet — start your campaign notebook below.")
+            Text("No pages yet — start this character's notebook below.")
                 .font(Paper.printedItalic(13))
                 .foregroundStyle(Paper.inkSoft)
 
@@ -528,7 +524,7 @@ struct NotebookEmptyState: View {
     }
 
     private func addPage(_ kind: NotebookPageKind) {
-        selection = campaign.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
+        selection = entries.addNotebookPage(kind: kind, paperStyle: library.defaultNotebookPaperStyle)
     }
 }
 
@@ -727,81 +723,3 @@ struct DrawingCanvas: UIViewRepresentable {
 }
 
 // MARK: - Caderno aberto direto da Campanha
-
-/// O caderno da campanha, sozinho — sem passar por nenhum personagem. Até
-/// aqui o único jeito de abrir o caderno era pela ficha de um personagem
-/// (`CharacterSheetView`'s aba Notebook), o que trazia junto a fileira de
-/// abas inteira (Sheet/Notebook, distintivo de sessão, menu ☰) mesmo
-/// quando a pessoa só queria ler o caderno partindo da própria Campanha.
-/// Essa fileira continua existindo — nada muda pra quem já está dentro da
-/// ficha de um personagem durante a sessão — mas agora o link "Open
-/// campaign notebook" de `CampaignDetailView` chega direto aqui, com só um
-/// botão simples de voltar, igual às outras telas empurradas a partir da
-/// Tela Principal.
-struct CampaignNotebookView: View {
-    @Binding var campaign: Campaign
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedID: UUID? = nil
-
-    var body: some View {
-        ZStack {
-            ChromeBackground()
-
-            VStack(spacing: 0) {
-                backRow
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .bottom) {
-                        Rectangle().fill(Paper.chromeDeep).frame(height: 1)
-                    }
-
-                ZStack {
-                    PaperBackground()
-
-                    if let resolvedID,
-                       campaign.notebookEntries.contains(where: { $0.id == resolvedID }) {
-                        VStack(spacing: 0) {
-                            NotebookBeadRow(campaign: $campaign, selection: $selectedID, currentID: resolvedID)
-                            NotebookPagerView(campaign: $campaign, currentID: currentPageID)
-                        }
-                    } else {
-                        ScrollView {
-                            NotebookEmptyState(campaign: $campaign, selection: $selectedID)
-                                .padding(18)
-                        }
-                    }
-                }
-            }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private var backRow: some View {
-        Button(action: { dismiss() }) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Paper.sheet)
-                .frame(width: 30, height: 30)
-                .background(Color.white.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Campaign")
-    }
-
-    /// `selectedID` chega `nil` tanto quando o caderno está mesmo vazio
-    /// quanto quando a tela acabou de abrir sem escolha nenhuma — nos dois
-    /// casos cai pra primeira folha em ordem, se existir alguma. Mesma
-    /// ideia de `CharacterSheetView`'s `resolvedID`/`currentNotebookPageID`.
-    private var resolvedID: UUID? {
-        selectedID ?? campaign.notebookEntries.sorted { $0.date < $1.date }.first?.id
-    }
-
-    private var currentPageID: Binding<UUID> {
-        Binding(
-            get: { resolvedID ?? UUID() },
-            set: { selectedID = $0 }
-        )
-    }
-}

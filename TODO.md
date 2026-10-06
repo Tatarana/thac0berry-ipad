@@ -6518,3 +6518,26 @@ Car −1 e Des +1 com Con de volta ao original; escolher Anão duas vezes dá +2
 Correção sugerida: guardar a raça aplicada e, ao trocar, desfazer os ajustes
 dela antes de aplicar os da nova (ou só aplicar se a raça mudou). A web faz
 igual ao iPad por enquanto (paridade); corrigir nos dois juntos.
+
+## AJUSTE v1.100 (2026-10-06) — caderno por personagem (formato 2)
+
+Pedido do usuário (feedback da web, 2026-10-06): o caderno é do jogador, por
+personagem, e não da campanha. Cada personagem de cada jogador tem o seu
+(anotações sobre a história, NPCs e o próprio personagem).
+
+- `PlayerCharacter.notebookEntries` (opcional) é o caderno agora; existe também
+  no Sandbox. `Campaign.notebookEntries` fica só como campo legado.
+- `CharacterLibrary.currentSchemaVersion` = 2. `migrateNotebooks` (no `load()` e
+  no import de backup) move as folhas de cada campanha para o primeiro
+  personagem vivo dela, em ordem de nome. Decisão do usuário: ainda é beta, as
+  folhas antigas não precisam de regra melhor. Build antigo abre o arquivo novo
+  só para leitura (formato maior).
+- Telas do caderno passam a receber `Binding<[NotebookEntry]>`. Saem a
+  `CampaignNotebookView`, a rota `AppRoute.campaignNotebook` e o link "Open
+  campaign notebook" da campanha; o caderno abre pela aba Notebook da ficha.
+- Personagem clonado nasce com o caderno vazio.
+- Schema regenerado e levado ao `thac0berry-data`.
+
+Próximos passos combinados: backend e web com o caderno por personagem (e o
+ícone do caderno na ficha da web); depois, imagem PNG das folhas de desenho
+para a web mostrar (só leitura).
