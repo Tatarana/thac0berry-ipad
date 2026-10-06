@@ -6497,3 +6497,14 @@ ora o ajuste de Elf (+5 PP, -5 OL, +5 MS, +10 HS, +5 DN), ora o de Half-Elf
 mais longa para a mais curta (ou em ordem fixa, Half-Elf antes de Elf). O
 gerador deixa Half-Elf fora do cálculo até a correção; a web implementa o
 comportamento pretendido (Half-Elf).
+
+## PENDENTE iPad (2026-10-06) — aplicar consequências apaga modificadores de save
+
+Achado ao portar o motor de consequências para a web (W2.5b):
+`SavingThrowsByLevelProvider` devolve um `SavingThrows(...)` novo, só com os
+cinco valores da tabela, e `ConsequenceEngine.applyAutomatic` faz
+`character.saves = newSaves`. Com isso, `saves.modifiers` e
+`saves.spellResistance` digitados pelo jogador somem ao aplicar as
+consequências de subir de nível. Correção sugerida: no `apply` da regra
+"savingThrows", copiar só os cinco valores, preservando `modifiers` e
+`spellResistance`. A web já faz assim.
