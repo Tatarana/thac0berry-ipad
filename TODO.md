@@ -6553,3 +6553,15 @@ leva também um PNG de cada folha de desenho (`NotebookEntry.drawingImage`).
   salvamento automático; no `library.json` do app o campo fica vazio.
 - Schema regenerado e levado ao `thac0berry-data`.
 - Construído sobre a v1.100 (caderno por personagem), ainda em teste.
+
+## PENDENTE iPad (2026-10-06) — classe Psionicist feita primeiro na web
+
+Decisão do usuário: a classe Psionicist (Complete Psionics Handbook) é feita
+primeiro na web; o iPad ganha quando voltarmos a ele. O schema
+(`Scripts/gen_library_schema.py`, OVERRIDES de `CharacterClass`) já aceita
+"Psionicist". Até o iPad ter o caso no enum, o `CharacterClass.init(from:)` lê
+o valor como Fighter: um backup com psionicista abriria como guerreiro e, se
+salvo, perderia a classe. Implementar no iPad: caso no enum, grupo próprio
+(XP Tabela 2, d6, THAC0 Tabela 7, saves Tabela 8, proficiências Tabela 10,
+limites raciais Tabela 1, atributos principais CON/WIS), kits de Psionicist e
+o bloco psiônico (PSPs, disciplinas, poderes, modos de defesa).
