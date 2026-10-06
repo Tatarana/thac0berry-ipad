@@ -92,6 +92,62 @@ OVERRIDES = {
     },
 }
 
+# Extensões feitas primeiro na web (decisão do usuário, 2026-10-06): campos que o
+# Swift ainda não tem. O iPad atual ignora a chave ao ler (e a perde ao salvar);
+# quando o iPad ganhar o campo, ele sai daqui e passa a ser gerado do modelo.
+WEB_FIRST_DEFS = {
+    # Bloco psiônico do Psionicist (Complete Psionics Handbook, cap. 1).
+    "Psionics": {
+        "type": "object",
+        "required": [],
+        "properties": {
+            "pspMaxOverride": {"anyOf": [{"type": "integer"}, {"type": "null"}],
+                               "description": "PSPs máximos escritos à mão; null = calculado pela Tabela 5."},
+            "pspCurrent": {"anyOf": [{"type": "integer"}, {"type": "null"}],
+                           "description": "PSPs atuais; null = cheio (igual ao máximo)."},
+            "primaryDiscipline": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            "disciplines": {"type": "array", "items": {"type": "string"},
+                            "description": "Disciplinas com acesso (inclui a principal)."},
+            "powers": {"type": "array", "items": {"$ref": "#/$defs/PsionicPowerEntry"}},
+            "defenseModes": {"type": "array", "items": {"type": "string"}},
+            "uses": {"type": "array", "items": {"$ref": "#/$defs/PsionicUse"},
+                     "description": "Registro de usos (PSPs gastos), para o XP sugerido do relatório da sessão."},
+        },
+    },
+    "PsionicPowerEntry": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+            "id": {"type": "string"},
+            "powerID": {"anyOf": [{"type": "string"}, {"type": "null"}],
+                        "description": "id em psionic_powers.json; null = poder escrito à mão."},
+            "name": {"type": "string"},
+            "discipline": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            "tier": {"anyOf": [{"type": "string"}, {"type": "null"}],
+                     "description": "Science ou Devotion."},
+        },
+    },
+    "PsionicUse": {
+        "type": "object",
+        "required": ["id", "date", "psp"],
+        "properties": {
+            "id": {"type": "string"},
+            "date": {"type": "string", "description": "ISO-8601 sem fração de segundo."},
+            "sessionID": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            "power": {"type": "string"},
+            "psp": {"type": "integer"},
+        },
+    },
+}
+WEB_FIRST_PROPERTIES = {
+    "PlayerCharacter": {
+        "psionics": {
+            "anyOf": [{"$ref": "#/$defs/Psionics"}, {"type": "null"}],
+            "description": "Bloco psiônico do Psionicist (feito primeiro na web, 2026-10-06; o iPad ainda não tem).",
+        },
+    },
+}
+
 ROOTS = ["Campaign", "PlayerCharacter"]
 
 
@@ -271,6 +327,9 @@ def build():
     b = Builder(decls)
     for r in ROOTS:
         b.define(r)
+    for name, props in WEB_FIRST_PROPERTIES.items():
+        b.defs[name]["properties"].update(props)
+    b.defs.update(WEB_FIRST_DEFS)
     defs = {k: b.defs[k] for k in sorted(b.defs)}
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
