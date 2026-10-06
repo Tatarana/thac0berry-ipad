@@ -6508,3 +6508,13 @@ cinco valores da tabela, e `ConsequenceEngine.applyAutomatic` faz
 consequências de subir de nível. Correção sugerida: no `apply` da regra
 "savingThrows", copiar só os cinco valores, preservando `modifiers` e
 `spellResistance`. A web já faz assim.
+
+## PENDENTE iPad (2026-10-06) — trocar de raça acumula os ajustes de atributo
+
+Achado ao portar o seletor de raça para a web (W2.5d2): `RaceOption.apply(to:)`
+soma os ajustes da raça escolhida aos atributos, mas não desfaz os da raça
+anterior. Escolher Anão (+1 Con, −1 Car) e depois Elfo (+1 Des, −1 Con) deixa
+Car −1 e Des +1 com Con de volta ao original; escolher Anão duas vezes dá +2 Con.
+Correção sugerida: guardar a raça aplicada e, ao trocar, desfazer os ajustes
+dela antes de aplicar os da nova (ou só aplicar se a raça mudou). A web faz
+igual ao iPad por enquanto (paridade); corrigir nos dois juntos.
