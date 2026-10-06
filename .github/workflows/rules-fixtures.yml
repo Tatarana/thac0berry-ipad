@@ -1,0 +1,93 @@
+# Valores de referência das regras de jogo, gerados pelo próprio código Swift
+# (Scripts/rules_fixtures/main.swift). A versão web reimplementa as regras em
+# TypeScript e compara com eles.
+#
+# 1. Compila Models + Store (menos CharacterLibrary.swift, que usa SwiftUI) +
+#    Utils + o gerador, para macOS, e roda com os JSON de regra ao lado.
+# 2. Compara com thac0berry-data/fixtures/rules/rules-fixtures.json (anotação
+#    OK ou DIFERE).
+# 3. Publica o arquivo gerado no branch `generated/rules-fixtures` deste repo
+#    (artifacts exigem login para baixar; um branch, não). Quem atualiza o
+#    thac0berry-data copia de lá.
+
+name: Regras (valores de referência)
+
+on:
+  push:
+    paths:
+      - "THAC0berry.swiftpm/Models/**"
+      - "THAC0berry.swiftpm/Store/**"
+      - "THAC0berry.swiftpm/Utils/**"
+      - "THAC0berry.swiftpm/Resources/rules_*.json"
+      - "Scripts/rules_fixtures/**"
+      - ".github/workflows/rules-fixtures.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: rules-fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: Tatarana/thac0berry-data
+          path: thac0berry-data
+
+      - name: Compilar o gerador
+        run: |
+          set -o pipefail
+          find THAC0berry.swiftpm/Models THAC0berry.swiftpm/Store THAC0berry.swiftpm/Utils -name '*.swift' \
+            ! -name CharacterLibrary.swift | sort > files.txt
+          echo "Scripts/rules_fixtures/main.swift" >> files.txt
+          mkdir -p build
+          xcrun swiftc -swift-version 5 -module-name RulesFixtures \
+            $(cat files.txt) -o build/rules-fixtures 2>&1 | tee build.log
+
+      - name: Gerar
+        run: |
+          cp THAC0berry.swiftpm/Resources/rules_*.json build/
+          ./build/rules-fixtures > rules-fixtures.json
+          echo "::notice title=Gerado::$(wc -c < rules-fixtures.json | tr -d ' ') bytes, sha256 $(shasum -a 256 rules-fixtures.json | cut -c1-12)"
+
+      - name: Comparar com thac0berry-data
+        run: |
+          target=thac0berry-data/fixtures/rules/rules-fixtures.json
+          if [ ! -f "$target" ]; then
+            echo "::warning title=Regras::$target ainda não existe no thac0berry-data"
+          elif cmp -s rules-fixtures.json "$target"; then
+            echo "::notice title=Regras::OK, igual ao thac0berry-data"
+          else
+            echo "::error title=Regras::DIFERE do thac0berry-data: copie do branch generated/rules-fixtures"
+            echo "differs=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Publicar no branch generated/rules-fixtures
+        if: always() && hashFiles('rules-fixtures.json') != ''
+        run: |
+          src_sha="$GITHUB_SHA"
+          mkdir pub && cp rules-fixtures.json pub/
+          cd pub
+          git init -q -b generated/rules-fixtures
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rules-fixtures.json
+          git commit -q -m "rules-fixtures.json gerado de ${src_sha}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" generated/rules-fixtures
+
+      - name: Anotações de erro de compilação
+        if: failure()
+        run: |
+          ROOT="$GITHUB_WORKSPACE/"
+          grep -E ': error:' build.log | sed "s|$ROOT||g" | head -10 | while IFS= read -r l; do echo "::error title=swiftc::$l"; done || true
+
+      - name: Falhar se diferente
+        if: env.differs == '1'
+        run: exit 1

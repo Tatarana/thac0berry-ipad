@@ -6484,3 +6484,16 @@ cada salvamento). Decisão do usuário: backups antigos podem ser descartados na
 web; a correção no iPad entra quando houver rodada de teste. Depois de corrigir:
 rodar `python Scripts/gen_library_schema.py` e levar o schema ao thac0berry-data
 (os dois campos saem de `required`).
+
+## PENDENTE iPad (2026-10-05) — ajuste racial de ladrão aleatório para Half-Elf
+
+Achado ao montar o gerador de valores de referência das regras (W2.4a da web):
+`ThievingSkillsTable.racialAdjustment(skill:race:)` percorre o dicionário
+`racialAdjustments` e devolve a primeira raça cujo nome normalizado está
+**contido** no campo Race. "half elf" contém "elf", e a ordem de um dicionário
+Swift muda a cada execução do app. Resultado: um ladrão/bardo Half-Elf recebe
+ora o ajuste de Elf (+5 PP, -5 OL, +5 MS, +10 HS, +5 DN), ora o de Half-Elf
+(+10 PP, +5 HS), conforme a execução. Correção sugerida: testar as chaves da
+mais longa para a mais curta (ou em ordem fixa, Half-Elf antes de Elf). O
+gerador deixa Half-Elf fora do cálculo até a correção; a web implementa o
+comportamento pretendido (Half-Elf).
