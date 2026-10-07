@@ -160,6 +160,17 @@ WEB_FIRST_PROPERTIES = {
             "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
             "description": "Retrato do motor de consequências: as outras classes no último estado revisado.",
         },
+        # Classe dupla (2026-10-07, MC4 em thac0berry-web/docs/multiclasse.md): a
+        # classe atual continua em characterClass/level; aqui ficam as anteriores,
+        # congeladas no nível em que o personagem as deixou.
+        "formerClasses": {
+            "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
+            "description": "Classes anteriores de um personagem de classe dupla (humanos), na ordem em que foram deixadas, com o nível em que congelaram; ausente = sem classe dupla.",
+        },
+        "lastAppliedFormerClasses": {
+            "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
+            "description": "Retrato do motor de consequências: as classes anteriores no último estado revisado.",
+        },
         "psionics": {
             "anyOf": [{"$ref": "#/$defs/Psionics"}, {"type": "null"}],
             "description": "Bloco psiônico do Psionicist (feito primeiro na web, 2026-10-06; o iPad ainda não tem).",
