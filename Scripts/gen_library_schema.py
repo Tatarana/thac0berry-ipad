@@ -139,8 +139,27 @@ WEB_FIRST_DEFS = {
         },
     },
 }
+WEB_FIRST_DEFS["ClassLevel"] = {
+    "type": "object",
+    "required": ["characterClass", "level"],
+    "properties": {
+        "characterClass": {"$ref": "#/$defs/CharacterClass"},
+        "level": {"type": "integer"},
+    },
+}
+
 WEB_FIRST_PROPERTIES = {
     "PlayerCharacter": {
+        # Multiclasse (2026-10-07, thac0berry-web/docs/multiclasse.md): a classe
+        # principal continua em characterClass/level; aqui ficam as outras.
+        "multiClasses": {
+            "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
+            "description": "Outras classes de um multiclasse (semi-humanos), com o nível de cada uma; ausente = classe única.",
+        },
+        "lastAppliedMultiClasses": {
+            "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
+            "description": "Retrato do motor de consequências: as outras classes no último estado revisado.",
+        },
         "psionics": {
             "anyOf": [{"$ref": "#/$defs/Psionics"}, {"type": "null"}],
             "description": "Bloco psiônico do Psionicist (feito primeiro na web, 2026-10-06; o iPad ainda não tem).",
