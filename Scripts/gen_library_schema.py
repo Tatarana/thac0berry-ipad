@@ -96,6 +96,19 @@ OVERRIDES = {
 # Swift ainda não tem. O iPad atual ignora a chave ao ler (e a perde ao salvar);
 # quando o iPad ganhar o campo, ele sai daqui e passa a ser gerado do modelo.
 WEB_FIRST_DEFS = {
+    # Conjuração vinda de um kit (2026-10-10, ajuste 6 da web): grimório e folhas
+    # de magia para quem não é mago/sacerdote (ex.: Shinobi Mage). Os slots são
+    # marcados à mão pelo jogador (decisão do usuário).
+    "KitSpellcasting": {
+        "type": "object",
+        "required": [],
+        "properties": {
+            "arcane": {"anyOf": [{"type": "array", "items": {"type": "integer", "minimum": 0}}, {"type": "null"}],
+                       "description": "Magia arcana: slots por círculo (índice 0 = 1º círculo); ausente/null = sem magia arcana."},
+            "divine": {"anyOf": [{"type": "array", "items": {"type": "integer", "minimum": 0}}, {"type": "null"}],
+                       "description": "Magia divina: slots por círculo (índice 0 = 1º círculo); ausente/null = sem magia divina."},
+        },
+    },
     # Bloco psiônico do Psionicist (Complete Psionics Handbook, cap. 1).
     "Psionics": {
         "type": "object",
@@ -170,6 +183,10 @@ WEB_FIRST_PROPERTIES = {
         "lastAppliedFormerClasses": {
             "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/ClassLevel"}}, {"type": "null"}],
             "description": "Retrato do motor de consequências: as classes anteriores no último estado revisado.",
+        },
+        "kitSpellcasting": {
+            "anyOf": [{"$ref": "#/$defs/KitSpellcasting"}, {"type": "null"}],
+            "description": "Conjuração vinda de um kit (grimório e folhas de magia sem ser mago/sacerdote), com os slots à mão; ausente = nenhuma.",
         },
         "psionics": {
             "anyOf": [{"$ref": "#/$defs/Psionics"}, {"type": "null"}],
