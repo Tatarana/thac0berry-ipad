@@ -86,6 +86,9 @@ OVERRIDES = {
             # usuário). O CharacterClass do iPad ainda não tem o caso; o init(from:)
             # dele lê valor desconhecido como Fighter. Ver TODO.md (v1.101+).
             "Psionicist",
+            # Anchorite (Domains of Dread, Ravenloft): também feita primeiro na web
+            # (2026-10-10, GT4b R2); só aparece em campanhas com Ravenloft ligado.
+            "Anchorite",
             "Guerreiro", "Paladino", "Patrulheiro", "Mago", "Clérigo", "Druida", "Ladino", "Bardo",
         ],
         "description": "Gravar só os valores em inglês; os em português são de bibliotecas antigas.",
