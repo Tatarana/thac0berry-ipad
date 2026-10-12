@@ -89,6 +89,8 @@ OVERRIDES = {
             # Anchorite (Domains of Dread, Ravenloft): também feita primeiro na web
             # (2026-10-10, GT4b R2); só aparece em campanhas com Ravenloft ligado.
             "Anchorite",
+            # Gypsy (Domains of Dread, Ravenloft): idem (2026-10-12, GT4b R3).
+            "Gypsy",
             "Guerreiro", "Paladino", "Patrulheiro", "Mago", "Clérigo", "Druida", "Ladino", "Bardo",
         ],
         "description": "Gravar só os valores em inglês; os em português são de bibliotecas antigas.",
