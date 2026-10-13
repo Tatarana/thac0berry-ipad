@@ -6518,3 +6518,18 @@ Car −1 e Des +1 com Con de volta ao original; escolher Anão duas vezes dá +2
 Correção sugerida: guardar a raça aplicada e, ao trocar, desfazer os ajustes
 dela antes de aplicar os da nova (ou só aplicar se a raça mudou). A web faz
 igual ao iPad por enquanto (paridade); corrigir nos dois juntos.
+
+## PENDENTE iPad (2026-10-13) — resumo das regras com asteriscos crus
+
+A lista do Rules Reference (`RulesCompendiumView.swift`, linha 216) mostra o
+`summary` com `Text(entry.summary)`. Com uma `String`, o SwiftUI não interpreta
+markdown, e 83 resumos aparecem com `**negrito**` e `*itálico*` crus (ex.:
+"**Alignment** is a shorthand…"). Correção sugerida: `Text(LocalizedStringKey(
+entry.summary))` ou `Text(AttributedString(markdown:))`, como o detalhe da regra
+já faz. Um `*` sem par (legenda "* = DM's choice") deve continuar como texto.
+A web corrigiu na v0.70.1 (`InlineMarkdown` no resumo). No `thac0berry-data`
+(2026-10-13), 12 resumos que eram nota de rodapé de tabela ganharam resumo de
+verdade e dois perderam a marca sem par (`scripts/fix_rule_summaries.py`): o
+`Resources/rules.json` daqui precisa de `python Scripts/sync_data.py` (o
+`data.yml` acusa a divergência até lá). Pendente também nos dados: 7 resumos
+que são uma tabela markdown inteira (CFH, CBH, WATW).
