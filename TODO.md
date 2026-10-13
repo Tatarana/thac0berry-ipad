@@ -6531,5 +6531,5 @@ A web corrigiu na v0.70.1 (`InlineMarkdown` no resumo). No `thac0berry-data`
 (2026-10-13), 12 resumos que eram nota de rodapé de tabela ganharam resumo de
 verdade e dois perderam a marca sem par (`scripts/fix_rule_summaries.py`): o
 `Resources/rules.json` daqui precisa de `python Scripts/sync_data.py` (o
-`data.yml` acusa a divergência até lá). Pendente também nos dados: 7 resumos
-que são uma tabela markdown inteira (CFH, CBH, WATW).
+`data.yml` acusa a divergência até lá). Na mesma data, 7 resumos que eram
+as linhas de uma tabela markdown (CFH, CBH, WATW) também ganharam uma frase.
