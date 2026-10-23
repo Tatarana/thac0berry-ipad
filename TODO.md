@@ -6554,3 +6554,8 @@ A página 4 da ficha (Reference Tables) ganhou:
   `RaceTables` e `raceAbilityRows`/`raceLevelLimits`/
   `constitutionSaveBonusRows` em `src/rules/raceKit.ts`. Raça em texto livre
   que não bate com a lista não mostra a seção.
+- **Druid** (web v0.102.1): era a única classe sem página 4. Ganhou a
+  progressão de magias de sacerdote (PHB Tabela 24), a tabela de Sabedoria e
+  a seção da raça, sem Turn Undead. No iPad: `hasReferencePage` passa a
+  incluir o Druid (o `rules-fixtures` gerado daqui muda junto; na web o teste
+  de paridade tem a exceção `webAhead`, que sai quando o iPad acompanhar).
