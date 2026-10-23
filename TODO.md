@@ -6533,3 +6533,24 @@ verdade e dois perderam a marca sem par (`scripts/fix_rule_summaries.py`): o
 `Resources/rules.json` daqui precisa de `python Scripts/sync_data.py` (o
 `data.yml` acusa a divergência até lá). Na mesma data, 7 resumos que eram
 as linhas de uma tabela markdown (CFH, CBH, WATW) também ganharam uma frase.
+
+## PENDENTE iPad (2026-10-23) — página 4: tabelas do Psionicist e da raça
+
+Feito primeiro na web (v0.102.0, decisão do usuário: o iPad fica para depois).
+A página 4 da ficha (Reference Tables) ganhou:
+
+- **Psionicist** (classe que o iPad ainda não tem; ver o pendente da classe):
+  CPsiH Tabelas 4 (progressão de poderes, linha do nível em destaque), 5
+  (potencial inerente, linha da Sabedoria), 6 (recuperação de PSPs), 14
+  (ataque × modos de defesa, colunas dos modos do personagem), 9 (armadura) e
+  3 (prêmios de XP). Na web: `PsionicistTables` em
+  `src/components/RecordPageFour.tsx`, dados em `src/rules/psionics.ts`.
+- **Seção "Race"** para toda classe com página 4 (`ClericReferencePage`,
+  `WizardReferencePage`, `WarriorReferencePage`, `RogueReferencePage`):
+  faixa e ajuste de cada atributo (PHB Tabelas 7 e 8, PWH, DoD), limites de
+  nível da raça por classe (DMG Tabela 7, PWH, CPsiH Tabela 1; a classe do
+  personagem em destaque) e, para anão, gnomo e halfling, a PHB Tabela 9
+  (bônus de resistência pela Constituição, linha da CON em destaque). Na web:
+  `RaceTables` e `raceAbilityRows`/`raceLevelLimits`/
+  `constitutionSaveBonusRows` em `src/rules/raceKit.ts`. Raça em texto livre
+  que não bate com a lista não mostra a seção.
