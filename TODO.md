@@ -6559,3 +6559,28 @@ A página 4 da ficha (Reference Tables) ganhou:
   a seção da raça, sem Turn Undead. No iPad: `hasReferencePage` passa a
   incluir o Druid (o `rules-fixtures` gerado daqui muda junto; na web o teste
   de paridade tem a exceção `webAhead`, que sai quando o iPad acompanhar).
+
+## PENDENTE iPad (2026-10-24) — proficiências bônus com a origem (`grantedBy`)
+
+Feito primeiro na web (v0.106.0). `ProficiencyEntry` ganhou o campo opcional
+`grantedBy: { kind: "kit" | "race" | "tribe", name }` (no schema pelo
+`Scripts/gen_library_schema.py`, `WEB_FIRST_PROPERTIES`/`ProficiencyGrant`,
+no branch `n3/imagem-do-desenho`). **O iPad atual ignora o campo ao ler e o
+perde ao salvar**: uma ficha aberta e salva no iPad volta a ter as bônus como
+proficiências comuns. Implementar no iPad:
+
+- o campo opcional no `ProficiencyEntry` (`decodeIfPresent`);
+- `addBonusProficiencies` (kit) e a tribo Vistani marcando a origem e com 0
+  slots; Endurance automática para anão (Complete Book of Dwarves, "0 Slots -
+  Dwarf");
+- ao trocar kit, raça ou tribo (e na troca de classe, que tira o kit), tirar
+  as bônus da origem antiga; perguntar antes de tirar uma já usada (Chk
+  preenchido): "Remove" tira, "Keep" a mantém como comprada (sem a marca,
+  com os slots do compêndio);
+- a etiqueta "kit"/"race"/"tribe" na linha.
+
+Na web: `grantProficiencies`, `revokeProficiencies`, `usedGrantedProficiencies`
+e `raceBonusProficiencies` em `src/rules/raceKit.ts`; a tela em
+`RecordHeader.regrant` (`src/components/RecordSheet.tsx`). Fichas antigas não
+são migradas (decisão do usuário): as bônus de kit gravadas antes continuam
+como comuns, com 1 slot.
