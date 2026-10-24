@@ -197,6 +197,29 @@ WEB_FIRST_PROPERTIES = {
             "anyOf": [{"$ref": "#/$defs/Psionics"}, {"type": "null"}],
             "description": "Bloco psiônico do Psionicist (feito primeiro na web, 2026-10-06; o iPad ainda não tem).",
         },
+        # Tribo de Vistani (2026-10-17; entrou direto no schema do thac0berry-data,
+        # sem passar por aqui — trazida em 2026-10-24 para o gerador bater).
+        "vistaniTribe": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "description": "Tribo de Vistani (Domains of Dread, Table 68; só faz sentido com a raça \"Half-Vistani\") — feito primeiro na web.",
+        },
+    },
+    # Proficiência bônus (2026-10-24): de onde ela veio, para sair junto com o
+    # kit/raça/tribo e não contar slots. Ausente = comprada pelo jogador.
+    "ProficiencyEntry": {
+        "grantedBy": {
+            "anyOf": [{"$ref": "#/$defs/ProficiencyGrant"}, {"type": "null"}],
+            "description": "Origem de uma proficiência bônus (kit, raça ou tribo); ausente/null = comprada pelo jogador.",
+        },
+    },
+}
+
+WEB_FIRST_DEFS["ProficiencyGrant"] = {
+    "type": "object",
+    "required": ["kind", "name"],
+    "properties": {
+        "kind": {"type": "string", "enum": ["kit", "race", "tribe"]},
+        "name": {"type": "string", "description": "Nome do kit, da raça ou da tribo que deu a proficiência."},
     },
 }
 
