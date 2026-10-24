@@ -212,6 +212,44 @@ WEB_FIRST_PROPERTIES = {
             "description": "Origem de uma proficiência bônus (kit, raça ou tribo); ausente/null = comprada pelo jogador.",
         },
     },
+    # Item mágico criado pelo mestre ou pelo jogador (2026-10-24; tabela
+    # custom_magic_item no backend): a linha guarda o id, a versão e uma cópia
+    # do item, para a ficha ficar legível sem o banco (backup, iPad, impressão).
+    "QuantifiedItem": {
+        "customItem": {
+            "anyOf": [{"$ref": "#/$defs/CustomItemSnapshot"}, {"type": "null"}],
+            "description": "Item mágico criado (mestre ou jogador): id e versão em custom_magic_item e a cópia dos dados; ausente/null = item do livro ou digitado.",
+        },
+    },
+}
+
+WEB_FIRST_DEFS["CustomMagicItemData"] = {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+        "name": {"type": "string"},
+        "category": {"type": "string", "description": "Categoria do compêndio (Weapon, Armor/Shield, Ring, Potion/Oil, Scroll/Book, Rod/Staff/Wand, Miscellaneous)."},
+        "summary": {"type": "string"},
+        "description": {"type": "string"},
+        "xpValue": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "goldValue": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "charges": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "attackBonus": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "damageBonus": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "acBonus": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "saveBonus": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "basedOn": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Id do item do livro de que foi copiado, se houver."},
+    },
+}
+
+WEB_FIRST_DEFS["CustomItemSnapshot"] = {
+    "type": "object",
+    "required": ["id", "version", "data"],
+    "properties": {
+        "id": {"type": "string", "description": "Id em custom_magic_item."},
+        "version": {"type": "integer", "description": "Versão do item quando a cópia foi feita."},
+        "data": {"$ref": "#/$defs/CustomMagicItemData"},
+    },
 }
 
 WEB_FIRST_DEFS["ProficiencyGrant"] = {
