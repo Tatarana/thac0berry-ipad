@@ -6597,3 +6597,12 @@ ser só o nome. Implementar no iPad: o campo opcional (`decodeIfPresent`),
 mostrar a cópia (nome, categoria, resumo, descrição, bônus) com a marca
 "homebrew" e, quando o iPad sincronizar com o backend, criar/editar o item e
 atualizar a cópia quando a versão do item for maior.
+
+## PENDENTE iPad (2026-10-24) — bônus de Inteligência nos slots nonweapon
+
+A web (v0.108.0) passou o bônus da Tabela 4 ("# of Languages") dos slots de
+proficiência de **arma** para os slots **nonweapon**, como no PHB (cap. 5). O
+iPad ainda soma o bônus nos slots de arma (`totalWeaponSlots` com a
+Inteligência, na linha "Weapon Proficiency Slots"). Implementar no iPad: tirar
+o bônus do total de arma e somá-lo ao total nonweapon (a web mostra
+"Nonweapon Proficiency Slots: usados/total (N left)" em Proficiencies).
