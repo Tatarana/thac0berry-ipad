@@ -6584,3 +6584,16 @@ e `raceBonusProficiencies` em `src/rules/raceKit.ts`; a tela em
 `RecordHeader.regrant` (`src/components/RecordSheet.tsx`). Fichas antigas não
 são migradas (decisão do usuário): as bônus de kit gravadas antes continuam
 como comuns, com 1 slot.
+
+## PENDENTE iPad (2026-10-24) — itens mágicos criados pelo mestre ou jogador
+
+Feito primeiro na web. Backend: tabela `custom_magic_item` (dono; mestre da
+campanha lê também os privados dos jogadores; membros leem os compartilhados;
+só o dono grava). Ficha: `QuantifiedItem.customItem` (`{ id, version, data }`,
+no schema pelo gerador, `WEB_FIRST_PROPERTIES`/`CustomItemSnapshot`/
+`CustomMagicItemData`, no branch `n3/imagem-do-desenho`). **O iPad atual
+ignora o campo ao ler e o perde ao salvar**: a linha de Magic Items volta a
+ser só o nome. Implementar no iPad: o campo opcional (`decodeIfPresent`),
+mostrar a cópia (nome, categoria, resumo, descrição, bônus) com a marca
+"homebrew" e, quando o iPad sincronizar com o backend, criar/editar o item e
+atualizar a cópia quando a versão do item for maior.
