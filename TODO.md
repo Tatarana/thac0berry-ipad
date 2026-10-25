@@ -6628,3 +6628,16 @@ proteção), a CA final = Armor + DEX − itens em uso, com as regras do DMG (an
 de proteção sem armadura mágica e sem somar com outro anel; manto de proteção
 sem armadura mágica nem escudo), e o "?" com o racional. Referência:
 `thac0berry-web/src/rules/armorClass.ts`.
+
+## PENDENTE iPad (2026-10-24) — AC: alinhar a caixa ARMOR com a web
+
+A web (v0.113.0) usa os mesmos campos `armorRating`/`shieldRating` do
+`ArmorPickerSheet` e também recalcula a caixa ARMOR (`armorClass`) quando a
+armadura ou o escudo mudam, mas **sem** tirar o bônus dos itens mágicos: na
+web ele sai da CA final (Armor + DEX − itens em uso, ver a pendência do bônus
+de AC dos itens). O `ConsequenceEngine.recalculateArmorClass` do iPad ainda
+desconta o `acBonus` do catálogo na caixa; com a web, ele contaria duas vezes.
+Alinhar: a caixa = armadura (sem armadura, 10, e não 0) + escudo; o bônus
+mágico só na CA final. A web também grava os nomes das peças em
+`combat.typeWorn` e calcula Shieldless AC (sem escudo comum nem mágico) e Rear
+AC (também sem o bônus de DEX). Referência: `thac0berry-web/src/rules/armorClass.ts`.
