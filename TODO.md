@@ -6641,3 +6641,11 @@ Alinhar: a caixa = armadura (sem armadura, 10, e não 0) + escudo; o bônus
 mágico só na CA final. A web também grava os nomes das peças em
 `combat.typeWorn` e calcula Shieldless AC (sem escudo comum nem mágico) e Rear
 AC (também sem o bônus de DEX). Referência: `thac0berry-web/src/rules/armorClass.ts`.
+
+## PENDENTE iPad (2026-10-25) — XP mínimo do nível
+
+A web (v0.114.0), ao mudar o nível, sobe o XP da ficha para o XP base do nível
+se ele estiver abaixo (nunca baixa). Multiclasse: classes × o maior requisito
+(o XP é dividido igualmente); classe dupla: só a classe atual. Fazer o mesmo
+no `onChange` de `level` (e no nível das outras classes do multiclasse).
+Referência: `minimumExperience` em `thac0berry-web/src/rules/multiclass.ts`.
