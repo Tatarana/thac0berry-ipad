@@ -6616,3 +6616,15 @@ nela os itens de Magic Items da ficha que têm funções, uma linha por função
 sem repetir os herdados do dia anterior. No iPad: trazer os dados
 (`python Scripts/sync_data.py`), decodificar `power.uses` como opcional
 (`decodeIfPresent`) e fazer o mesmo em `startSpellSheet`.
+
+## PENDENTE iPad (2026-10-24) — bônus de AC dos itens mágicos
+
+A web (v0.112.0) gravou dois campos novos na linha de Magic Items
+(`QuantifiedItem.acBonus` e `worn`; no schema pelo gerador,
+`WEB_FIRST_PROPERTIES`). **O iPad atual ignora os campos ao ler e os perde ao
+salvar.** Implementar: os campos opcionais (`decodeIfPresent`), o bônus
+sugerido (item criado, ou "+N" do nome de armadura, escudo ou item de
+proteção), a CA final = Armor + DEX − itens em uso, com as regras do DMG (anel
+de proteção sem armadura mágica e sem somar com outro anel; manto de proteção
+sem armadura mágica nem escudo), e o "?" com o racional. Referência:
+`thac0berry-web/src/rules/armorClass.ts`.
