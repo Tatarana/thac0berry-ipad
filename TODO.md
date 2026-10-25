@@ -6606,3 +6606,13 @@ iPad ainda soma o bônus nos slots de arma (`totalWeaponSlots` com a
 Inteligência, na linha "Weapon Proficiency Slots"). Implementar no iPad: tirar
 o bônus do total de arma e somá-lo ao total nonweapon (a web mostra
 "Nonweapon Proficiency Slots: usados/total (N left)" em Proficiencies).
+
+## PENDENTE iPad (2026-10-24) — itens que lançam magias na spell sheet
+
+O `thac0berry-data` ganhou `power.uses` nos itens mágicos (funções do item:
+nome, magia equivalente, cargas por uso, limite por dia, efeito; lote 1 com os
+Rods/Staves/Wands do DMG). A web (v0.111.0), ao criar uma spell sheet, põe
+nela os itens de Magic Items da ficha que têm funções, uma linha por função,
+sem repetir os herdados do dia anterior. No iPad: trazer os dados
+(`python Scripts/sync_data.py`), decodificar `power.uses` como opcional
+(`decodeIfPresent`) e fazer o mesmo em `startSpellSheet`.
